@@ -1,8 +1,8 @@
 # Build, testes e publicação.
 #
-# Roda em todo push, de qualquer branch: assim dá para validar
-# uma mudança num branch ANTES de ela chegar na main. Publicar imagens, criar
-# release e fazer deploy acontecem só na main e só com tudo verde.
+# Roda só em push na main (o dono não usa branches: valida com
+# `npm run verificar` local e sobe direto). Publicar imagens, criar release e
+# fazer deploy acontecem só com tudo verde.
 #
 #   1. verificar  tipos, build do Next e testes do serviço de WhatsApp
 #   2. stack      monta as 3 imagens (linux/arm64), sobe a stack inteira num
@@ -20,7 +20,7 @@ name: principal
 
 on:
   push:
-    branches: ["**"]
+    branches: [main]
   workflow_dispatch:
 
 # Na main os runs entram em fila (cada um vira uma release). Nos outros

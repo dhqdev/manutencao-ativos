@@ -18,8 +18,8 @@ cara do que já existe: mesmo idioma, mesmas camadas, mesma segurança.
   (`criarUsuario`, `textoObrigatorio`, `Resultado`, `erroBanco`). Termos técnicos
   que não têm tradução natural ficam em inglês (`cache`, `token`, `bucket`).
 - Comentários explicam **o porquê** (a regra, o risco evitado), não o óbvio.
-- Fluxo de entrega combinado com o dono: o código chega na **`main`** já
-  validado. Cada push verde na main gera a release `vAAAA.MM.DD-N` (N = número
+- Fluxo de entrega combinado com o dono: `npm run verificar` local e push
+  **direto na `main`** (sem branch). Cada push verde na main gera a release `vAAAA.MM.DD-N` (N = número
   do run) com as imagens `app`, `whatsapp` e `ops` no ghcr.io. Main vermelha é
   falha nossa: veja a seção 6.
 
@@ -239,11 +239,13 @@ npm run testar       # só os testes de unidade (testes/unidade, node:test)
 
 - `scripts/verificar.sh` é **o mesmo** passo do job `verificar` do Actions e
   roda sozinho no `git push` (pre-push). Não use `--no-verify` para "resolver".
-- O e2e e a stack (Swarm) só rodam no Actions. Mudou tela, fluxo, SQL, infra
-  ou o próprio `testes/`? **Suba primeiro num branch** (`git push origin
-  HEAD:claude/<algo>`): o workflow roda em todo branch, sem publicar nada.
-  Só depois do run verde, leve o commit para a `main`. Iterar o e2e direto na
-  main foi o que deixou 8 runs vermelhos seguidos.
+- Sem branches: o dono pediu (19/11/2026) que tudo vá **direto para a
+  `main`**, e o Actions roda só lá. Por isso o `npm run verificar` local é a
+  barreira antes do push. O e2e e a stack (Swarm) só rodam no Actions: mudou
+  tela, fluxo, SQL, infra ou `testes/`? Confira com cuidado (tela no
+  navegador, SQL num Postgres de verdade) antes de subir, e acompanhe o run
+  da main até ficar verde. Se ficar vermelho, corrija na hora com um commit
+  novo.
 - `package-lock.json` sempre em sincronia (`npm install` e commite o lock);
   o CI usa `npm ci` estrito.
 - O CI (`.github/workflows/principal.yml`) sobe a stack inteira num Swarm,
