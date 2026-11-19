@@ -325,6 +325,13 @@ docker exec -it $(docker ps -qf name=manutencao_db) psql -U postgres -d manutenc
   "update auth.users set encrypted_password = crypt('NovaSenha123', gen_salt('bf', 10)) where email = 'dono@empresa.com.br'"
 ```
 
+### Assistente de IA (Groq, opcional)
+
+Crie uma chave em [console.groq.com/keys](https://console.groq.com/keys) e
+cole no console do superadmin, aba **Integrações** → **Groq**. Não é variável
+da stack: vale na hora, sem deploy. O servidor precisa sair para
+`https://api.groq.com` (porta 443). Use **Testar conexão** para conferir.
+
 ### E-mail de recuperação de senha (opcional)
 
 Preencha `SMTP_*` no `.env` (qualquer provedor SMTP: o do seu domínio,

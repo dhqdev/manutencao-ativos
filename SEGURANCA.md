@@ -325,3 +325,22 @@ controla o servidor. Por isso:
   PostgREST e Traefik não mudam.
 - Uma atualização por vez (índice único); pedido interrompido vira erro quando
   o atualizador reinicia.
+
+## Assistente de IA (Groq) e credenciais do console
+
+- A chave do Groq fica em `sistema_credenciais` (RLS ligado, nenhuma policy,
+  só `service_role`). Só as ações do console gravam, depois de conferir na
+  sessão do banco que quem pediu é o superadmin. A tela recebe apenas se a
+  chave existe e os 4 últimos caracteres.
+- O modelo não monta SQL. Ele escolhe entre ferramentas fixas
+  (`lib/assistente-ferramentas.ts`): tabela e colunas de uma lista fechada,
+  operadores de uma lista fechada, valores passados como parâmetro. Colunas
+  sensíveis (caminho de anexo, ids de usuário) não estão na lista.
+- As consultas rodam com o JWT de quem perguntou (`createClient`, RLS) e com
+  `org_id` da empresa aberta: o assistente vê o mesmo que a pessoa vê nas
+  telas. Não existe ferramenta de escrita.
+- O que vai para o Groq: a pergunta, a conversa da aba e as linhas que o
+  modelo consultou. Dados da empresa saem do servidor para a API do Groq;
+  sem chave cadastrada, nada sai.
+- Freio de 15 perguntas por minuto por pessoa (protege a cota do Groq) e
+  resultado de cada consulta cortado em ~12 mil caracteres.

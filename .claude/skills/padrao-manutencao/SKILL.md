@@ -97,6 +97,18 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   - Toda ação começa com `exigirSuperadmin()` (`lib/actions/admin.ts`), que
     confere `obterSessao().superadmin` — o posto vem do banco a cada
     requisição, nunca do cookie.
+- Credenciais de serviços externos (Groq, Backblaze...) **não** viram
+  variável da stack: o superadmin cola na aba **Integrações** do console
+  (`components/admin/integracoes.tsx`, um cartão por serviço dentro de
+  `IntegracoesAdmin`). Ficam em `sistema_credenciais` (chave/valor, só
+  `service_role`, `db/sql/70-integracoes.sql`); leia no servidor com
+  `obterCredenciais()` (`lib/integracoes.ts`) e mande para a tela só se existe
+  e o final (nunca o valor). Campo de chave em branco = manter a atual.
+- Assistente de IA (`/assistente`, Groq): o modelo só chama as ferramentas de
+  `lib/assistente-ferramentas.ts` (tabelas/colunas em lista fechada, só
+  leitura) e `lib/assistente.ts` executa com `createClient()` + `org_id` da
+  empresa aberta. Tabela nova que o cliente deveria poder perguntar ⇒ entre
+  em `TABELAS` (sem colunas sensíveis: caminho de arquivo, ids de usuário).
 - Arquivos: o navegador sobe direto para `/api/arquivos` com token de envio
   (`criarUploadAssinado`); o caminho começa sempre por `{org_id}/`. Ao apagar
   linhas com anexos/fotos, chame `removerArquivos()` depois.
@@ -117,9 +129,9 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
     estranho não derruba o deploy. Regra nova de valor vai lá.
   - `60-equipe.sql` `equipe_acessos()`: último acesso e sessões abertas da
     equipe (dados de `auth.*` que o PostgREST não expõe)
-  - `71-backup.sql` `sistema_credenciais` (credenciais das integrações,
-    chave/valor, só service_role), `sistema_backups` (rodadas e pedidos de
-    "backup agora") e `sistema_backup_servico` (sinal de vida)
+  - `70-integracoes.sql` `sistema_credenciais` (chaves do console)
+  - `71-backup.sql` `sistema_backups` (rodadas e pedidos de "backup agora")
+    e `sistema_backup_servico` (sinal de vida do serviço backup)
   - Coisa nova grande: crie `40-<assunto>.sql` em vez de inchar os outros.
 - Tabela nova: `org_id ... references organizacoes on delete cascade`, índice
   em `org_id`, `enable row level security` e policies separadas por comando
@@ -216,11 +228,8 @@ Variável nova de ambiente ⇒ atualize **todos** estes lugares no mesmo commit:
   desloga todo mundo.
 - Scripts da imagem `ops` (`db/scripts/*.sh`) são `sh` POSIX (Alpine/busybox):
   nada de bash-ismos. Comando novo da imagem ⇒ `entrypoint.sh`.
-- Integrações (aba do console): credencial de serviço de fora vai em
-  `sistema_credenciais` (uma linha por chave, `b2_*`, `groq_*`...), um cartão
-  por serviço. Segredo **nunca** volta para o navegador: a tela mostra só
-  `finalDoSegredo()` e campo secreto em branco = manter o salvo. Teste a
-  credencial na API do serviço antes de gravar.
+- Credencial nova de integração (seção 2): teste na API do serviço antes de
+  gravar (como `testarB2()` em `lib/backup.ts`).
 - Backup: `db/scripts/backup.sh` (local + Backblaze B2 via `rclone` com
   configuração por variáveis de ambiente, sem arquivo de config). As
   credenciais do B2 vêm do console (`sistema_credenciais`, relidas a cada

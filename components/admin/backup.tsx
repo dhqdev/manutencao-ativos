@@ -51,6 +51,7 @@ export function CartaoBackup({ situacao }: { situacao: SituacaoBackup }) {
   return (
     <Secao
       titulo="Backup no Backblaze B2"
+      className="lg:col-span-2"
       acoes={
         <Botao
           variante="secundario"

@@ -2,10 +2,17 @@ import { Abas } from "@/components/abas";
 import { CartaoAtualizacao } from "@/components/admin/atualizacao";
 import { CartaoBackup } from "@/components/admin/backup";
 import { UsoClientes } from "@/components/admin/clientes";
+import { CartaoGroq, IntegracoesAdmin } from "@/components/admin/integracoes";
 import { ehFiltroUsuario } from "@/components/admin/tipos";
 import { ListaUsuarios } from "@/components/admin/usuarios";
 import { Cabecalho } from "@/components/ui";
-import { carregarEmpresas, carregarUso, carregarUsuarios, exigirSuperadminTela } from "@/lib/admin-console";
+import {
+  carregarEmpresas,
+  carregarGroq,
+  carregarUso,
+  carregarUsuarios,
+  exigirSuperadminTela,
+} from "@/lib/admin-console";
 import { situacaoAtualizacao } from "@/lib/atualizacao";
 import { urlSite } from "@/lib/auth/config";
 import { situacaoBackup } from "@/lib/backup";
@@ -13,10 +20,10 @@ import { situacaoBackup } from "@/lib/backup";
 export const metadata = { title: "Gerência · Console do superadmin" };
 
 /**
- * A única tela do console do superadmin: gerência dos usuários e, na outra
- * aba, quanto cada cliente usa e se o WhatsApp dele está conectado; na
- * terceira, as integrações (credenciais do Backblaze B2 e o backup). A versão
- * do sistema (com o botão Atualizar) fica num bloco abaixo.
+ * A única tela do console do superadmin: gerência dos usuários, quanto cada
+ * cliente usa e se o WhatsApp dele está conectado, e as integrações (chaves de
+ * serviços externos: o Groq do assistente e o Backblaze B2 do backup). A
+ * versão do sistema (com o botão Atualizar) fica num bloco abaixo.
  */
 export default async function ConsoleAdmin({
   searchParams,
@@ -24,11 +31,12 @@ export default async function ConsoleAdmin({
   searchParams: Promise<{ filtro?: string; aba?: string }>;
 }) {
   const sessao = await exigirSuperadminTela();
-  const [{ filtro, aba }, usuarios, empresas, atualizacao, backup] = await Promise.all([
+  const [{ filtro, aba }, usuarios, empresas, atualizacao, groq, backup] = await Promise.all([
     searchParams,
     carregarUsuarios(),
     carregarEmpresas(),
     situacaoAtualizacao(),
+    carregarGroq(),
     situacaoBackup(),
   ]);
   const uso = empresas.dados ? await carregarUso(empresas.dados.map((e) => e.id)) : null;
@@ -38,7 +46,7 @@ export default async function ConsoleAdmin({
     <>
       <Cabecalho
         titulo="Gerência"
-        descricao="Usuários de todo o sistema e o uso de cada cliente. Clique num usuário para ver os detalhes e as ações."
+        descricao="Usuários de todo o sistema, o uso de cada cliente e as integrações. Clique num usuário para ver os detalhes e as ações."
       />
       {erro ? (
         <p className="card px-5 py-4 text-sm text-red-700">
@@ -79,10 +87,18 @@ export default async function ConsoleAdmin({
             {
               id: "integracoes",
               rotulo: "Integrações",
+              // Credenciais de serviços externos (Groq, Backblaze...), em sistema_credenciais.
               conteudo: (
-                <div className="grid gap-6">
+                <IntegracoesAdmin>
+                  {groq.dados ? (
+                    <CartaoGroq situacao={groq.dados} />
+                  ) : (
+                    <p className="card px-5 py-4 text-sm text-red-700">
+                      Não foi possível ler as integrações: {groq.erro}. Confira se o migrador da versão nova rodou.
+                    </p>
+                  )}
                   <CartaoBackup situacao={backup} />
-                </div>
+                </IntegracoesAdmin>
               ),
             },
           ]}

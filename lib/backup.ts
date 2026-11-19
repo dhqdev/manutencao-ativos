@@ -1,5 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/db/admin";
+import { obterCredenciais } from "@/lib/integracoes";
 import { CHAVES_B2, DIAS_PADRAO, PASTA_PADRAO, finalDoSegredo, type ChaveB2 } from "@/lib/backup-regras";
 
 /**
@@ -53,12 +54,7 @@ export type SituacaoBackup = {
 
 /** Credenciais do B2 como estão no banco (com os segredos: uso só no servidor). */
 export async function credenciaisB2(): Promise<Partial<Record<ChaveB2, string>>> {
-  const { data, error } = await createAdminClient()
-    .from("sistema_credenciais")
-    .select("chave, valor")
-    .in("chave", [...CHAVES_B2]);
-  if (error) throw new Error(error.message);
-  return Object.fromEntries((data ?? []).map((l) => [l.chave, l.valor])) as Partial<Record<ChaveB2, string>>;
+  return obterCredenciais([...CHAVES_B2]);
 }
 
 export async function situacaoBackup(): Promise<SituacaoBackup> {
