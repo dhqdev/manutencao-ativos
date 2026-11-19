@@ -5,7 +5,9 @@
 #                 Docker Swarm, verifica segurança/cron/banco/backup, roda o
 #                 teste ponta a ponta no Chromium e, se tudo passar, publica
 #                 as imagens no GitHub Container Registry
-#   3. deploy     (opcional) atualiza o servidor por SSH — liga sozinho quando
+#   3. release    cria a release do GitHub (vAAAA.MM.DD-N) com notas dos
+#                 commits, tags das imagens e o pacote infra/ anexado
+#   4. deploy     (opcional) atualiza o servidor por SSH — liga sozinho quando
 #                 a variável DEPLOY_HOST estiver configurada no repositório
 #
 # Tudo roda em runner ARM64 nativo (mesma arquitetura da Oracle Ampere).
@@ -73,8 +75,14 @@ jobs:
       packages: write
     env:
       TAG: ${{ github.sha }}
+    outputs:
+      versao: ${{ steps.versao.outputs.versao }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Versão
+        id: versao
+        run: echo "versao=v$(date -u +%Y.%m.%d)-${{ github.run_number }}" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@v3
 
@@ -158,13 +166,64 @@ jobs:
           if-no-files-found: ignore
 
       - name: Publicar imagens no GHCR (só com tudo verde)
+        env:
+          VERSAO: ${{ steps.versao.outputs.versao }}
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
           for imagem in app whatsapp ops; do
-            docker tag "$IMAGEM_BASE/$imagem:$TAG" "$IMAGEM_BASE/$imagem:latest"
-            docker push "$IMAGEM_BASE/$imagem:$TAG"
-            docker push "$IMAGEM_BASE/$imagem:latest"
+            for etiqueta in "$VERSAO" latest; do
+              docker tag "$IMAGEM_BASE/$imagem:$TAG" "$IMAGEM_BASE/$imagem:$etiqueta"
+            done
+            for etiqueta in "$TAG" "$VERSAO" latest; do
+              docker push "$IMAGEM_BASE/$imagem:$etiqueta"
+            done
           done
+
+  release:
+    needs: stack
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      VERSAO: ${{ needs.stack.outputs.versao }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pacote de instalação
+        run: |
+          pasta="manutencao-$VERSAO"
+          mkdir -p "pacote/$pasta/infra"
+          cp infra/stack.yml infra/traefik.yml infra/deploy.sh infra/preparar-servidor.sh infra/.env.exemplo "pacote/$pasta/infra/"
+          cp INSTALACAO.md WHATSAPP.md SEGURANCA.md "pacote/$pasta/"
+          tar -czf "infra-$VERSAO.tar.gz" -C pacote "$pasta"
+
+      - name: Criar a release
+        run: |
+          {
+            echo "Versão testada no GitHub Actions: build ARM64, stack completa num Docker Swarm de teste e teste ponta a ponta no navegador."
+            echo
+            echo "## Imagens (linux/arm64)"
+            echo
+            for imagem in app whatsapp ops; do
+              echo "- \`$IMAGEM_BASE/$imagem:$VERSAO\`"
+            done
+            echo
+            echo "## Instalar ou atualizar esta versão"
+            echo
+            echo '```bash'
+            echo "cd /opt/manutencao/infra && TAG=$VERSAO ./deploy.sh"
+            echo '```'
+            echo
+            echo "Commit: $GITHUB_SHA · Guia: INSTALACAO.md (também no pacote anexo)."
+          } > notas.md
+          gh release create "$VERSAO" "infra-$VERSAO.tar.gz" \
+            --target "$GITHUB_SHA" \
+            --title "$VERSAO" \
+            --notes-file notas.md \
+            --generate-notes \
+            --latest
 
   deploy:
     needs: stack

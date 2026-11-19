@@ -144,10 +144,26 @@ servidor.listen(config.porta, "0.0.0.0", () => {
     "servidor de WhatsApp no ar",
   );
 
-  restaurarSessoes()
-    .then((n) => logger.info({ sessoes: n }, "restaurando sessões salvas"))
-    .catch((err) => logger.error({ err }, "falha ao restaurar sessões (confira POSTGREST_URL, JWT_SECRET e se o migrador já rodou)"));
+  restaurarComInsistencia();
 });
+
+/**
+ * No boot do servidor (ou num deploy da stack inteira) este serviço pode subir
+ * antes do banco e do PostgREST. Em vez de desistir, tenta de novo com espera
+ * crescente até conseguir religar as sessões salvas.
+ */
+function restaurarComInsistencia(tentativa = 1) {
+  restaurarSessoes()
+    .then((n) => logger.info({ sessoes: n, tentativa }, "restaurando sessões salvas"))
+    .catch((err) => {
+      const espera = Math.min(60_000, 2000 * 2 ** Math.min(tentativa, 5));
+      logger.warn(
+        { err, tentativa },
+        `banco indisponível ao restaurar sessões; tentando de novo em ${espera / 1000}s (confira POSTGREST_URL, JWT_SECRET e o migrador)`,
+      );
+      setTimeout(() => restaurarComInsistencia(tentativa + 1), espera);
+    });
+}
 
 let desligando = false;
 async function desligar(sinal) {

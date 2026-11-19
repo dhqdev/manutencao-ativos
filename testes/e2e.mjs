@@ -99,10 +99,18 @@ await passo("cadastra um ativo com foto (upload para /api/arquivos)", async () =
 });
 
 await passo("a foto do ativo abre (link assinado)", async () => {
-  const leitura = respostaDeArquivo("GET");
   await page.getByText("Trator E2E").first().click();
   await page.waitForURL(/\/ativos\/[0-9a-f-]{36}$/);
-  const r = await leitura;
+  // A miniatura da lista já usou o mesmo link (validade arredondada para a
+  // hora cheia): a foto pode vir do cache, sem nova requisição. Por isso
+  // confere a imagem na tela e baixa o link à parte.
+  const foto = page.locator('img[alt="Foto de Trator E2E"]');
+  await foto.waitFor();
+  await page.waitForFunction(() => {
+    const i = document.querySelector('img[alt="Foto de Trator E2E"]');
+    return i && i.complete && i.naturalWidth > 0;
+  });
+  const r = await page.request.get(await foto.getAttribute("src"));
   verdade(r.status() === 200, `foto: ${r.status()}`);
   verdade(r.headers()["content-type"] === "image/png", `tipo: ${r.headers()["content-type"]}`);
 });

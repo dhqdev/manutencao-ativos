@@ -35,7 +35,8 @@ migrador · cron (resumo do WhatsApp) · backup diário
 | **traefik** | Porta de entrada, HTTPS automático, painel protegido por senha |
 
 Instalação no servidor (Oracle Cloud ARM64): **[INSTALACAO.md](INSTALACAO.md)**.
-Build e testes: GitHub Actions na `main` (`.github/workflows/principal.yml`).
+Build, testes e releases: GitHub Actions na `main` (`.github/workflows/principal.yml`) —
+cada push verde gera uma release `vAAAA.MM.DD-N` com as imagens e o pacote de instalação.
 
 ### O banco
 

@@ -10,8 +10,10 @@ internet ─► traefik ─► app ─► rest (PostgREST) ─► db (PostgreSQL
 migrador · cron · backup
 ```
 
-O GitHub Actions monta e testa as imagens a cada push na `main` e publica em
-`ghcr.io/dhqdev/manutencao-ativos/{app,whatsapp,ops}` (linux/arm64).
+O GitHub Actions monta e testa as imagens a cada push na `main`, publica em
+`ghcr.io/dhqdev/manutencao-ativos/{app,whatsapp,ops}` (linux/arm64) e cria uma
+**release** (`vAAAA.MM.DD-N`) com as notas dos commits, as tags das imagens e o
+pacote `infra/` anexado.
 
 ---
 
@@ -167,8 +169,9 @@ O job `deploy` copia `stack.yml`, `traefik.yml` e `deploy.sh` e roda
 
 **Atualizar:** push na `main` (com deploy automático) ou, na VM, `./deploy.sh`.
 
-**Voltar uma versão:** `TAG=<sha do commit> ./deploy.sh` (cada imagem publicada
-tem a tag do commit).
+**Voltar uma versão:** escolha a release na aba *Releases* do GitHub e rode
+`TAG=v2026.11.19-12 ./deploy.sh` (cada imagem tem a tag da release, do commit
+e `latest`).
 
 **Logs:** `docker service logs -f manutencao_<serviço>` (app, rest, db,
 whatsapp, cron, backup, migrador) e `docker service logs -f traefik_traefik`.
