@@ -136,8 +136,9 @@ h3 {
 
 /* ---------------------------------------------------------------------------
    Movimento
-   No celular as folhas sobem a partir da borda inferior; no desktop o diálogo
-   só aparece com um leve avanço. Quem pediu menos animação recebe menos.
+   No celular os modais descem da borda superior (folha-topo) e o menu "Mais"
+   sobe da barra inferior (folha); no desktop o diálogo só aparece com um leve
+   avanço. Quem pediu menos animação recebe menos.
 --------------------------------------------------------------------------- */
 @keyframes surgir {
   from {
@@ -151,6 +152,15 @@ h3 {
 @keyframes subir-folha {
   from {
     transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes descer-folha {
+  from {
+    transform: translateY(-100%);
   }
   to {
     transform: translateY(0);
@@ -174,6 +184,10 @@ h3 {
 
 @utility folha {
   animation: subir-folha 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@utility folha-topo {
+  animation: descer-folha 0.28s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 @utility dialogo {
@@ -359,6 +373,7 @@ h3 {
 @media (prefers-reduced-motion: reduce) {
   .veu,
   .folha,
+  .folha-topo,
   .dialogo,
   .entrada-pagina,
   .lista-escalonada > *,

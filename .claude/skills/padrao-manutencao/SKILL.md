@@ -155,7 +155,8 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   cookie `natal` deixa cada aparelho desligar. Decoração em
   `components/natal/decoracao.tsx` (luzes, neve no menu, gorro, trenó).
 - Tem que funcionar no celular (é PWA): barra inferior + menu "Mais"; modais
-  viram folha de baixo para cima. Item novo de menu vai em `MENU` de
+  viram folha que desce do topo (`Modal`, animação `folha-topo`); só o menu
+  "Mais" sobe da barra inferior. Item novo de menu vai em `MENU` de
   `components/shell/navegacao.tsx`, com o `grupo` (Operação, Análise,
   Administração); os 4 primeiros vão na barra inferior do celular.
 - Menu lateral (desktop) recolhe para só ícones (botão na borda ou Ctrl+B).
