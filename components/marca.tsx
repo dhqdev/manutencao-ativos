@@ -1,38 +1,48 @@
 /**
- * Identidade: uma porca sextavada (bolt/nut) — leitura imediata de manutenção
- * mecânica e legível até em 16px, no favicon.
+ * Identidade: um "M" de Manutenção cuja segunda perna sobe como um visto (✓)
+ * — o serviço feito. Traço único, sem detalhe fino: continua legível em 16px
+ * no favicon. O azul do selo é fixo (não usa `marca-*`, que muda no tema
+ * escuro) para a marca ser a mesma em qualquer tela.
+ *
+ * Os mesmos traços estão em app/icon.svg, app/apple-icon.svg e nos PNGs de
+ * public/icones (gerados por scripts/gerar-icones.mjs). Mudou aqui, gere de novo.
  */
+export const TRACO_MARCA = "M6.4 17.25V8.25l5.25 6 6-7.5";
+
 export function Simbolo({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden focusable="false">
       <path
-        d="M12 2.6 20.1 7.3v9.4L12 21.4 3.9 16.7V7.3z"
+        d={TRACO_MARCA}
         stroke="currentColor"
-        strokeWidth="1.8"
+        strokeWidth="2.4"
+        strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.8" />
     </svg>
   );
 }
 
+const TAMANHOS = {
+  sm: { caixa: "h-8 w-8 rounded-[9px]", icone: "h-5 w-5" },
+  md: { caixa: "h-9 w-9 rounded-[10px]", icone: "h-[22px] w-[22px]" },
+  lg: { caixa: "h-14 w-14 rounded-2xl", icone: "h-9 w-9" },
+} as const;
+
+/** Selo azul com o símbolo. Funciona sobre fundo claro e escuro sem variação. */
 export function Logo({
   tamanho = "md",
-  tom = "escuro",
+  className = "",
 }: {
-  tamanho?: "sm" | "md";
-  tom?: "escuro" | "claro";
+  tamanho?: keyof typeof TAMANHOS;
+  className?: string;
 }) {
-  const caixa = tamanho === "sm" ? "h-8 w-8" : "h-9 w-9";
-  const icone = tamanho === "sm" ? "h-4 w-4" : "h-[18px] w-[18px]";
-
+  const t = TAMANHOS[tamanho];
   return (
     <span
-      className={`flex ${caixa} shrink-0 items-center justify-center rounded-[10px] ${
-        tom === "claro" ? "bg-superficie text-slate-900" : "bg-slate-900 text-slate-50"
-      }`}
+      className={`relative flex ${t.caixa} shrink-0 items-center justify-center bg-gradient-to-br from-[#3b82f6] to-[#1d4ed8] text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.25),0_1px_2px_rgb(15_23_42/0.25),0_4px_14px_-4px_rgb(37_99_235/0.55)] ${className}`}
     >
-      <Simbolo className={icone} />
+      <Simbolo className={t.icone} />
     </span>
   );
 }

@@ -1,6 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180">
-  <rect width="180" height="180" rx="40" fill="#0F172A"/>
-  <path d="M90 33 139.4 61.5v57L90 147 40.6 118.5v-57z"
-        fill="none" stroke="#FFFFFF" stroke-width="11" stroke-linejoin="round"/>
-  <circle cx="90" cy="90" r="25" fill="none" stroke="#FFFFFF" stroke-width="11"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="180" height="180">
+  <defs>
+    <linearGradient id="fundo" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3B82F6"/>
+      <stop offset="1" stop-color="#1D4ED8"/>
+    </linearGradient>
+  </defs>
+  <rect width="24" height="24" fill="url(#fundo)"/>
+  <g transform="translate(12 12) scale(.82) translate(-12 -12)">
+    <path d="M6.4 17.25V8.25l5.25 6 6-7.5" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
 </svg>

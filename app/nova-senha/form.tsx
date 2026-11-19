@@ -4,7 +4,7 @@ import { startTransition, useActionState, useState } from "react";
 import { LoaderCircle } from "lucide-react";
 import { definirNovaSenha, type EstadoForm } from "@/app/auth/actions";
 import { CampoSenha, ForcaSenha, enviarSemLimpar } from "@/components/auth/campos";
-import { Alerta } from "@/components/auth/moldura";
+import { Alerta } from "@/components/auth/alerta";
 import { Botao } from "@/components/ui";
 
 export function FormNovaSenha() {

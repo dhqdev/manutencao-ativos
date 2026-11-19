@@ -1,14 +1,12 @@
 import { WifiOff } from "lucide-react";
-import { Simbolo } from "@/components/marca";
+import { Logo } from "@/components/marca";
 
 export const metadata = { title: "Sem conexão" };
 
 export default function Offline() {
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-slate-50 px-6 text-center">
-      <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-900 text-slate-50">
-        <Simbolo className="h-7 w-7" />
-      </span>
+      <Logo tamanho="lg" />
 
       <div>
         <h1 className="text-xl font-semibold tracking-tight text-slate-900">Você está sem conexão</h1>

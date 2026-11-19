@@ -4,7 +4,7 @@ import { startTransition, useActionState, useState } from "react";
 import { ArrowRight, Building2, CheckCircle2, LoaderCircle, Mail, MailCheck, Phone, User } from "lucide-react";
 import { cadastrar, type EstadoForm } from "@/app/auth/actions";
 import { CampoIcone, CampoSenha, ForcaSenha, enviarSemLimpar } from "@/components/auth/campos";
-import { Alerta } from "@/components/auth/moldura";
+import { Alerta } from "@/components/auth/alerta";
 import { BotaoLink, Botao } from "@/components/ui";
 
 export function FormCadastro() {

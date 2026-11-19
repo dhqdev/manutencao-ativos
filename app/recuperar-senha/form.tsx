@@ -4,7 +4,7 @@ import { startTransition, useActionState } from "react";
 import { LoaderCircle, Mail } from "lucide-react";
 import { recuperarSenha, type EstadoForm } from "@/app/auth/actions";
 import { CampoIcone, enviarSemLimpar } from "@/components/auth/campos";
-import { Alerta } from "@/components/auth/moldura";
+import { Alerta } from "@/components/auth/alerta";
 import { Botao } from "@/components/ui";
 
 export function FormRecuperar() {

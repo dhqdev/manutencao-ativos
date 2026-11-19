@@ -39,7 +39,7 @@ export function ConsoleAdmin({
       {/* ---------------- Lateral (desktop) ---------------- */}
       <aside className="tema-original no-print fixed inset-y-0 left-0 z-30 hidden w-64 flex-col bg-slate-900 lg:flex">
         <Link href="/admin" className="flex items-center gap-3 px-5 py-5">
-          <Logo tom="claro" />
+          <Logo />
           <div className="min-w-0">
             <p className="truncate text-[15px] font-semibold leading-tight tracking-tight text-white">Manutenção</p>
             <p className="flex items-center gap-1 truncate text-xs leading-tight text-amber-300">

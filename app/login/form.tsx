@@ -5,7 +5,7 @@ import { startTransition, useActionState } from "react";
 import { ArrowRight, LoaderCircle, Mail } from "lucide-react";
 import { entrar, type EstadoForm } from "@/app/auth/actions";
 import { CampoIcone, CampoSenha, enviarSemLimpar } from "@/components/auth/campos";
-import { Alerta } from "@/components/auth/moldura";
+import { Alerta } from "@/components/auth/alerta";
 import { Botao } from "@/components/ui";
 
 export function FormLogin({ destino, avisoInicial }: { destino?: string; avisoInicial?: string }) {

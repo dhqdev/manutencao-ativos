@@ -165,8 +165,18 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   caminho (cookie, como o tema), não `localStorage`. Com o menu recolhido, o
   nome vem da `Dica` (hover/foco) e de um texto `sr-only` no link.
 - Telas de entrada (`/login`, `/cadastro`, `/recuperar-senha`, `/nova-senha`)
-  usam `MolduraAuth` (`components/auth/moldura.tsx`) e os campos de
+  usam `MolduraAuth` (`components/auth/moldura.tsx`, server component: lê o
+  cookie do Natal para pôr o gorro e a neve) e os campos de
   `components/auth/campos.tsx` (`CampoSenha` já avisa Caps Lock ligado).
+  Formulário cliente importa `Alerta` de `components/auth/alerta.tsx`, nunca
+  de `moldura.tsx` (ela usa `next/headers`). A ilustração do painel é a
+  `Vitrine` (`components/auth/vitrine.tsx`): cartões de exemplo, `aria-hidden`.
+- Marca: `Logo` / `Simbolo` de `components/marca.tsx` (um "M" cuja segunda
+  perna vira um visto, num selo azul fixo que serve em fundo claro e escuro;
+  sem prop de tom). Mudou o traço (`TRACO_MARCA`)? Atualize `app/icon.svg` e
+  `app/apple-icon.svg`, rode `node scripts/gerar-icones.mjs` (PNGs do PWA) e
+  suba `VERSAO` em `public/sw.js` (os ícones ficam em cache). Gorro de Natal
+  vai num `span relative` em volta do `Logo`.
 - Formulário cliente: `useTransition` + chamar a action + mostrar `erro` +
   `router.refresh()` no sucesso (veja `FormModal` em `components/admin/comum.tsx`).
   Envolva a chamada em `chamarAcao(() => acao(fd))` (`lib/acao-cliente.ts`):

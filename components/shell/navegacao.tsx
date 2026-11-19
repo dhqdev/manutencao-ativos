@@ -146,7 +146,7 @@ export function Navegacao({
             aria-label={recolhido ? `${nomeEmpresa} · Dashboard` : undefined}
           >
             <span className="relative">
-              <Logo tom="claro" />
+              <Logo />
               {natal.ligado && <Gorro className="absolute -right-2 -top-3 h-6 w-6 rotate-[18deg]" />}
             </span>
             {recolhido ? (

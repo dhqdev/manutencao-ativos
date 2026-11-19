@@ -276,51 +276,20 @@ h3 {
   animation: reluzir 1.4s ease-in-out infinite;
 }
 
-/* Ilustração animada das telas de entrada */
-@keyframes girar {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes apertar {
+/* Cartões da vitrine das telas de entrada (components/auth/vitrine.tsx):
+   flutuam devagar, cada um no seu tempo. */
+@keyframes flutuar {
   0%,
   100% {
-    transform: rotate(-18deg);
+    transform: translateY(0);
   }
   50% {
-    transform: rotate(14deg);
+    transform: translateY(-6px);
   }
 }
 
-@keyframes piscar {
-  0%,
-  100% {
-    opacity: 0;
-    transform: scale(0.4);
-  }
-  40% {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@utility anim-girar {
-  animation: girar 12s linear infinite;
-}
-
-@utility anim-girar-reverso {
-  animation: girar 8s linear infinite reverse;
-}
-
-@utility anim-apertar {
-  animation: apertar 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
-}
-
-@utility anim-faisca {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: piscar 1.8s ease-out infinite;
+@utility anim-flutuar {
+  animation: flutuar 6s ease-in-out infinite;
 }
 
 /* ---------------------------------------------------------------------------
@@ -395,10 +364,7 @@ h3 {
   .lista-escalonada > *,
   .pop-in,
   .reluzente,
-  .anim-girar,
-  .anim-girar-reverso,
-  .anim-apertar,
-  .anim-faisca,
+  .anim-flutuar,
   .natal-luz,
   .natal-balanco {
     animation: none !important;

@@ -12,7 +12,8 @@
  * Nada de API nem de arquivos (/api/...) passa por aqui.
  */
 
-const VERSAO = "manutencao-v1";
+// Suba o número quando um arquivo sem hash no nome mudar (ex.: os ícones da marca).
+const VERSAO = "manutencao-v2";
 const CACHE_ESTATICO = `${VERSAO}-estatico`;
 const PAGINA_OFFLINE = "/offline";
 
