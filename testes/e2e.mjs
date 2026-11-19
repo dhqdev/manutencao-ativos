@@ -39,6 +39,17 @@ async function passo(nome, fn) {
     await page.screenshot({ path: `${base}.png`, fullPage: true }).catch(() => {});
     await writeFile(`${base}.html`, await page.content().catch(() => "")).catch(() => {});
     console.error(`\nURL: ${page.url()}\n`, e);
+    // O que a tela mostrava: campos inválidos, mensagens de erro e o diálogo aberto.
+    const tela = await page
+      .evaluate(() => ({
+        invalidos: [...document.querySelectorAll(":invalid")]
+          .filter((c) => c.name)
+          .map((c) => `${c.name}: ${c.validationMessage}`),
+        erros: [...document.querySelectorAll(".text-red-700, [role=alert]")].map((el) => el.textContent?.trim()),
+        dialogo: document.querySelector("[role=dialog]")?.textContent?.replace(/\s+/g, " ").slice(0, 1500) ?? null,
+      }))
+      .catch(() => null);
+    console.error("Tela no momento da falha:", JSON.stringify(tela, null, 2));
     if (errosDoNavegador.length) console.error("Erros no navegador:\n", errosDoNavegador.join("\n"));
     await navegador.close();
     process.exit(1);
