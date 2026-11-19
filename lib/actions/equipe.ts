@@ -6,7 +6,15 @@ import { createClient } from "@/lib/db/server";
 import { createAdminClient } from "@/lib/db/admin";
 import { gerarSenhaLegivel as gerarSenha, senhaValida } from "@/lib/auth/senhas";
 import { criarUsuario as criarLogin, definirSenha, excluirUsuario, usuarioPorId } from "@/lib/auth/usuarios";
-import { erroBanco, mensagemErro, texto, textoObrigatorio, type Resultado } from "@/lib/form";
+import {
+  emailValido,
+  erroBanco,
+  exigirId,
+  mensagemErro,
+  texto,
+  textoObrigatorio,
+  type Resultado,
+} from "@/lib/form";
 import type { PapelMembro } from "@/lib/types";
 
 const PAPEIS_CONVIDAVEIS: PapelMembro[] = ["gestor", "tecnico", "leitor"];
@@ -15,8 +23,18 @@ export type Credenciais =
   | { ok: true; nome: string; email: string; senha: string | null; aviso?: string }
   | { ok: false; erro: string };
 
+/** Papel escolhido ao convidar: vazio vira técnico (o padrão da tela). */
 function papelValido(valor: string | null): PapelMembro {
   return PAPEIS_CONVIDAVEIS.includes(valor as PapelMembro) ? (valor as PapelMembro) : "tecnico";
+}
+
+/**
+ * Papel ao ALTERAR alguém: valor fora da lista é recusado. Antes caía em
+ * "técnico" — um pedido malformado rebaixava o gestor sem ninguém perceber.
+ */
+function papelExato(valor: unknown): PapelMembro {
+  if (PAPEIS_CONVIDAVEIS.includes(valor as PapelMembro)) return valor as PapelMembro;
+  throw new Error("Escolha um papel válido: gestor, técnico ou leitor.");
 }
 
 /**
@@ -47,7 +65,7 @@ export async function criarUsuario(fd: FormData): Promise<Credenciais> {
     const papel = papelValido(texto(fd, "papel"));
     const senha = texto(fd, "senha") ?? gerarSenha();
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, erro: "E-mail inválido." };
+    if (!emailValido(email)) return { ok: false, erro: "E-mail inválido." };
     if (!senhaValida(senha)) return { ok: false, erro: "A senha deve ter entre 6 e 72 caracteres." };
 
     const admin = createAdminClient();
@@ -104,9 +122,12 @@ export async function adicionarMembro(fd: FormData): Promise<Resultado> {
     const { orgId } = await getContexto();
     const db = await createClient();
 
+    const email = textoObrigatorio(fd, "email", "o e-mail da pessoa").toLowerCase();
+    if (!emailValido(email)) return { ok: false, erro: "E-mail inválido." };
+
     const { error } = await db.rpc("adicionar_membro", {
       p_org: orgId,
-      p_email: textoObrigatorio(fd, "email", "o e-mail da pessoa"),
+      p_email: email,
       p_papel: papelValido(texto(fd, "papel")),
     });
 
@@ -121,13 +142,15 @@ export async function adicionarMembro(fd: FormData): Promise<Resultado> {
 
 export async function alterarPapel(userId: string, papel: PapelMembro): Promise<Resultado> {
   try {
+    exigirId(userId, "a pessoa");
+    const novoPapel = papelExato(papel);
     const { orgId } = await getContexto();
     const db = await createClient();
 
     const { error } = await db.rpc("alterar_papel_membro", {
       p_org: orgId,
       p_user: userId,
-      p_papel: papelValido(papel),
+      p_papel: novoPapel,
     });
     if (error) return erroBanco(error);
 
@@ -147,6 +170,7 @@ export async function alterarPapel(userId: string, papel: PapelMembro): Promise<
  */
 export async function redefinirSenha(userId: string): Promise<Credenciais> {
   try {
+    exigirId(userId, "a pessoa");
     const { orgId, userId: eu } = await exigirGestor();
     if (userId === eu) return { ok: false, erro: "Para trocar a sua senha, use \"Alterar senha\"." };
 
@@ -190,7 +214,11 @@ export async function redefinirSenha(userId: string): Promise<Credenciais> {
  */
 export async function removerMembro(userId: string): Promise<Resultado> {
   try {
-    const { orgId } = await getContexto();
+    exigirId(userId, "a pessoa");
+    const { orgId, userId: eu } = await getContexto();
+    // Tirar a si mesmo daqui podia apagar o próprio login no meio da sessão
+    // (a limpeza abaixo vale para quem só participa desta empresa).
+    if (userId === eu) return { ok: false, erro: "Você não pode remover a si mesmo da equipe." };
     const db = await createClient();
 
     const { error } = await db.rpc("remover_membro", { p_org: orgId, p_user: userId });

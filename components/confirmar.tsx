@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { LoaderCircle, Trash2, TriangleAlert } from "lucide-react";
 import { Modal, RodapeModal } from "@/components/modal";
 import { Botao, cn } from "@/components/ui";
+import { chamarAcao } from "@/lib/acao-cliente";
 import type { Resultado } from "@/lib/form";
 
 export function BotaoExcluir({
@@ -30,7 +31,7 @@ export function BotaoExcluir({
   function confirmar() {
     setErro(null);
     iniciar(async () => {
-      const r = await acao();
+      const r = await chamarAcao(acao);
       if (!r.ok) setErro(r.erro);
       else {
         setAberto(false);

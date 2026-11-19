@@ -9,6 +9,7 @@ import { senhaValida } from "@/lib/auth/senhas";
 import { definirSenha } from "@/lib/auth/usuarios";
 import {
   erroBanco,
+  exigirId,
   mensagemErro,
   texto,
   textoObrigatorio,
@@ -69,7 +70,7 @@ export async function trocarEmpresa(fd: FormData): Promise<Resultado> {
   try {
     const { userId } = await getContexto();
     const db = await createClient();
-    const orgId = textoObrigatorio(fd, "org_id", "a empresa");
+    const orgId = exigirId(textoObrigatorio(fd, "org_id", "a empresa"), "a empresa");
 
     const { data: membro } = await db
       .from("org_membros")

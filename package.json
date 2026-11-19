@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start -p 3001",
     "typecheck": "tsc --noEmit",
+    "testar": "node --import ./testes/unidade/registrar.mjs --test --test-reporter=spec testes/unidade/*.test.mjs",
     "verificar": "bash scripts/verificar.sh",
     "prepare": "git config core.hooksPath .githooks 2>/dev/null || true"
   },

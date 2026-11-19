@@ -4,6 +4,7 @@ import { useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Check, LoaderCircle } from "lucide-react";
 import { Botao } from "@/components/ui";
+import { chamarAcao } from "@/lib/acao-cliente";
 import type { Resultado } from "@/lib/form";
 
 /**
@@ -32,7 +33,7 @@ export function FormularioSalvar({
     setErro(null);
     setSucesso(false);
     iniciar(async () => {
-      const r = await acao(fd);
+      const r = await chamarAcao(() => acao(fd));
       if (!r.ok) {
         setErro(r.erro);
         return;

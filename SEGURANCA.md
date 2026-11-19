@@ -117,6 +117,24 @@ formulário público de cadastro) deixaria qualquer pessoa se colocar dentro de
 outra empresa. A troca de senha pelo gestor só vale para quem participa
 apenas daquela empresa, para um gestor não tomar a conta do dono de outra.
 
+### 10. Entrada do navegador ia crua para o banco
+
+Ids, tipos (enums) e números chegavam ao Postgres sem conferência: um id
+malformado ou um tipo inesperado voltava como erro do banco em inglês na tela,
+valores negativos (custo, horímetro, garantia) entravam e distorciam os totais,
+e `alterarPapel` com papel inválido rebaixava a pessoa para técnico em
+silêncio. Agora as server actions validam com `exigirId`, `opcao` e
+`naoNegativo` (`lib/form.ts`) antes de gravar, o papel inválido é recusado, o
+gestor não pode remover a si mesmo (a limpeza do login apagaria a própria
+conta no meio da sessão), e `db/sql/50-validacoes.sql` repete as regras de
+valor como `check` no banco.
+
+### 11. Sessão vencida aparecia como "NEXT_REDIRECT"
+
+As actions chamam `getContexto()` dentro do `try`; com a sessão vencida, o
+redirect para o login era engolido pelo `catch` e a tela mostrava
+"NEXT_REDIRECT". `mensagemErro()` agora relança os erros internos do Next.
+
 ---
 
 ## Content Security Policy

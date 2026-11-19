@@ -1,21 +1,28 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { hoje } from "@/lib/format";
+import { unstable_rethrow } from "next/navigation";
+import { hoje, somarDias, somarMeses } from "@/lib/format";
 import { getContexto } from "@/lib/session";
 import { createClient } from "@/lib/db/server";
 import {
   erroBanco,
   booleano,
   data,
+  dataValida,
+  exigirId,
+  idOpcional,
+  idValido,
   inteiro,
   mensagemErro,
+  naoNegativo,
   numero,
+  opcao,
   texto,
   textoObrigatorio,
   type Resultado,
 } from "@/lib/form";
-import { SEM_PERMISSAO, podeGerenciar } from "@/lib/permissoes";
+import { SEM_PERMISSAO, podeGerenciar, podeRegistrar } from "@/lib/permissoes";
 import { removerArquivos, urlsAssinadas } from "@/lib/arquivos";
 import type { TipoManutencao, UnidadePeriodicidade } from "@/lib/types";
 
@@ -25,24 +32,6 @@ function revalidarTudo() {
   revalidatePath("/calendario");
   revalidatePath("/relatorios");
   revalidatePath("/ativos", "layout");
-}
-
-/** Soma dias a uma data "AAAA-MM-DD" sem passar pelo fuso local. */
-function somarDias(iso: string, dias: number) {
-  const [a, m, d] = iso.split("-").map(Number);
-  const dt = new Date(Date.UTC(a, m - 1, d));
-  dt.setUTCDate(dt.getUTCDate() + dias);
-  return dt.toISOString().slice(0, 10);
-}
-
-/** Soma meses sem estourar para o mês seguinte (31/01 + 1 mês = 28/02). */
-function somarMeses(iso: string, meses: number) {
-  const [a, m, d] = iso.split("-").map(Number);
-  const dt = new Date(Date.UTC(a, m - 1, 1));
-  dt.setUTCMonth(dt.getUTCMonth() + meses);
-  const ultimoDia = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth() + 1, 0)).getUTCDate();
-  dt.setUTCDate(Math.min(d, ultimoDia));
-  return dt.toISOString().slice(0, 10);
 }
 
 type Db = Awaited<ReturnType<typeof createClient>>;
@@ -88,26 +77,54 @@ async function avancarPlano(
     .eq("id", planoId);
 }
 
+const TIPOS: TipoManutencao[] = ["preventiva", "corretiva", "preditiva", "inspecao", "melhoria"];
+const UNIDADES: UnidadePeriodicidade[] = ["dias", "meses", "horas"];
+
 export async function salvarManutencao(fd: FormData): Promise<Resultado> {
   try {
-    const { orgId, userId } = await getContexto();
+    const { orgId, userId, papel } = await getContexto();
+    if (!podeRegistrar(papel)) return { ok: false, erro: SEM_PERMISSAO };
     const db = await createClient();
 
-    const id = texto(fd, "id");
-    const ativoId = textoObrigatorio(fd, "ativo_id", "o ativo");
+    // Tudo é lido e conferido ANTES de gravar qualquer coisa. Antes, com
+    // "Repetir esta manutenção" marcado e a descrição vazia, a periódica era
+    // criada e só depois o registro falhava — sobrava uma periódica órfã.
+    const id = idOpcional(fd, "id", "a manutenção");
+    const ativoId = exigirId(textoObrigatorio(fd, "ativo_id", "o ativo"), "o ativo");
     const dataManutencao = data(fd, "data_manutencao") ?? hoje();
-    const horimetro = numero(fd, "horimetro");
-    const valor = numero(fd, "valor") ?? 0;
+    const horimetro = naoNegativo(numero(fd, "horimetro"), "o horímetro / KM");
+    const valor = naoNegativo(numero(fd, "valor"), "o valor") ?? 0;
     const responsavel = texto(fd, "responsavel");
 
-    let planoId = texto(fd, "plano_id");
+    const dados = {
+      org_id: orgId,
+      ativo_id: ativoId,
+      plano_id: idOpcional(fd, "plano_id", "a manutenção periódica"),
+      tipo: opcao(texto(fd, "tipo"), TIPOS, "corretiva", "o tipo de manutenção"),
+      data_manutencao: dataManutencao,
+      descricao: textoObrigatorio(fd, "descricao", "a descrição do serviço"),
+      pecas: texto(fd, "pecas"),
+      valor,
+      responsavel,
+      empresa: texto(fd, "empresa"),
+      nota_fiscal: texto(fd, "nota_fiscal"),
+      garantia_dias: naoNegativo(inteiro(fd, "garantia_dias", 0), "a garantia") ?? 0,
+      horimetro,
+      observacoes: texto(fd, "observacoes"),
+    };
 
     // "Repetir esta manutenção": cria o plano periódico junto com o registro,
     // para quem não quer sair da tela e cadastrar a preventiva à parte.
+    let planoCriado: string | null = null;
     if (booleano(fd, "criar_plano")) {
       const periodicidade = inteiro(fd, "plano_periodicidade_valor", 0) ?? 0;
-      const unidade = (texto(fd, "plano_periodicidade_unidade") ??
-        "meses") as UnidadePeriodicidade;
+      const unidade = opcao(
+        texto(fd, "plano_periodicidade_unidade"),
+        UNIDADES,
+        "meses",
+        "a unidade da periodicidade",
+      );
+      const tipoPlano = textoObrigatorio(fd, "plano_tipo", "o nome da manutenção periódica");
 
       if (periodicidade <= 0) {
         return { ok: false, erro: "Informe de quanto em quanto tempo ela se repete." };
@@ -124,7 +141,7 @@ export async function salvarManutencao(fd: FormData): Promise<Resultado> {
         .insert({
           org_id: orgId,
           ativo_id: ativoId,
-          tipo: textoObrigatorio(fd, "plano_tipo", "o nome da manutenção periódica"),
+          tipo: tipoPlano,
           periodicidade_valor: periodicidade,
           periodicidade_unidade: unidade,
           proxima_data:
@@ -145,37 +162,31 @@ export async function salvarManutencao(fd: FormData): Promise<Resultado> {
         .single();
 
       if (erroPlano) return erroBanco(erroPlano);
-      planoId = plano.id;
+      planoCriado = plano.id;
+      dados.plano_id = plano.id;
     }
 
-    const dados = {
-      org_id: orgId,
-      ativo_id: ativoId,
-      plano_id: planoId,
-      tipo: (texto(fd, "tipo") ?? "corretiva") as TipoManutencao,
-      data_manutencao: dataManutencao,
-      descricao: textoObrigatorio(fd, "descricao", "a descrição do serviço"),
-      pecas: texto(fd, "pecas"),
-      valor,
-      responsavel,
-      empresa: texto(fd, "empresa"),
-      nota_fiscal: texto(fd, "nota_fiscal"),
-      garantia_dias: inteiro(fd, "garantia_dias", 0) ?? 0,
-      horimetro,
-      observacoes: texto(fd, "observacoes"),
-    };
-
     const { data: linha, error } = id
-      ? await db.from("manutencoes").update(dados).eq("id", id).select("id").single()
+      ? await db
+          .from("manutencoes")
+          .update(dados)
+          .eq("id", id)
+          .eq("org_id", orgId)
+          .select("id")
+          .single()
       : await db
           .from("manutencoes")
           .insert({ ...dados, created_by: userId })
           .select("id")
           .single();
 
-    if (error) return erroBanco(error);
+    if (error) {
+      // O registro não entrou: desfaz a periódica criada para ele.
+      if (planoCriado) await db.from("planos_manutencao").delete().eq("id", planoCriado);
+      return erroBanco(error);
+    }
 
-    if (!id && planoId) await avancarPlano(db, planoId, dataManutencao, horimetro);
+    if (!id && dados.plano_id) await avancarPlano(db, dados.plano_id, dataManutencao, horimetro);
 
     revalidarTudo();
     return { ok: true, id: linha.id };
@@ -186,6 +197,7 @@ export async function salvarManutencao(fd: FormData): Promise<Resultado> {
 
 export async function excluirManutencao(id: string): Promise<Resultado> {
   try {
+    exigirId(id, "a manutenção");
     const { orgId } = await getContexto();
     const db = await createClient();
 
@@ -221,12 +233,10 @@ export type FiltroLimpeza = {
   ativoId?: string | null;
 };
 
-const DATA_ISO = /^\d{4}-\d{2}-\d{2}$/;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 /** Monta a consulta do histórico a limpar, sempre presa à empresa aberta. */
 async function consultaLimpeza(f: FiltroLimpeza) {
-  if (!DATA_ISO.test(f.de) || !DATA_ISO.test(f.ate)) throw new Error("Informe as duas datas.");
+  if (!dataValida(f.de) || !dataValida(f.ate)) throw new Error("Informe as duas datas.");
+  if (f.tipo !== "todos" && !TIPOS.includes(f.tipo)) throw new Error("Tipo de manutenção inválido.");
   if (f.de > f.ate) throw new Error("A data inicial não pode ser maior que a final.");
 
   const { orgId, papel } = await getContexto();
@@ -241,7 +251,7 @@ async function consultaLimpeza(f: FiltroLimpeza) {
     .lte("data_manutencao", f.ate);
 
   if (f.tipo !== "todos") q = q.eq("tipo", f.tipo);
-  if (f.ativoId && UUID.test(f.ativoId)) q = q.eq("ativo_id", f.ativoId);
+  if (f.ativoId && idValido(f.ativoId)) q = q.eq("ativo_id", f.ativoId);
 
   const { data, error } = await q;
   if (error) throw new Error(error.message);
@@ -324,6 +334,7 @@ export async function registrarAnexo(entrada: {
   tamanho: number | null;
 }): Promise<Resultado> {
   try {
+    exigirId(entrada.manutencaoId, "a manutenção");
     const { orgId } = await getContexto();
     const db = await createClient();
 
@@ -344,14 +355,14 @@ export async function registrarAnexo(entrada: {
     }
 
     // O caminho precisa começar pela pasta da própria empresa.
-    if (!entrada.path.startsWith(`${orgId}/${entrada.manutencaoId}/`)) {
+    if (!entrada.path.startsWith(`${orgId}/${entrada.manutencaoId}/`) || entrada.path.includes("..")) {
       return { ok: false, erro: "Caminho de arquivo inválido." };
     }
 
     const { error } = await db.from("manutencao_anexos").insert({
       org_id: orgId,
       manutencao_id: entrada.manutencaoId,
-      nome: entrada.nome,
+      nome: (entrada.nome || "arquivo").slice(0, 200),
       path: entrada.path,
       tipo_mime: entrada.tipoMime,
       tamanho: entrada.tamanho,
@@ -369,6 +380,7 @@ export async function registrarAnexo(entrada: {
 
 export async function excluirAnexo(id: string): Promise<Resultado> {
   try {
+    exigirId(id, "o anexo");
     const { orgId } = await getContexto();
     const db = await createClient();
 
@@ -391,17 +403,33 @@ export async function excluirAnexo(id: string): Promise<Resultado> {
   }
 }
 
-/** Gera links temporários (1h) para visualizar os anexos de uma manutenção. */
+/**
+ * Gera links temporários (1h) para visualizar os anexos de uma manutenção.
+ * Falha vira lista vazia: a tela mostra "sem anexos" em vez de quebrar o modal.
+ */
 export async function linksDosAnexos(manutencaoId: string) {
-  const db = await createClient();
-  const { data: anexos } = await db
-    .from("manutencao_anexos")
-    .select("*")
-    .eq("manutencao_id", manutencaoId)
-    .order("created_at");
+  if (!idValido(manutencaoId)) return [];
+  try {
+    const { orgId } = await getContexto();
+    const db = await createClient();
+    const { data: anexos, error } = await db
+      .from("manutencao_anexos")
+      .select("*")
+      .eq("manutencao_id", manutencaoId)
+      .eq("org_id", orgId)
+      .order("created_at");
 
-  if (!anexos?.length) return [];
+    if (error) {
+      console.error("[anexos] listar", error.message);
+      return [];
+    }
+    if (!anexos?.length) return [];
 
-  const urls = urlsAssinadas(anexos.map((a) => a.path));
-  return anexos.map((a, i) => ({ ...a, url: urls[i] }));
+    const urls = urlsAssinadas(anexos.map((a) => a.path));
+    return anexos.map((a, i) => ({ ...a, url: urls[i] }));
+  } catch (e) {
+    unstable_rethrow(e);
+    console.error("[anexos] listar", e);
+    return [];
+  }
 }

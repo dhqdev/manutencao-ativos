@@ -8,14 +8,20 @@ import {
   erroBanco,
   booleano,
   data,
+  exigirId,
+  idOpcional,
   inteiro,
   mensagemErro,
+  naoNegativo,
   numero,
+  opcao,
   texto,
   textoObrigatorio,
   type Resultado,
 } from "@/lib/form";
 import type { UnidadePeriodicidade } from "@/lib/types";
+
+const UNIDADES: UnidadePeriodicidade[] = ["dias", "meses", "horas"];
 
 function revalidar() {
   revalidatePath("/dashboard");
@@ -30,14 +36,14 @@ export async function salvarPlano(fd: FormData): Promise<Resultado> {
     const { orgId } = await getContexto();
     const db = await createClient();
 
-    const id = texto(fd, "id");
-    const unidade = (texto(fd, "periodicidade_unidade") ?? "meses") as UnidadePeriodicidade;
+    const id = idOpcional(fd, "id", "a manutenção periódica");
+    const unidade = opcao(texto(fd, "periodicidade_unidade"), UNIDADES, "meses", "a unidade da periodicidade");
     const periodicidade = inteiro(fd, "periodicidade_valor", 0) ?? 0;
 
     if (periodicidade <= 0) return { ok: false, erro: "A periodicidade deve ser maior que zero." };
 
     const proximaData = data(fd, "proxima_data");
-    const proximoHorimetro = numero(fd, "proximo_horimetro");
+    const proximoHorimetro = naoNegativo(numero(fd, "proximo_horimetro"), "o horímetro da próxima");
 
     if (unidade === "horas" && proximoHorimetro === null)
       return { ok: false, erro: "Informe o horímetro da próxima manutenção." };
@@ -46,23 +52,29 @@ export async function salvarPlano(fd: FormData): Promise<Resultado> {
 
     const dados = {
       org_id: orgId,
-      ativo_id: textoObrigatorio(fd, "ativo_id", "o ativo"),
+      ativo_id: exigirId(textoObrigatorio(fd, "ativo_id", "o ativo"), "o ativo"),
       tipo: textoObrigatorio(fd, "tipo", "o tipo de manutenção"),
       descricao: texto(fd, "descricao"),
       periodicidade_valor: periodicidade,
       periodicidade_unidade: unidade,
       proxima_data: proximaData,
       proximo_horimetro: proximoHorimetro,
-      alerta_antecedencia_dias: inteiro(fd, "alerta_antecedencia_dias", 7) ?? 7,
-      alerta_antecedencia_horas: numero(fd, "alerta_antecedencia_horas") ?? 50,
+      alerta_antecedencia_dias: naoNegativo(inteiro(fd, "alerta_antecedencia_dias", 7), "o aviso em dias") ?? 7,
+      alerta_antecedencia_horas: naoNegativo(numero(fd, "alerta_antecedencia_horas"), "o aviso em horas") ?? 50,
       responsavel: texto(fd, "responsavel"),
-      custo_estimado: numero(fd, "custo_estimado"),
+      custo_estimado: naoNegativo(numero(fd, "custo_estimado"), "o custo estimado"),
       ativo: fd.has("ativo") ? booleano(fd, "ativo") : true,
       observacoes: texto(fd, "observacoes"),
     };
 
     const { data: linha, error } = id
-      ? await db.from("planos_manutencao").update(dados).eq("id", id).select("id").single()
+      ? await db
+          .from("planos_manutencao")
+          .update(dados)
+          .eq("id", id)
+          .eq("org_id", orgId)
+          .select("id")
+          .single()
       : await db.from("planos_manutencao").insert(dados).select("id").single();
 
     if (error) return erroBanco(error);
@@ -76,8 +88,15 @@ export async function salvarPlano(fd: FormData): Promise<Resultado> {
 
 export async function excluirPlano(id: string): Promise<Resultado> {
   try {
+    exigirId(id, "a manutenção periódica");
+    const { orgId } = await getContexto();
     const db = await createClient();
-    const { data: afetadas, error } = await db.from("planos_manutencao").delete().eq("id", id).select("id");
+    const { data: afetadas, error } = await db
+      .from("planos_manutencao")
+      .delete()
+      .eq("id", id)
+      .eq("org_id", orgId)
+      .select("id");
     if (error) return erroBanco(error);
     if (!afetadas?.length) return { ok: false, erro: SEM_PERMISSAO };
     revalidar();
@@ -89,11 +108,14 @@ export async function excluirPlano(id: string): Promise<Resultado> {
 
 export async function alternarPlano(id: string, ativo: boolean): Promise<Resultado> {
   try {
+    exigirId(id, "a manutenção periódica");
+    const { orgId } = await getContexto();
     const db = await createClient();
     const { data: afetadas, error } = await db
       .from("planos_manutencao")
-      .update({ ativo })
+      .update({ ativo: ativo === true })
       .eq("id", id)
+      .eq("org_id", orgId)
       .select("id");
     if (error) return erroBanco(error);
     if (!afetadas?.length) return { ok: false, erro: SEM_PERMISSAO };

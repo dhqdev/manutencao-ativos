@@ -8,9 +8,13 @@ import {
   erroBanco,
   booleano,
   data,
+  exigirId,
+  idOpcional,
   inteiro,
   mensagemErro,
+  naoNegativo,
   numero,
+  opcao,
   texto,
   textoObrigatorio,
   type Resultado,
@@ -20,6 +24,15 @@ import { removerArquivos, tokenDeEnvio } from "@/lib/arquivos";
 import type { StatusAtivo } from "@/lib/types";
 
 const EXTENSOES = ["jpg", "jpeg", "png", "webp", "heic", "heif"];
+const STATUS: StatusAtivo[] = ["ativo", "manutencao", "inativo", "baixado"];
+
+/** Ano de fabricação plausível (o campo é livre: "20024" virava ativo do futuro). */
+function anoValido(ano: number | null) {
+  if (ano === null) return null;
+  const limite = new Date().getFullYear() + 1;
+  if (ano < 1900 || ano > limite) throw new Error(`Informe um ano entre 1900 e ${limite}.`);
+  return ano;
+}
 
 type Db = Awaited<ReturnType<typeof createClient>>;
 
@@ -44,21 +57,22 @@ function nomeSeguro(nome: string) {
 
 export async function salvarAtivo(fd: FormData): Promise<Resultado> {
   try {
-    const { orgId } = await getContexto();
+    const { orgId, papel } = await getContexto();
+    if (!podeGerenciar(papel)) return { ok: false, erro: SEM_PERMISSAO };
     const db = await createClient();
 
-    const id = texto(fd, "id");
+    const id = idOpcional(fd, "id", "o ativo");
     const dados = {
       org_id: orgId,
-      categoria_id: textoObrigatorio(fd, "categoria_id", "a categoria"),
+      categoria_id: exigirId(textoObrigatorio(fd, "categoria_id", "a categoria"), "a categoria"),
       nome: textoObrigatorio(fd, "nome", "o nome do ativo"),
       modelo: texto(fd, "modelo"),
       marca: texto(fd, "marca"),
       identificacao: texto(fd, "identificacao"),
-      ano: inteiro(fd, "ano"),
+      ano: anoValido(inteiro(fd, "ano")),
       data_cadastro: data(fd, "data_cadastro") ?? hoje(),
-      horimetro_atual: numero(fd, "horimetro_atual") ?? 0,
-      status: (texto(fd, "status") ?? "ativo") as StatusAtivo,
+      horimetro_atual: naoNegativo(numero(fd, "horimetro_atual"), "o horímetro / KM") ?? 0,
+      status: opcao(texto(fd, "status"), STATUS, "ativo", "a situação do ativo"),
       observacoes: texto(fd, "observacoes"),
       ...(booleano(fd, "remover_foto") ? { foto_url: null } : {}),
     };
@@ -66,7 +80,7 @@ export async function salvarAtivo(fd: FormData): Promise<Resultado> {
     if (id && booleano(fd, "remover_foto")) await apagarFoto(db, id);
 
     const { data: linha, error } = id
-      ? await db.from("ativos").update(dados).eq("id", id).select("id").single()
+      ? await db.from("ativos").update(dados).eq("id", id).eq("org_id", orgId).select("id").single()
       : await db.from("ativos").insert(dados).select("id").single();
 
     if (error) return erroBanco(error);
@@ -82,6 +96,7 @@ export async function salvarAtivo(fd: FormData): Promise<Resultado> {
 
 export async function excluirAtivo(id: string): Promise<Resultado> {
   try {
+    exigirId(id, "o ativo");
     const { orgId } = await getContexto();
     const db = await createClient();
 
@@ -130,11 +145,17 @@ export async function excluirAtivo(id: string): Promise<Resultado> {
 
 export async function atualizarHorimetro(id: string, valor: number): Promise<Resultado> {
   try {
+    exigirId(id, "o ativo");
+    if (typeof valor !== "number" || !Number.isFinite(valor) || valor < 0) {
+      return { ok: false, erro: "Informe um horímetro / KM válido (zero ou mais)." };
+    }
+    const { orgId } = await getContexto();
     const db = await createClient();
     const { data: afetadas, error } = await db
       .from("ativos")
       .update({ horimetro_atual: valor })
       .eq("id", id)
+      .eq("org_id", orgId)
       .select("id");
     if (error) return erroBanco(error);
     if (!afetadas?.length) return { ok: false, erro: SEM_PERMISSAO };
@@ -157,6 +178,7 @@ export async function prepararFotoAtivo(
   nomeArquivo: string,
 ): Promise<{ ok: true; caminho: string; token: string } | { ok: false; erro: string }> {
   try {
+    exigirId(ativoId, "o ativo");
     const { orgId, papel } = await getContexto();
     if (!podeGerenciar(papel)) return { ok: false, erro: SEM_PERMISSAO };
     const db = await createClient();
@@ -185,7 +207,9 @@ export async function prepararFotoAtivo(
 /** Grava o caminho da foto no ativo e descarta a anterior. */
 export async function definirFotoAtivo(ativoId: string, caminho: string): Promise<Resultado> {
   try {
-    const { orgId } = await getContexto();
+    exigirId(ativoId, "o ativo");
+    const { orgId, papel } = await getContexto();
+    if (!podeGerenciar(papel)) return { ok: false, erro: SEM_PERMISSAO };
     const db = await createClient();
 
     if (!caminho.startsWith(`${orgId}/ativos/${ativoId}/`) || caminho.includes("..")) {

@@ -6,7 +6,10 @@ import { createClient } from "@/lib/db/server";
 import {
   data,
   erroBanco,
+  exigirId,
+  idOpcional,
   inteiro,
+  naoNegativo,
   mensagemErro,
   numero,
   texto,
@@ -31,9 +34,9 @@ export async function salvarPneu(fd: FormData): Promise<Resultado> {
     const { orgId, userId } = await getContexto();
     const db = await createClient();
 
-    const id = texto(fd, "id");
+    const id = idOpcional(fd, "id", "o pneu");
     const condicao = texto(fd, "condicao") as CondicaoPneu | null;
-    const sulcoInicial = numero(fd, "sulco_inicial_mm");
+    const sulcoInicial = naoNegativo(numero(fd, "sulco_inicial_mm"), "o sulco inicial");
 
     const dados = {
       org_id: orgId,
@@ -44,10 +47,10 @@ export async function salvarPneu(fd: FormData): Promise<Resultado> {
       dot: texto(fd, "dot"),
       condicao: condicao && CONDICOES.includes(condicao) ? condicao : "novo",
       sulco_inicial_mm: sulcoInicial,
-      pressao_psi: numero(fd, "pressao_psi"),
+      pressao_psi: naoNegativo(numero(fd, "pressao_psi"), "a pressão"),
       recapagens: Math.max(inteiro(fd, "recapagens", 0) ?? 0, 0),
       data_compra: data(fd, "data_compra"),
-      valor_compra: numero(fd, "valor_compra"),
+      valor_compra: naoNegativo(numero(fd, "valor_compra"), "o valor de compra"),
       fornecedor: texto(fd, "fornecedor"),
       nota_fiscal: texto(fd, "nota_fiscal"),
       localizacao: texto(fd, "localizacao"),
@@ -80,7 +83,7 @@ export async function salvarPneu(fd: FormData): Promise<Resultado> {
       return erroBanco(error);
     }
 
-    await db.from("pneu_movimentacoes").insert({
+    const { error: erroEntrada } = await db.from("pneu_movimentacoes").insert({
       org_id: orgId,
       pneu_id: novo.id,
       tipo: "entrada",
@@ -90,6 +93,9 @@ export async function salvarPneu(fd: FormData): Promise<Resultado> {
       observacoes: dados.fornecedor ? `Fornecedor: ${dados.fornecedor}` : null,
       created_by: userId,
     });
+    // O pneu já foi cadastrado; só o registro de entrada no histórico falhou.
+    // Não desfaz o cadastro, mas deixa rastro no log para investigar.
+    if (erroEntrada) console.error("[pneus] entrada no histórico", erroEntrada.message);
 
     revalidar();
     return { ok: true, id: novo.id };
@@ -100,6 +106,7 @@ export async function salvarPneu(fd: FormData): Promise<Resultado> {
 
 export async function excluirPneu(id: string): Promise<Resultado> {
   try {
+    exigirId(id, "o pneu");
     const { orgId } = await getContexto();
     const db = await createClient();
 
@@ -133,19 +140,19 @@ export async function movimentarPneu(fd: FormData): Promise<Resultado> {
     const tipo = texto(fd, "tipo") as TipoMovPneu | null;
     if (!tipo || !TIPOS_MOV.includes(tipo)) return { ok: false, erro: "Escolha o tipo de movimentação." };
 
-    const ativoId = texto(fd, "ativo_id");
-    const horimetro = numero(fd, "horimetro");
+    const ativoId = idOpcional(fd, "ativo_id", "o veículo");
+    const horimetro = naoNegativo(numero(fd, "horimetro"), "o horímetro / KM");
 
     const { error } = await db.from("pneu_movimentacoes").insert({
       org_id: orgId,
-      pneu_id: textoObrigatorio(fd, "pneu_id", "o pneu"),
+      pneu_id: exigirId(textoObrigatorio(fd, "pneu_id", "o pneu"), "o pneu"),
       tipo,
       data: data(fd, "data") ?? hoje(),
       ativo_id: ativoId,
       posicao: texto(fd, "posicao"),
       horimetro,
-      sulco_mm: numero(fd, "sulco_mm"),
-      valor: numero(fd, "valor"),
+      sulco_mm: naoNegativo(numero(fd, "sulco_mm"), "o sulco"),
+      valor: naoNegativo(numero(fd, "valor"), "o valor"),
       observacoes: texto(fd, "observacoes"),
       created_by: userId,
     });
@@ -162,7 +169,7 @@ export async function movimentarPneu(fd: FormData): Promise<Resultado> {
         .eq("org_id", orgId)
         .maybeSingle();
       if (ativo && Number(ativo.horimetro_atual) < horimetro) {
-        await db.from("ativos").update({ horimetro_atual: horimetro }).eq("id", ativoId);
+        await db.from("ativos").update({ horimetro_atual: horimetro }).eq("id", ativoId).eq("org_id", orgId);
       }
     }
 
@@ -178,6 +185,7 @@ export async function historicoDoPneu(
   pneuId: string,
 ): Promise<{ ok: true; itens: (MovimentacaoPneu & { ativo_nome: string | null })[] } | { ok: false; erro: string }> {
   try {
+    exigirId(pneuId, "o pneu");
     const { orgId } = await getContexto();
     const db = await createClient();
 

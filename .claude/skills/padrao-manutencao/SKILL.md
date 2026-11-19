@@ -69,6 +69,18 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   lançar erro para o cliente. `redirect()` fica **fora** do `try/catch`.
 - Leia o FormData só com `texto`, `textoObrigatorio`, `numero`, `inteiro`,
   `data`, `booleano` (`lib/form.ts`): eles aceitam vírgula decimal, datas ISO etc.
+- Nada do navegador vai cru para o banco (senão volta erro do Postgres em
+  inglês na tela): id → `exigirId`/`idOpcional`; enum → `opcao(valor, LISTA,
+  padrão, "o rótulo")`; número que não pode ser negativo → `naoNegativo`.
+  Ações que recebem id por parâmetro começam com `exigirId(id, "o ...")`.
+- Valide **tudo antes da primeira gravação**. Se a ação grava em duas
+  tabelas, desfaça a primeira quando a segunda falhar (ex.: periódica criada
+  junto com a manutenção em `salvarManutencao`).
+- `mensagemErro()` relança redirect/notFound do Next (`unstable_rethrow`):
+  `getContexto()` dentro do try redireciona para o login com sessão vencida.
+  Em catch próprio que não usa `mensagemErro`, chame `unstable_rethrow(e)`.
+- `erroBanco()` traduz os códigos do Postgres (23503, 23514, 22P02...); as
+  mensagens de `raise exception` das nossas funções passam como vieram.
 - Permissões por papel ficam em `lib/permissoes.ts` e **espelham** o RLS.
   Papéis: proprietário / gestor (tudo) · técnico (registra manutenções, anexos,
   movimenta pneus) · leitor (só consulta).
@@ -99,6 +111,9 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   - `20-auth.sql` funções `auth_*` (login, sessão, senha)
   - `30-superadmin.sql` superadmin vindo da stack e funções `admin_*`
   - `40-atualizacoes.sql` pedidos do botão Atualizar e sinal do atualizador
+  - `50-validacoes.sql` travas `check` (valores não negativos, cor #RRGGBB)
+    criadas como `not valid` por `pg_temp.trava()`: base antiga com dado
+    estranho não derruba o deploy. Regra nova de valor vai lá.
   - Coisa nova grande: crie `40-<assunto>.sql` em vez de inchar os outros.
 - Tabela nova: `org_id ... references organizacoes on delete cascade`, índice
   em `org_id`, `enable row level security` e policies separadas por comando
@@ -140,10 +155,20 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   `components/auth/campos.tsx` (`CampoSenha` já avisa Caps Lock ligado).
 - Formulário cliente: `useTransition` + chamar a action + mostrar `erro` +
   `router.refresh()` no sucesso (veja `FormModal` em `components/admin/comum.tsx`).
+  Envolva a chamada em `chamarAcao(() => acao(fd))` (`lib/acao-cliente.ts`):
+  queda de rede ou aba com versão antiga vira mensagem no formulário em vez
+  de derrubar a tela.
+- Fronteiras de erro: `app/(app)/error.tsx` (mantém o menu), `app/error.tsx`
+  e `app/global-error.tsx`, todas com `ErroTela` (`components/erro-tela.tsx`).
+  No Next 16 a prop é `retry` (não `reset`).
 - Tela restrita: confira no servidor e chame `notFound()` (não só esconder o botão).
 - Datas com hora: use `dataHoraBR` (fuso fixo de Brasília). `toLocaleString`
   sem `timeZone` em componente cliente gera erro de hidratação (#418) quando o
   fuso do navegador difere do servidor.
+- "Hoje" e meses: `hoje()`, `mesBR(n)`, `primeiroDiaDoMes(n)`,
+  `ultimoDiaDoMes(n)`, `somarDias`, `somarMeses` (`lib/format.ts`). Nunca
+  `new Date()` + `setMonth`/`toLocaleDateString("sv-SE")` sem fuso: o
+  container roda em UTC e depois das 21h já seria o dia (ou mês) seguinte.
 
 ## 5. Infra, stack e variáveis
 
@@ -180,8 +205,13 @@ Antes de qualquer push:
 
 ```bash
 npm install          # uma vez: liga o pre-push (.githooks) via script "prepare"
-npm run verificar    # lock, tipos, build, WhatsApp, shell — ~30 s
+npm run verificar    # lock, tipos, unidade, build, WhatsApp, shell — ~30 s
+npm run testar       # só os testes de unidade (testes/unidade, node:test)
 ```
+
+- Testes de unidade: `testes/unidade/*.test.mjs` com `node:test`, importando
+  os `.ts` direto (o Node remove os tipos; `registrar.mjs` resolve `@/` e
+  `next/*`). Lógica pura nova (validação, datas, cálculos) ganha teste lá.
 
 - `scripts/verificar.sh` é **o mesmo** passo do job `verificar` do Actions e
   roda sozinho no `git push` (pre-push). Não use `--no-verify` para "resolver".

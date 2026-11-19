@@ -4,7 +4,7 @@
 # `npm run verificar`. Se algo falha aqui, falharia no Actions também — melhor
 # descobrir antes de subir.
 #
-#   npm run verificar            tudo (lock, tipos, build, WhatsApp, shell)
+#   npm run verificar            tudo (lock, tipos, unidade, build, WhatsApp, shell)
 #   VERIFICAR_RAPIDO=1 ...       pula o build do Next (o passo mais lento)
 set -euo pipefail
 
@@ -27,6 +27,9 @@ fi
 
 passo "Tipos (tsc)"
 npm run --silent typecheck
+
+passo "Testes de unidade (lib/form, lib/format)"
+npm run --silent testar
 
 if [ "${VERIFICAR_RAPIDO:-}" != "1" ]; then
   passo "Build do Next"
