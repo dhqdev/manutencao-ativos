@@ -10,7 +10,10 @@ FROM postgres:17-alpine
 
 RUN apk add --no-cache curl tzdata rclone docker-cli
 
-ENV TZ=America/Sao_Paulo
+# Versão da release (vAAAA.MM.DD-N), passada pelo CI: os serviços que ficam no
+# ar comparam com a do banco e aplicam o SQL se o banco estiver atrás.
+ARG VERSAO=dev
+ENV TZ=America/Sao_Paulo OPS_VERSAO=$VERSAO
 COPY sql/ /ops/sql/
 COPY scripts/ /ops/
 RUN chmod +x /ops/*.sh

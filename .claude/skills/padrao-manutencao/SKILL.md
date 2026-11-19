@@ -115,7 +115,11 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
 
 ## 3. Banco (`db/sql/`)
 
-- Os arquivos rodam em ordem a **cada deploy** pelo migrador: tudo tem que ser
+- Os arquivos rodam em ordem a **cada deploy** pelo migrador (e por
+  `garantir_esquema` de `db/scripts/comum.sh`, que backup e atualizador chamam
+  ao subir quando a imagem, `OPS_VERSAO`, é mais nova que `sistema_esquema`:
+  o Portainer nem sempre roda o migrador de novo). Cada arquivo segura a trava
+  727272, então dois aplicadores ao mesmo tempo não trombam. Tudo tem que ser
   **idempotente** (`create table if not exists`, `add column if not exists`,
   `create or replace function`, `drop policy if exists` + `create policy`,
   enums com `exception when duplicate_object`).
@@ -130,6 +134,8 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   - `60-equipe.sql` `equipe_acessos()`: último acesso e sessões abertas da
     equipe (dados de `auth.*` que o PostgREST não expõe)
   - `70-integracoes.sql` `sistema_credenciais` (chaves do console)
+  - `80-esquema.sql` `sistema_esquema`: versão do SQL aplicado (fica por
+    último; arquivo novo vem antes dele)
   - `71-backup.sql` `sistema_backups` (rodadas e pedidos de "backup agora")
     e `sistema_backup_servico` (sinal de vida do serviço backup)
   - Coisa nova grande: crie `40-<assunto>.sql` em vez de inchar os outros.

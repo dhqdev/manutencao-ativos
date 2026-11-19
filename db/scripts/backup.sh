@@ -277,6 +277,10 @@ if [ "${1:-}" = "agora" ]; then
   exit $?
 fi
 
+# Banco atrás da imagem (o Swarm não rodou o migrador de novo)? Atualiza
+# aqui mesmo, antes de usar as tabelas novas.
+garantir_esquema
+
 # Rodada que ficou "executando" quando o serviço caiu nunca vai terminar:
 # sem isto ela travaria a fila (só um backup ativo por vez).
 echo "update sistema_backups set estado = 'erro', concluido_em = now(),

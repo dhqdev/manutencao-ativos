@@ -103,6 +103,7 @@ jobs:
           platforms: linux/arm64
           load: true
           tags: ${{ env.IMAGEM_BASE }}/ops:${{ env.TAG }}
+          build-args: VERSAO=${{ steps.versao.outputs.versao }}
           labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
           cache-from: type=gha,scope=ops
           cache-to: type=gha,scope=ops,mode=max

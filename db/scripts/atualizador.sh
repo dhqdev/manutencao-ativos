@@ -163,6 +163,12 @@ atualizar() { # id versão
     fi
   done
 
+  # O migrador já avisa o PostgREST, mas o aviso se perde se o PostgREST
+  # estava reconectando naquela hora: aí ele segue com o esquema antigo e
+  # tabela nova responde "not in the schema cache". Avisar de novo no fim é
+  # de graça e resolve.
+  echo "notify pgrst, 'reload schema'" | sql >/dev/null 2>&1 || true
+
   terminar "$id" concluida "Sistema atualizado para $versao."
   log "pedido $id: concluído"
 
@@ -171,6 +177,7 @@ atualizar() { # id versão
 }
 
 aguardar_banco
+garantir_esquema
 
 # Pedido que estava em andamento quando o atualizador caiu não termina mais.
 sql >/dev/null <<'SQL'

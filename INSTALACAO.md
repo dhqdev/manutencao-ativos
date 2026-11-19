@@ -101,8 +101,10 @@ ou mais caracteres): é o login que administra todas as empresas e usuários pel
 > [`infra/portainer.yml`](infra/portainer.yml): troque os valores `TROQUE-...`,
 > cole em *Stacks → Add stack* e faça o Deploy. Para atualizar: console do
 > superadmin → **Versão do sistema** → **Atualizar** (serviço `manutencao-atualizador`), ou
-> troque a tag das linhas `image:` do ghcr.io pela release nova e clique em
-> *Update the stack*.
+> clique em *Update the stack* com **Re-pull image and redeploy** ligado (com
+> `:latest`) ou trocando a tag das linhas `image:` pela release nova. Não
+> precisa mexer no migrador: os serviços backup e atualizador conferem a versão
+> do banco ao subir e aplicam o SQL que faltar.
 
 ## 6. Subir
 
@@ -184,6 +186,13 @@ O job `deploy` copia `stack.yml`, `traefik.yml` e `deploy.sh` e roda
 imagens: quando a release muda o arquivo da stack (variável ou serviço novo),
 atualize a stack também. Stack antiga, sem o serviço `atualizador`: atualize a
 stack uma vez com o arquivo novo e o botão passa a funcionar.
+
+O banco acompanha sozinho: além do migrador, os serviços **backup** e
+**atualizador** comparam, ao subir, a versão da imagem deles com a gravada em
+`sistema_esquema` e aplicam o SQL se o banco estiver atrás (nunca para trás).
+Isso cobre o caso em que o Swarm não roda o migrador de novo (tarefa antiga
+"Complete" com a mesma especificação), que deixava tabela nova faltando
+("not in the schema cache").
 
 **Voltar uma versão:** escolha a release na aba *Releases* do GitHub e rode
 `TAG=v2026.11.19-12 ./deploy.sh` (cada imagem tem a tag da release, do commit

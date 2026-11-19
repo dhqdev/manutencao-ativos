@@ -66,7 +66,11 @@ export function CartaoBackup({ situacao }: { situacao: SituacaoBackup }) {
     >
       <div className="space-y-5 px-4 py-4 sm:px-5" data-cartao-backup>
         {situacao.erro && (
-          <Aviso>Não consegui ler as tabelas do backup: {situacao.erro}. Confira se o migrador da versão nova rodou.</Aviso>
+          <Aviso>
+            Não consegui ler as tabelas do backup ({situacao.erro}). O banco ainda não recebeu a versão nova:
+            atualize a stack no Portainer (Update the stack, com Re-pull image ligado). O serviço backup aplica o que
+            faltar ao subir.
+          </Aviso>
         )}
 
         <div className="grid gap-3 text-sm sm:grid-cols-2">

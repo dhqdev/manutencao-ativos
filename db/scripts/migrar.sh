@@ -32,18 +32,4 @@ fi
 echo "[migrador] aguardando o banco em $PGHOST..."
 aguardar_banco
 
-saida=$(mktemp)
-for arquivo in /ops/sql/*.sql; do
-  echo "[migrador] aplicando $(basename "$arquivo")"
-  if ! psql -v ON_ERROR_STOP=1 -q "$@" -f "$arquivo" >"$saida" 2>&1; then
-    cat "$saida" >&2
-    echo "[migrador] FALHOU em $(basename "$arquivo")" >&2
-    exit 1
-  fi
-  # Mostra o que não for aviso de rotina.
-  grep -v "^NOTICE\|already exists, skipping\|does not exist, skipping\|^psql:.*NOTICE" "$saida" || true
-done
-rm -f "$saida"
-
-psql -qc "notify pgrst, 'reload schema'"
-echo "[migrador] banco em dia."
+aplicar_sql "$@" || exit 1

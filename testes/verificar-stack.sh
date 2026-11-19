@@ -66,6 +66,8 @@ echo "$r" | grep -q "^erro: .*não foi encontrada" && ok "versão inexistente re
 docker service inspect --format '{{.Spec.TaskTemplate.ContainerSpec.Image}}' manutencao_app | grep -q ":$TAG" && ok "app continua na versão testada" || erro "atualizador mexeu no app"
 banco -c "insert into sistema_atualizacoes (versao) values ('x; rm -rf /')" >/dev/null 2>&1 && erro "banco aceitou versão fora do padrão" || ok "banco recusa versão fora do padrão"
 
+banco -c "select versao from sistema_esquema" | grep -Eq '^v[0-9]{4}\.[0-9]{2}\.[0-9]{2}-[0-9]+$' \
+  && ok "migrador gravou a versão do esquema" || erro "sistema_esquema sem versão: $(banco -c "select versao from sistema_esquema" 2>&1)"
 echo "— backup (pg_dump 17 contra o banco da stack)"
 docker run --rm --network manutencao_interna -e PGHOST=db -e PGPASSWORD="$POSTGRES_PASSWORD" \
   --entrypoint sh "$IMAGEM_BASE/ops:$TAG" -c '. /ops/comum.sh && pg_dump -Fc -f /tmp/b.dump && test -s /tmp/b.dump && pg_restore -l /tmp/b.dump | grep -q "TABLE DATA public ativos"' \
