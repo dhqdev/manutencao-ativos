@@ -304,6 +304,28 @@ await passo("console: uso de cada cliente (arquivos e banco) e WhatsApp", async 
   await linha.locator('[data-whatsapp="desligado"]').waitFor();
 });
 
+await passo("console: integrações com o backup (serviço no ar e backup agora)", async () => {
+  await page.goto("/admin?aba=integracoes");
+  const cartao = page.locator("[data-cartao-backup]");
+  await cartao.waitFor();
+  // O serviço backup da stack manda sinal de vida a cada 15 s.
+  await cartao.locator('[data-backup-servico="online"]').waitFor({ timeout: 60_000 });
+  const ids = page.locator("[data-backup-id]");
+  const antes = (await ids.count()) > 0 ? await ids.first().getAttribute("data-backup-id") : null;
+  await page.getByRole("button", { name: "Fazer backup agora" }).click();
+  // Ele pega o pedido, faz o dump e conta de volta; a tela recarrega sozinha.
+  await page.waitForFunction(
+    (anterior) => {
+      const li = document.querySelector("[data-backup-id]");
+      return !!li && li.getAttribute("data-backup-id") !== anterior && li.getAttribute("data-backup-estado") === "ok";
+    },
+    antes,
+    { timeout: 120_000 },
+  );
+  // Sem credenciais o B2 fica desligado e o formulário pede tudo.
+  await cartao.getByText("Não configurado").waitFor();
+});
+
 await passo("superadmin bloqueia um usuário e ele não entra mais", async () => {
   await page.goto("/admin");
   await page.locator(`li[data-usuario="${INTRUSO.email}"] button`).click();

@@ -31,7 +31,7 @@ migrador · cron (resumo do WhatsApp) · backup diário · atualizador
 | **whatsapp** | Servidor Baileys sempre ligado (QR, "digitando", reconexão) |
 | **migrador** | Aplica `db/sql/*.sql` a cada deploy (idempotente) e cria/atualiza o superadmin |
 | **cron** | Chama a rotina do resumo diário do WhatsApp de hora em hora |
-| **backup** | `pg_dump` + arquivos todo dia, com retenção, e cópia no Backblaze B2 (opcional) |
+| **backup** | `pg_dump` + arquivos todo dia, com retenção, e cópia no Backblaze B2 (credenciais no console do superadmin, aba Integrações) |
 | **atualizador** | Aplica a release nova quando o superadmin clica em **Atualizar** no console (tem o socket do Docker; não abre porta) |
 | **traefik** | Porta de entrada, HTTPS automático, painel protegido por senha |
 
@@ -49,6 +49,7 @@ Todo o SQL fica em [`db/sql/`](db/sql/) e é aplicado pelo migrador:
 | `10-schema.sql` | Tabelas, RLS, views, funções e triggers do sistema |
 | `20-auth.sql` | Funções de login, sessão, senha e recuperação (só o servidor chama) |
 | `30-superadmin.sql` | Login do superadmin (vindo da stack) e funções `admin_*` do painel de administração |
+| `71-backup.sql` | Credenciais das integrações (`sistema_credenciais`), rodadas do backup e sinal de vida do serviço backup |
 
 Cadastro automático: ao criar conta, o usuário ganha empresa, perfil e as 6
 categorias padrão.
@@ -209,6 +210,14 @@ comparando os clientes), quantos ativos e manutenções tem e se o **WhatsApp
 está conectado** (com o número). No topo, os totais: clientes, espaço usado,
 quanto é arquivo e quanto é banco, e quantos estão com WhatsApp.
 
+Na aba **Integrações** ficam as credenciais dos serviços de fora. O cartão
+**Backup no Backblaze B2** recebe keyID, applicationKey, bucket, pasta, dias de
+retenção e a senha de criptografia (opcional); **Testar conexão** confere a
+chave na API do Backblaze, e **Salvar** só grava se o teste passar. Os segredos
+não voltam para a tela (só os 4 últimos caracteres). O cartão mostra se o
+serviço backup está no ar, para onde ele está mandando, as pastas no bucket, o
+botão **Fazer backup agora** e as últimas 10 rodadas (automáticas e manuais).
+
 Abaixo fica o bloco **Versão do sistema** (a que está no ar e a
 última publicada no GitHub Packages, com o botão **Atualizar**).
 
@@ -254,7 +263,7 @@ quantos registros vão sair e pede para digitar APAGAR.
 ```
 app/
   (app)/            telas internas (dashboard, ativos, manutenções, calendário, relatórios, configurações)
-  admin/            console do superadmin (uma tela: gerência dos usuários e versão)
+  admin/            console do superadmin (uma tela: usuários, clientes, integrações e versão)
   api/arquivos/     envio e leitura de fotos/anexos (links assinados)
   api/notificacoes/ rotina diária do WhatsApp (chamada pelo serviço cron)
   auth/             login, cadastro, recuperação de senha e logout

@@ -73,6 +73,11 @@ docker run --rm --network manutencao_interna -e PGHOST=db -e PGPASSWORD="$POSTGR
 docker run --rm --network manutencao_interna -e PGHOST=db -e PGPASSWORD="$POSTGRES_PASSWORD" -e BACKUP_DIR=/tmp/bk \
   --entrypoint sh "$IMAGEM_BASE/ops:$TAG" -c '/ops/backup.sh agora >/dev/null && grep -q "^.* ok banco-" /tmp/bk/ULTIMO-BACKUP.txt' \
   && ok "backup-agora termina com sucesso e registra o status" || erro "backup-agora falhou"
+[ "$(banco -c "select count(*) from sistema_backups where estado = 'ok' and arquivo like 'banco-%'")" -ge 1 ] \
+  && ok "backup registrado no histórico do console" || erro "backup-agora não registrou a rodada em sistema_backups"
+for _ in $(seq 1 30); do [ -n "$(banco -c "select 1 from sistema_backup_servico where visto_em > now() - interval '1 minute'")" ] && break; sleep 2; done
+[ -n "$(banco -c "select 1 from sistema_backup_servico where visto_em > now() - interval '1 minute'")" ] \
+  && ok "serviço backup no ar (sinal de vida no banco)" || erro "serviço backup sem sinal: $(docker service logs --tail 5 manutencao_backup 2>&1)"
 
 echo
 if [ "$falhas" -gt 0 ]; then echo "$falhas verificação(ões) falharam."; exit 1; fi

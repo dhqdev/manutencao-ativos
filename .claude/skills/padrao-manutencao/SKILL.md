@@ -88,7 +88,8 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   casca própria em `components/admin/console.tsx`). Ele **não** entra no
   sistema das empresas: `getContexto()` o redireciona para `/admin` e ele não
   pode ser membro de equipe (`admin_definir_membro` recusa). O dono quer
-  **uma tela só** (`app/admin/page.tsx`: abas Usuários e Clientes e uso + bloco da versão);
+  **uma tela só** (`app/admin/page.tsx`: abas Usuários, Clientes e uso e
+  Integrações + bloco da versão);
   não crie telas novas no console sem ele pedir.
   - Toda página do console começa com `exigirSuperadminTela()`
     (`lib/admin-console.ts`) — layout e página rodam em paralelo, não confie
@@ -116,6 +117,9 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
     estranho não derruba o deploy. Regra nova de valor vai lá.
   - `60-equipe.sql` `equipe_acessos()`: último acesso e sessões abertas da
     equipe (dados de `auth.*` que o PostgREST não expõe)
+  - `71-backup.sql` `sistema_credenciais` (credenciais das integrações,
+    chave/valor, só service_role), `sistema_backups` (rodadas e pedidos de
+    "backup agora") e `sistema_backup_servico` (sinal de vida)
   - Coisa nova grande: crie `40-<assunto>.sql` em vez de inchar os outros.
 - Tabela nova: `org_id ... references organizacoes on delete cascade`, índice
   em `org_id`, `enable row level security` e policies separadas por comando
@@ -212,8 +216,18 @@ Variável nova de ambiente ⇒ atualize **todos** estes lugares no mesmo commit:
   desloga todo mundo.
 - Scripts da imagem `ops` (`db/scripts/*.sh`) são `sh` POSIX (Alpine/busybox):
   nada de bash-ismos. Comando novo da imagem ⇒ `entrypoint.sh`.
+- Integrações (aba do console): credencial de serviço de fora vai em
+  `sistema_credenciais` (uma linha por chave, `b2_*`, `groq_*`...), um cartão
+  por serviço. Segredo **nunca** volta para o navegador: a tela mostra só
+  `finalDoSegredo()` e campo secreto em branco = manter o salvo. Teste a
+  credencial na API do serviço antes de gravar.
 - Backup: `db/scripts/backup.sh` (local + Backblaze B2 via `rclone` com
-  configuração por variáveis de ambiente, sem arquivo de config). O dump só
+  configuração por variáveis de ambiente, sem arquivo de config). As
+  credenciais do B2 vêm do console (`sistema_credenciais`, relidas a cada
+  rodada) e, com ele vazio, das variáveis `B2_*` da stack. No B2:
+  `<pasta>/banco/AAAA/MM/`, `<pasta>/arquivos/`, `<pasta>/arquivos-removidos/<carimbo>/`.
+  O serviço olha `sistema_backups` a cada 15 s (botão "Fazer backup agora"),
+  registra cada rodada lá e manda sinal de vida em `sistema_backup_servico`. O dump só
   conta se o `pg_restore --list` o lê; a retenção só apaga cópias antigas
   depois de um backup bom; `ULTIMO-BACKUP.txt` no volume diz o resultado da
   última rodada; `backup-agora` sai com erro se falhar.

@@ -248,7 +248,13 @@ Fotos e anexos ficam no volume `manutencao_arquivos`. Nada é público:
 
 ## O que continua sendo responsabilidade sua
 
-- **Backups fora da VM**: preencha as variáveis `B2_*` (Backblaze B2, INSTALACAO.md → Backups).
+- **Backups fora da VM**: preencha o Backblaze B2 no console do superadmin
+  (Gerência → Integrações) ou nas variáveis `B2_*` (INSTALACAO.md → Backups).
+  As credenciais ficam em `sistema_credenciais`, com RLS ligado e sem policy
+  (só a chave de servidor lê); a applicationKey e a senha de criptografia
+  nunca voltam para o navegador, e o app só grava depois de conferir o posto
+  de superadmin na sessão. Elas vão junto no dump do banco: use a senha de
+  criptografia do backup para o B2 não guardar a própria chave em claro.
 - **Senha forte para o superadmin** (`SUPERADMIN_SENHA`): ele enxerga e altera
   todas as empresas. As funções `admin_*` do banco só rodam com a chave de
   servidor, e o app confere o posto na sessão (no banco) em cada tela e ação

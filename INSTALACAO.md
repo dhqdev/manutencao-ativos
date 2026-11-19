@@ -210,7 +210,8 @@ nenhuma cópia antiga é apagada pela retenção.
 
 **Copie para fora da VM** — um backup no mesmo disco não salva de um disco
 perdido. O serviço de backup já manda tudo para o **Backblaze B2** quando as
-variáveis `B2_*` estão preenchidas.
+credenciais estão no console do superadmin (**Gerência → Integrações**) ou nas
+variáveis `B2_*` da stack.
 
 #### Backblaze B2 (cópia fora do servidor)
 
@@ -223,7 +224,16 @@ primeiros 10 GB grátis) e compatível com o `rclone`, que já vem na imagem `op
 3. **Application Keys → Add a New Application Key**: *Allow access to Bucket(s)*:
    só esse bucket; *Type of Access*: **Read and Write**. Copie o **keyID** e a
    **applicationKey** (ela aparece uma vez só).
-4. Preencha no serviço de backup (`infra/.env` ou na stack do Portainer):
+4. No console do superadmin, **Gerência → Integrações → Backup no Backblaze
+   B2**: cole o keyID, a applicationKey e o nome do bucket (pasta e dias de
+   retenção são opcionais) e clique em **Salvar**. O console confere a chave na
+   API do Backblaze antes de gravar (bucket inexistente, chave sem acesso a ele
+   ou bucket público são recusados). O serviço backup relê as credenciais a
+   cada rodada: não precisa mexer na stack. A applicationKey e a senha de
+   criptografia nunca voltam para a tela (só os 4 últimos caracteres).
+
+   Alternativa (reserva, usada só se o console estiver vazio): as variáveis
+   do serviço de backup (`infra/.env` ou na stack do Portainer):
 
    ```
    B2_KEY_ID='keyID'
@@ -234,30 +244,37 @@ primeiros 10 GB grátis) e compatível com o `rclone`, que já vem na imagem `op
    B2_SENHA_CRIPTOGRAFIA=''       # opcional: criptografa antes de enviar
    ```
 
-5. Atualize a stack. No log do backup deve aparecer
-   `Backblaze B2 conectado` (`docker service logs manutencao_backup`).
+5. No log do backup deve aparecer `Backblaze B2 conectado (console)` (ou
+   `(variaveis)`) em até 15 segundos (`docker service logs manutencao_backup`).
+   O cartão do console mostra o destino em uso, se o serviço está no ar e as
+   últimas rodadas (data, tamanho do banco e dos arquivos, se o B2 deu certo).
 
 O que vai para lá, todo dia depois do backup local das 3h30:
 
 | No bucket | O quê |
 |---|---|
-| `manutencao/banco/banco-AAAAMMDD-HHMM.dump` | Um dump do banco por dia, guardado por `B2_DIAS` dias |
+| `manutencao/banco/AAAA/MM/banco-AAAAMMDD-HHMM.dump` | Um dump do banco por dia, em pastas por ano e mês, guardado pelos dias de retenção (padrão 30) |
 | `manutencao/arquivos/` | Espelho das fotos e anexos (só o que mudou sobe) |
-| `manutencao/arquivos-removidos/AAAAMMDD-HHMM/` | O que foi apagado no sistema, guardado por `B2_DIAS` dias |
+| `manutencao/arquivos-removidos/AAAAMMDD-HHMM/` | O que foi apagado no sistema, guardado pelos mesmos dias |
 
-**Testar agora**, sem esperar a madrugada (Portainer → Containers → backup →
-Console, ou na VM):
+A retenção no B2 só apaga cópias antigas depois de um envio bom, como a local.
+
+**Testar agora**, sem esperar a madrugada: botão **Fazer backup agora** no
+cartão do console (o serviço pega o pedido em até 15 segundos e a tela
+acompanha), ou pelo Portainer → Containers → backup → Console, ou na VM:
 
 ```bash
 docker exec -it $(docker ps -qf name=manutencao_backup) /ops/backup.sh agora
 ```
 
-> Com `B2_SENHA_CRIPTOGRAFIA` os nomes e o conteúdo ficam ilegíveis no painel
+> Com a senha de criptografia (no console ou `B2_SENHA_CRIPTOGRAFIA`) os nomes e o conteúdo ficam ilegíveis no painel
 > do Backblaze. **Guarde essa senha fora do servidor**: sem ela o backup não
 > abre. Não troque depois de começar (os arquivos antigos continuariam na senha velha).
 
 **Baixar do B2 para restaurar** (traz para o volume de backups e depois segue
-os passos de restauração abaixo):
+os passos de restauração abaixo). Se as credenciais estão só no console,
+exporte antes `B2_KEY_ID`, `B2_APP_KEY`, `B2_BUCKET`, `B2_PASTA` e
+`B2_SENHA_CRIPTOGRAFIA` com os mesmos valores:
 
 ```bash
 cd /opt/manutencao/infra && set -a && . ./.env && set +a
@@ -270,8 +287,8 @@ docker run --rm -v manutencao_backups:/backups \
       export RCLONE_CONFIG_C_TYPE=crypt RCLONE_CONFIG_C_REMOTE="$R"
       export RCLONE_CONFIG_C_PASSWORD=$(rclone obscure "$B2_SENHA_CRIPTOGRAFIA"); R="c:"
     fi
-    rclone lsf "$R/banco"                                    # lista os dumps
-    rclone copy "$R/banco/banco-AAAAMMDD-HHMM.dump" /backups # baixa um
+    rclone lsf -R "$R/banco"                                       # lista os dumps
+    rclone copy "$R/banco/AAAA/MM/banco-AAAAMMDD-HHMM.dump" /backups # baixa um
     rclone copy "$R/arquivos" /backups/arquivos-b2           # fotos e anexos'
 ```
 
