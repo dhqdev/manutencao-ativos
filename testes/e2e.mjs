@@ -155,6 +155,9 @@ await passo("registra manutenção com anexo PDF", async () => {
 
 await passo("o anexo baixa como PDF", async () => {
   await page.goto("/manutencoes");
+  await abrirHistorico();
+  // Os anexos aparecem ao expandir a manutenção.
+  await page.getByRole("button", { name: "Ver detalhes" }).first().click();
   const link = page.locator('a[href*="/api/arquivos/"]').first();
   await link.waitFor({ state: "attached" });
   const r = await page.request.get(await link.getAttribute("href"));
