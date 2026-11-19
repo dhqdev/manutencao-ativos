@@ -17,7 +17,7 @@ import { BotaoExcluir } from "@/components/confirmar";
 import { DialogoManutencao } from "@/components/manutencoes/dialogo-manutencao";
 import { Badge, cn } from "@/components/ui";
 import { excluirManutencao } from "@/lib/actions/manutencoes";
-import { TIPOS_MANUTENCAO, dataBR, moeda, numero, paraData } from "@/lib/format";
+import { TIPOS_MANUTENCAO, dataBR, hoje, moeda, numero, paraData } from "@/lib/format";
 import type { Manutencao, PlanoManutencao, TipoManutencao } from "@/lib/types";
 
 export type AnexoComUrl = {
@@ -132,7 +132,7 @@ export function ListaManutencoes({
               const anexosDaLinha = porManutencao.get(m.id) ?? [];
               const aberto = expandido === m.id;
               const garantiaAtiva =
-                m.garantia_ate && (paraData(m.garantia_ate)?.getTime() ?? 0) >= Date.now() - 86400000;
+                m.garantia_ate && m.garantia_ate >= hoje();
 
               return (
                 <li key={m.id} className="card overflow-hidden">

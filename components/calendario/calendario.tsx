@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { Badge, cn } from "@/components/ui";
-import { dataBR, isoLocal, moeda } from "@/lib/format";
+import { dataBR, hoje, isoLocal, moeda } from "@/lib/format";
 
 export type EventoCalendario = {
   id: string;
@@ -46,15 +46,19 @@ export function Calendario({
   eventos: EventoCalendario[];
   categorias: { id: string; nome: string; cor: string }[];
 }) {
-  const agora = new Date();
-  const [mes, setMes] = useState(new Date(agora.getFullYear(), agora.getMonth(), 1));
+  // "Hoje" de Brasília, igual no servidor (UTC) e no navegador: com
+  // `new Date()` puro, depois das 21h o servidor já marcava o dia seguinte e o
+  // React acusava diferença na hidratação.
+  const hojeISO = hoje();
+  const [anoHoje, mesHoje] = hojeISO.split("-").map(Number);
+  const [mes, setMes] = useState(new Date(anoHoje, mesHoje - 1, 1));
   const [categoria, setCategoria] = useState("todas");
   const [tipos, setTipos] = useState<Record<EventoCalendario["tipo"], boolean>>({
     realizada: true,
     programada: true,
     atrasada: true,
   });
-  const [diaSelecionado, setDiaSelecionado] = useState<string | null>(isoLocal(agora));
+  const [diaSelecionado, setDiaSelecionado] = useState<string | null>(hojeISO);
 
   const filtrados = useMemo(
     () =>
@@ -87,7 +91,6 @@ export function Calendario({
     });
   }, [mes]);
 
-  const hojeISO = isoLocal(agora);
   const doMes = filtrados.filter(
     (e) =>
       e.data >= isoLocal(new Date(mes.getFullYear(), mes.getMonth(), 1)) &&
@@ -131,7 +134,7 @@ export function Calendario({
           <button
             type="button"
             onClick={() => {
-              setMes(new Date(agora.getFullYear(), agora.getMonth(), 1));
+              setMes(new Date(anoHoje, mesHoje - 1, 1));
               setDiaSelecionado(hojeISO);
             }}
             className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"

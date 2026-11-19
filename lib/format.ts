@@ -43,18 +43,51 @@ export function dataHoraBR(iso: string | null | undefined) {
   });
 }
 
+const FUSO = "America/Sao_Paulo";
+
 /**
  * Data de hoje em Brasília (AAAA-MM-DD). `toISOString` usa UTC — depois das 21h
  * já seria amanhã — e o container roda em UTC; o fuso fixo resolve os dois.
+ * Também evita erro de hidratação: servidor e navegador chegam ao mesmo dia.
  */
-export const hoje = () => new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+export const hoje = (agora = new Date()) => agora.toLocaleDateString("sv-SE", { timeZone: FUSO });
 
-export function primeiroDiaDoMes(d = new Date()) {
-  return new Date(d.getFullYear(), d.getMonth(), 1).toLocaleDateString("sv-SE");
+const doisDigitos = (n: number) => String(n).padStart(2, "0");
+
+/** Ano e mês (1–12) de Brasília, deslocados `meses` a partir do mês atual. */
+export function mesBR(meses = 0, agora = new Date()) {
+  const [a, m] = hoje(agora).split("-").map(Number);
+  const d = new Date(Date.UTC(a, m - 1 + meses, 1));
+  return { ano: d.getUTCFullYear(), mes: d.getUTCMonth() + 1 };
 }
 
-export function ultimoDiaDoMes(d = new Date()) {
-  return new Date(d.getFullYear(), d.getMonth() + 1, 0).toLocaleDateString("sv-SE");
+/** Primeiro dia do mês (de Brasília) como AAAA-MM-DD. `meses` desloca: -1 = mês passado. */
+export function primeiroDiaDoMes(meses = 0, agora = new Date()) {
+  const { ano, mes } = mesBR(meses, agora);
+  return `${ano}-${doisDigitos(mes)}-01`;
+}
+
+export function ultimoDiaDoMes(meses = 0, agora = new Date()) {
+  const { ano, mes } = mesBR(meses, agora);
+  return `${ano}-${doisDigitos(mes)}-${doisDigitos(new Date(Date.UTC(ano, mes, 0)).getUTCDate())}`;
+}
+
+/** Soma dias a uma data AAAA-MM-DD sem passar pelo fuso local. */
+export function somarDias(iso: string, dias: number) {
+  const [a, m, d] = iso.split("-").map(Number);
+  const dt = new Date(Date.UTC(a, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + dias);
+  return dt.toISOString().slice(0, 10);
+}
+
+/** Soma meses sem estourar para o mês seguinte (31/01 + 1 mês = 28/02). */
+export function somarMeses(iso: string, meses: number) {
+  const [a, m, d] = iso.split("-").map(Number);
+  const dt = new Date(Date.UTC(a, m - 1, 1));
+  dt.setUTCMonth(dt.getUTCMonth() + meses);
+  const ultimoDia = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth() + 1, 0)).getUTCDate();
+  dt.setUTCDate(Math.min(d, ultimoDia));
+  return dt.toISOString().slice(0, 10);
 }
 
 export const isoLocal = (d: Date) => d.toLocaleDateString("sv-SE");

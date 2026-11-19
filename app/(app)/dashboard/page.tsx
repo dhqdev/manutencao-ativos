@@ -18,8 +18,10 @@ import {
   TIPOS_MANUTENCAO,
   dataBR,
   descreverPrazo,
+  mesBR,
   moeda,
   numero,
+  primeiroDiaDoMes,
 } from "@/lib/format";
 import { getContexto } from "@/lib/session";
 import { createClient } from "@/lib/db/server";
@@ -31,10 +33,9 @@ export default async function DashboardPage() {
   const { orgId, profile } = await getContexto();
   const db = await createClient();
 
-  const inicioJanela = new Date();
-  inicioJanela.setDate(1);
-  inicioJanela.setMonth(inicioJanela.getMonth() - 5);
-  const janelaISO = inicioJanela.toLocaleDateString("sv-SE");
+  // Meses de Brasília: o container roda em UTC, e na virada do mês (depois das
+  // 21h do último dia) o servidor já estaria no mês seguinte.
+  const janelaISO = primeiroDiaDoMes(-5);
 
   const [{ data: totais }, { data: planos }, { data: recentes }, { data: doPeriodo }, { count: qtdAtivos }] =
     await Promise.all([
@@ -78,22 +79,15 @@ export default async function DashboardPage() {
 
   // Gasto dos últimos 6 meses
   const meses: PontoMensal[] = [];
+  const indicePorMes = new Map<string, number>();
   for (let i = 5; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(1);
-    d.setMonth(d.getMonth() - i);
+    const { ano, mes } = mesBR(-i);
+    indicePorMes.set(`${ano}-${String(mes).padStart(2, "0")}`, meses.length);
     meses.push({
-      rotulo: d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", ""),
+      rotulo: new Date(ano, mes - 1, 1).toLocaleDateString("pt-BR", { month: "short" }).replace(".", ""),
       valor: 0,
       quantidade: 0,
     });
-  }
-  const indicePorMes = new Map<string, number>();
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(1);
-    d.setMonth(d.getMonth() - i);
-    indicePorMes.set(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`, 5 - i);
   }
 
   const porCategoria = new Map<string, GastoCategoria>();

@@ -2,6 +2,7 @@ import { Calendario, type EventoCalendario } from "@/components/calendario/calen
 import { Cabecalho } from "@/components/ui";
 import { getContexto } from "@/lib/session";
 import { createClient } from "@/lib/db/server";
+import { primeiroDiaDoMes, ultimoDiaDoMes } from "@/lib/format";
 import type { ManutencaoCompleta, PlanoStatus } from "@/lib/types";
 
 export const metadata = { title: "Calendário · Gestão de Manutenção" };
@@ -11,18 +12,16 @@ export default async function CalendarioPage() {
   const db = await createClient();
 
   // Janela de 12 meses para trás e 12 para frente.
-  const de = new Date();
-  de.setMonth(de.getMonth() - 12);
-  const ate = new Date();
-  ate.setMonth(ate.getMonth() + 12);
+  const de = primeiroDiaDoMes(-12);
+  const ate = ultimoDiaDoMes(12);
 
   const [{ data: realizadas }, { data: planos }, { data: categorias }] = await Promise.all([
     db
       .from("vw_manutencoes_completo")
       .select("*")
       .eq("org_id", orgId)
-      .gte("data_manutencao", de.toLocaleDateString("sv-SE"))
-      .lte("data_manutencao", ate.toLocaleDateString("sv-SE")),
+      .gte("data_manutencao", de)
+      .lte("data_manutencao", ate),
     db.from("vw_planos_status").select("*").eq("org_id", orgId).eq("ativo", true),
     db.from("categorias").select("id, nome, cor").eq("org_id", orgId).order("ordem").order("nome"),
   ]);

@@ -25,6 +25,7 @@ import {
   type StatusWhatsapp,
 } from "@/lib/actions/whatsapp";
 import { MAX_DESTINATARIOS, formatarTelefone } from "@/lib/telefone";
+import { dataHoraBR } from "@/lib/format";
 
 export type ConexaoAtual = {
   status: "desconectado" | "conectando" | "conectado";
@@ -496,7 +497,7 @@ export function PainelWhatsapp({ conexao }: { conexao: ConexaoAtual }) {
               <div className="flex items-center justify-between gap-3 pt-1">
                 <p className="text-xs text-slate-500">
                   {conexao?.ultimo_envio
-                    ? `Último envio: ${new Date(conexao.ultimo_envio).toLocaleString("pt-BR")}`
+                    ? `Último envio: ${dataHoraBR(conexao.ultimo_envio)}`
                     : "Nenhum resumo enviado ainda."}
                 </p>
                 <Botao type="submit" tamanho="sm" disabled={ocupado}>

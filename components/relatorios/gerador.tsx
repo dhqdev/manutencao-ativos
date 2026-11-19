@@ -19,9 +19,11 @@ import {
   TIPOS_MANUTENCAO,
   TIPOS_MOV_PNEU,
   dataBR,
+  hoje,
   moeda,
   numero,
   primeiroDiaDoMes,
+  somarMeses,
   ultimoDiaDoMes,
 } from "@/lib/format";
 import {
@@ -125,10 +127,9 @@ export function GeradorRelatorio({
       setAte(ultimoDiaDoMes());
       return;
     }
-    const inicio = new Date();
-    inicio.setMonth(inicio.getMonth() - meses);
-    setDe(inicio.toLocaleDateString("sv-SE"));
-    setAte(new Date().toLocaleDateString("sv-SE"));
+    const hojeBR = hoje();
+    setDe(somarMeses(hojeBR, -meses));
+    setAte(hojeBR);
   }
 
   function baixarPDF() {
