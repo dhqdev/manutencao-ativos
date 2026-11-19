@@ -171,6 +171,7 @@ as $$
              (select count(*) from public.manutencoes m where m.org_id = o.id) as manutencoes,
              (select max(m.created_at) from public.manutencoes m where m.org_id = o.id) as ultima_atividade,
              (select w.status from public.whatsapp_conexoes w where w.org_id = o.id) as whatsapp,
+             (select w.numero from public.whatsapp_conexoes w where w.org_id = o.id) as whatsapp_numero,
              coalesce((
                select json_agg(json_build_object(
                         'user_id', m.user_id, 'papel', m.papel,
@@ -445,6 +446,47 @@ begin
     end if;
   end loop;
 end $$;
+
+-- Quanto cada empresa ocupa no banco: linhas e bytes de todas as tabelas com
+-- org_id (descobertas na hora, então tabela nova entra sozinha). Os arquivos
+-- (fotos e anexos) ficam no disco e o app soma à parte.
+create or replace function public.admin_uso_empresas()
+returns json
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_tabela text;
+  v_sql    text := '';
+  v_json   json;
+begin
+  for v_tabela in
+    select c.table_name
+      from information_schema.columns c
+      join information_schema.tables t
+        on t.table_schema = c.table_schema and t.table_name = c.table_name
+     where c.table_schema = 'public' and c.column_name = 'org_id' and t.table_type = 'BASE TABLE'
+     order by c.table_name
+  loop
+    v_sql := v_sql || case when v_sql = '' then '' else ' union all ' end
+          || format('select org_id, count(*) as linhas, coalesce(sum(pg_column_size(x.*)), 0) as bytes '
+                    'from public.%I x group by org_id', v_tabela);
+  end loop;
+
+  if v_sql = '' then
+    return '[]'::json;
+  end if;
+
+  execute format(
+    'select coalesce(json_agg(json_build_object(''org_id'', org_id, ''linhas'', linhas, ''bytes'', bytes)), ''[]''::json)
+       from (select org_id, sum(linhas)::bigint as linhas, sum(bytes)::bigint as bytes
+               from (%s) u where org_id is not null group by org_id) s', v_sql)
+    into v_json;
+  return v_json;
+end;
+$$;
 
 -- Permissões: só o servidor ------------------------------------------------
 do $$

@@ -15,7 +15,7 @@ type Item = { href: string; rotulo: string; Icone: LucideIcon; exato?: boolean }
  * ganha a própria página em app/admin/<seção>/page.tsx; com mais de uma, a
  * barra inferior aparece no celular.
  */
-const SECOES: Item[] = [{ href: "/admin", rotulo: "Usuários", Icone: Users, exato: true }];
+const SECOES: Item[] = [{ href: "/admin", rotulo: "Gerência", Icone: Users, exato: true }];
 
 /**
  * Casca do console do superadmin. Separada da navegação do sistema das

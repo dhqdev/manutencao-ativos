@@ -203,7 +203,13 @@ empresas):
   acesso e sessões, **empresas** (pôr em outra empresa, trocar o papel, tirar)
   e excluir.
 
-Abaixo da lista fica o bloco **Versão do sistema** (a que está no ar e a
+Na aba **Clientes e uso**, cada empresa aparece com o **espaço que ocupa**
+(fotos e anexos no disco + estimativa das linhas no banco, com barra
+comparando os clientes), quantos ativos e manutenções tem e se o **WhatsApp
+está conectado** (com o número). No topo, os totais: clientes, espaço usado,
+quanto é arquivo e quanto é banco, e quantos estão com WhatsApp.
+
+Abaixo fica o bloco **Versão do sistema** (a que está no ar e a
 última publicada no GitHub Packages, com o botão **Atualizar**).
 
 #### Atualizar pelo console

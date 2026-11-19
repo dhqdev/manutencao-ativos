@@ -263,7 +263,7 @@ await passo("usuário comum não vê o console do superadmin", async () => {
 await passo("superadmin (da stack) entra direto na gerência de usuários, sem acesso ao sistema", async () => {
   await page.goto("/auth/sair");
   await entrar(SUPERADMIN, "**/admin");
-  await page.getByRole("heading", { name: "Usuários", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "Gerência", exact: true }).waitFor();
   await page.locator(`li[data-usuario="${GESTOR.email}"]`).waitFor();
   // O sistema das empresas devolve o superadmin ao console.
   await page.goto("/dashboard");
@@ -292,6 +292,16 @@ await passo("console: detalhe do usuário troca o papel na empresa", async () =>
   await papel.selectOption("tecnico");
   await page.waitForLoadState("networkidle");
   await page.keyboard.press("Escape");
+});
+
+await passo("console: uso de cada cliente (arquivos e banco) e WhatsApp", async () => {
+  await page.goto("/admin?aba=clientes");
+  const linha = page.locator('li[data-cliente="Oficina E2E"]');
+  await linha.waitFor();
+  // A Oficina E2E tem uma foto e um PDF: o espaço não pode ser zero.
+  await linha.getByText(/[1-9]\d* arquivo\(s\)/).waitFor();
+  verdade(!/^0 B$/.test((await linha.locator("[data-uso-total]").textContent())?.trim() ?? ""), "uso zerado");
+  await linha.locator('[data-whatsapp="desligado"]').waitFor();
 });
 
 await passo("superadmin bloqueia um usuário e ele não entra mais", async () => {

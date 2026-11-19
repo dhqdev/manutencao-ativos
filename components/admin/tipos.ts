@@ -46,6 +46,7 @@ export type EmpresaAdmin = {
   manutencoes: number;
   ultima_atividade: string | null;
   whatsapp: string | null;
+  whatsapp_numero: string | null;
   membros: MembroAdmin[];
 };
 
@@ -113,3 +114,24 @@ export const ORDENS = {
   novos: "Mais novos",
 } as const;
 export type Ordem = keyof typeof ORDENS;
+
+/** Quanto uma empresa ocupa: linhas/bytes no banco e arquivos no disco. */
+export type UsoEmpresa = {
+  org_id: string;
+  linhas: number;
+  bytesBanco: number;
+  arquivos: number;
+  bytesArquivos: number;
+};
+
+export function tamanho(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  const un = ["KB", "MB", "GB", "TB"];
+  let v = bytes / 1024;
+  let i = 0;
+  while (v >= 1024 && i < un.length - 1) {
+    v /= 1024;
+    i++;
+  }
+  return `${v.toLocaleString("pt-BR", { maximumFractionDigits: v < 10 ? 1 : 0 })} ${un[i]}`;
+}
