@@ -3,7 +3,7 @@ import { cache } from "react";
 import { notFound, redirect } from "next/navigation";
 import { obterSessao } from "@/lib/auth/sessao";
 import { createAdminClient } from "@/lib/db/admin";
-import type { EmpresaAdmin, ResumoAdmin, UsuarioAdmin } from "@/components/admin/tipos";
+import type { EmpresaAdmin, UsuarioAdmin } from "@/components/admin/tipos";
 
 /**
  * Console do superadmin (/admin). Layout e páginas rodam em paralelo no Next,
@@ -27,7 +27,6 @@ async function rpc<T>(nome: string, vazio: T): Promise<Dados<T>> {
   return { dados: (data ?? vazio) as T, erro: null };
 }
 
-export const carregarResumo = cache(() => rpc<ResumoAdmin>("admin_resumo", {} as ResumoAdmin));
 export const carregarUsuarios = cache(() => rpc<UsuarioAdmin[]>("admin_usuarios", []));
 export const carregarEmpresas = cache(() => rpc<EmpresaAdmin[]>("admin_empresas", []));
 

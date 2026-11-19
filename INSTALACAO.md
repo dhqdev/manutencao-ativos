@@ -100,7 +100,7 @@ ou mais caracteres): é o login que administra todas as empresas e usuários pel
 > **Portainer com um Traefik que já existe na VM?** Use
 > [`infra/portainer.yml`](infra/portainer.yml): troque os valores `TROQUE-...`,
 > cole em *Stacks → Add stack* e faça o Deploy. Para atualizar: console do
-> superadmin → **Sistema** → **Atualizar** (serviço `manutencao-atualizador`), ou
+> superadmin → **Versão do sistema** → **Atualizar** (serviço `manutencao-atualizador`), ou
 > troque a tag das linhas `image:` do ghcr.io pela release nova e clique em
 > *Update the stack*.
 
@@ -120,11 +120,11 @@ docker service logs -f manutencao_app
 ```
 
 Em 1–2 minutos: `https://SEU_DOMINIO` → entre com o `SUPERADMIN_EMAIL` e a
-`SUPERADMIN_SENHA`. Você cai no **console do superadmin**, onde cria empresas e usuários.
+`SUPERADMIN_SENHA`. Você cai no **console do superadmin**, onde cria os usuários (cada um numa empresa nova ou numa existente).
 
 > Quer que só você crie contas? Ponha `CADASTRO_ABERTO='false'` no `.env` e
 > rode `./deploy.sh` de novo. Novos usuários passam a ser criados pelo
-> superadmin (console → Usuários) ou pelo gestor (Configurações → Equipe).
+> superadmin (console) ou pelo gestor (Configurações → Equipe).
 
 ---
 
@@ -178,7 +178,7 @@ O job `deploy` copia `stack.yml`, `traefik.yml` e `deploy.sh` e roda
 
 ## Operação
 
-**Atualizar:** console do superadmin → **Sistema** → **Atualizar para vX**
+**Atualizar:** console do superadmin → bloco **Versão do sistema** → **Atualizar para vX**
 (o serviço `atualizador` aplica a última release publicada no ghcr.io), push na
 `main` (com deploy automático) ou, na VM, `./deploy.sh`. O botão troca só as
 imagens: quando a release muda o arquivo da stack (variável ou serviço novo),
@@ -294,7 +294,7 @@ docker run --rm -v manutencao_arquivos:/dados/arquivos -v manutencao_backups:/ba
 
 ### Trocar a senha de alguém pelo servidor
 
-O jeito fácil é o superadmin: **console → Usuários → chave** (define ou
+O jeito fácil é o superadmin: **console → chave na linha do usuário** (define ou
 gera uma senha nova). Pelo terminal, para quando nem o superadmin entra
 (a senha do superadmin se acerta trocando `SUPERADMIN_SENHA` na stack):
 

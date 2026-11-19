@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building2, LayoutDashboard, LogOut, type LucideIcon, Server, ShieldCheck, Users } from "lucide-react";
+import { LogOut, type LucideIcon, ShieldCheck, Users } from "lucide-react";
 import { Logo } from "@/components/marca";
 import { cn } from "@/components/ui";
 import { AlternarTema } from "@/components/tema/alternar-tema";
@@ -11,20 +11,16 @@ import { iniciais } from "@/lib/format";
 type Item = { href: string; rotulo: string; Icone: LucideIcon; exato?: boolean };
 
 /**
- * Seções do console. Seção nova (ex.: atualizações) entra aqui e ganha a
- * própria página em app/admin/<seção>/page.tsx. Até 5 cabem na barra do celular.
+ * O console tem uma tela só (gerência dos usuários). Seção nova entra aqui e
+ * ganha a própria página em app/admin/<seção>/page.tsx; com mais de uma, a
+ * barra inferior aparece no celular.
  */
-const SECOES: Item[] = [
-  { href: "/admin", rotulo: "Visão geral", Icone: LayoutDashboard, exato: true },
-  { href: "/admin/usuarios", rotulo: "Usuários", Icone: Users },
-  { href: "/admin/empresas", rotulo: "Empresas", Icone: Building2 },
-  { href: "/admin/sistema", rotulo: "Sistema", Icone: Server },
-];
+const SECOES: Item[] = [{ href: "/admin", rotulo: "Usuários", Icone: Users, exato: true }];
 
 /**
  * Casca do console do superadmin. Separada da navegação do sistema das
- * empresas de propósito: o superadmin só gerencia (usuários, empresas,
- * sistema), não trabalha dentro de nenhuma empresa.
+ * empresas de propósito: o superadmin só gerencia os usuários, não trabalha
+ * dentro de nenhuma empresa.
  */
 export function ConsoleAdmin({
   nome,
@@ -121,7 +117,14 @@ export function ConsoleAdmin({
           </div>
         </header>
 
-        <main className="min-w-0 flex-1 px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 sm:p-6 sm:pb-[calc(6rem+env(safe-area-inset-bottom))] lg:p-8 lg:pb-8">
+        <main
+          className={cn(
+            "min-w-0 flex-1 px-4 pt-4 sm:p-6 lg:p-8 lg:pb-8",
+            SECOES.length > 1
+              ? "pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-[calc(6rem+env(safe-area-inset-bottom))]"
+              : "pb-[calc(1.5rem+env(safe-area-inset-bottom))]",
+          )}
+        >
           <div key={pathname} className="entrada-pagina mx-auto w-full max-w-6xl">
             {children}
           </div>
@@ -129,6 +132,7 @@ export function ConsoleAdmin({
       </div>
 
       {/* ---------------- Barra inferior (celular) ---------------- */}
+      {SECOES.length > 1 && (
       <nav
         className="no-print area-segura-inferior fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-superficie/95 backdrop-blur lg:hidden"
         aria-label="Console (celular)"
@@ -156,6 +160,7 @@ export function ConsoleAdmin({
           ))}
         </div>
       </nav>
+      )}
     </div>
   );
 }

@@ -166,16 +166,3 @@ export function FormModal({
     </Modal>
   );
 }
-
-/** Número grande com legenda (visão geral e detalhe da empresa). */
-export function Numero({ rotulo, valor, detalhe }: { rotulo: string; valor: number | string; detalhe?: string }) {
-  return (
-    <div className="card p-3.5 sm:p-5">
-      <p className="text-xs font-medium text-slate-500 sm:text-sm">{rotulo}</p>
-      <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-900">
-        {typeof valor === "number" ? valor.toLocaleString("pt-BR") : valor}
-      </p>
-      {detalhe && <p className="mt-1 truncate text-[11px] text-slate-500 sm:text-xs">{detalhe}</p>}
-    </div>
-  );
-}

@@ -172,28 +172,20 @@ para o e-mail novo; deixar as duas vazias tira o posto de todo mundo.
 O superadmin **só gerencia**: ao entrar ele cai direto no **console do
 superadmin** (`/admin`), com menu próprio, e não tem acesso ao sistema das
 empresas (dashboard, ativos, manutenções…). Qualquer tela do sistema o devolve
-ao console, e ele não pode fazer parte da equipe de nenhuma empresa. O console
-tem:
+ao console, e ele não pode fazer parte da equipe de nenhuma empresa.
 
-- **Visão geral**: números do sistema (usuários, empresas, ativos, manutenções,
-  sessões abertas, WhatsApps conectados), o que pede atenção (bloqueados,
-  usuários sem empresa, empresas sem proprietário), últimos acessos e empresas
-  mais novas.
-- **Usuários** (todos, de todas as empresas), com filtros (entraram em 7 dias,
-  nunca entraram, sem empresa, bloqueados): criar login (numa empresa nova ou
-  numa existente, com qualquer papel), editar nome e e-mail, definir/gerar
-  senha, encerrar sessões, **bloquear/desbloquear** e excluir.
-- **Empresas**: lista com busca e uma tela por empresa com números, dados
-  (editar), equipe (adicionar pessoa, trocar papel, trocar o proprietário,
-  remover) e excluir (com fotos, anexos e WhatsApp).
-- **Sistema**: **versão do sistema** (a que está no ar e a última publicada no
-  GitHub Packages, com o botão **Atualizar**), saúde do banco, sessões e
-  WhatsApp, e como o superadmin é definido.
+O console tem **uma tela só, a gerência dos usuários** (todos, de todas as
+empresas), com filtros (entraram em 7 dias, nunca entraram, sem empresa,
+bloqueados): criar login (numa empresa nova ou numa existente, com qualquer
+papel), editar nome e e-mail, definir/gerar senha, encerrar sessões,
+**bloquear/desbloquear** e excluir. No topo fica o bloco **Versão do sistema**
+(a que está no ar e a última publicada no GitHub Packages, com o botão
+**Atualizar**).
 
 #### Atualizar pelo console
 
 Cada push verde na `main` publica as imagens com a tag `vAAAA.MM.DD-N` no
-ghcr.io. A tela **Sistema** compara a versão no ar (gravada na imagem do app)
+ghcr.io. O bloco **Versão do sistema**, no topo do console, compara a versão no ar (gravada na imagem do app)
 com a maior tag publicada e, quando há uma nova, mostra **Atualizar para
 vX**. O clique só grava o pedido no banco (`sistema_atualizacoes`); o serviço
 `atualizador` da stack pega o pedido e:
@@ -212,7 +204,7 @@ Sem o serviço `atualizador` na stack, a tela avisa e o botão fica desligado.
 A cada deploy o migrador tira o superadmin das empresas: a empresa vazia que o
 cadastro monta para ele é apagada; nas empresas com mais gente ele só sai (se
 era o proprietário, a próxima pessoa assume). Empresa com dados em que ele é a
-única pessoa fica, e aparece no console para você decidir.
+única pessoa fica como está.
 
 Quem não é superadmin não vê o console e recebe 404 em `/admin`. Cada tela e
 cada ação conferem no banco, pela sessão, se quem pediu é o superadmin; as
@@ -232,7 +224,7 @@ quantos registros vão sair e pede para digitar APAGAR.
 ```
 app/
   (app)/            telas internas (dashboard, ativos, manutenções, calendário, relatórios, configurações)
-  admin/            console do superadmin (só gerência: usuários, empresas, sistema)
+  admin/            console do superadmin (uma tela: gerência dos usuários e versão)
   api/arquivos/     envio e leitura de fotos/anexos (links assinados)
   api/notificacoes/ rotina diária do WhatsApp (chamada pelo serviço cron)
   auth/             login, cadastro, recuperação de senha e logout

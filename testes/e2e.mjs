@@ -234,53 +234,33 @@ await passo("usuário comum não vê o console do superadmin", async () => {
   verdade((await page.locator('a[href^="/admin"]').count()) === 0, "link do console apareceu para usuário comum");
   // A tela é transmitida aos poucos (loading.tsx): o status HTTP já saiu 200
   // quando a página chama notFound(). Confere o conteúdo, não o status.
-  await page.goto("/admin/usuarios");
+  await page.goto("/admin");
   await page.getByText("Página não encontrada").first().waitFor();
   verdade((await page.getByText("Console do superadmin").count()) === 0, "usuário comum abriu o console!");
   verdade((await page.getByText(GESTOR.email).count()) === 0, "console vazou a lista de usuários!");
 });
 
-await passo("superadmin (da stack) entra direto no console, sem acesso ao sistema das empresas", async () => {
+await passo("superadmin (da stack) entra direto na gerência de usuários, sem acesso ao sistema", async () => {
   await page.goto("/auth/sair");
   await entrar(SUPERADMIN, "**/admin");
-  await page.getByRole("heading", { name: "Visão geral" }).waitFor();
+  await page.getByRole("heading", { name: "Usuários", exact: true }).waitFor();
+  await page.locator(`li[data-usuario="${GESTOR.email}"]`).waitFor();
   // O sistema das empresas devolve o superadmin ao console.
   await page.goto("/dashboard");
   await page.waitForURL("**/admin");
   verdade((await page.locator('a[href="/dashboard"]').count()) === 0, "console mostrou o menu do sistema");
 });
 
-await passo("console: usuários e empresas de todo o sistema", async () => {
-  await page.goto("/admin/usuarios");
-  await page.locator(`li[data-usuario="${GESTOR.email}"]`).waitFor();
-  await page.goto("/admin/empresas");
-  await page.getByText("Oficina E2E", { exact: true }).first().waitFor();
-  await page.getByText("Empresa Intrusa", { exact: true }).first().waitFor();
-  await page.getByRole("link", { name: /Oficina E2E/ }).click();
-  await page.getByRole("heading", { name: "Oficina E2E" }).waitFor();
-  await page.locator(`li[data-membro="${GESTOR.email}"]`).waitFor();
-});
-
-await passo("console: tela Sistema mostra a versão e o atualizador", async () => {
-  await page.goto("/admin/sistema");
+await passo("console: bloco da versão do sistema com o atualizador", async () => {
   await page.getByRole("heading", { name: "Versão do sistema" }).waitFor();
   const versao = (await page.locator("[data-versao-atual]").textContent())?.trim();
   verdade(/^v\d{4}\.\d{2}\.\d{2}-\d+$/.test(versao ?? ""), `versão no ar fora do padrão: ${versao}`);
   // O serviço atualizador da stack manda sinal de vida: sem ele aparece o aviso.
   verdade((await page.getByText("não está rodando na stack").count()) === 0, "painel diz que o atualizador não está na stack");
-  await page.goto("/admin/empresas");
-  await page.getByRole("link", { name: /Oficina E2E/ }).click();
-  await page.getByRole("heading", { name: "Oficina E2E" }).waitFor();
-});
-
-await passo("console: superadmin não entra na equipe de uma empresa", async () => {
-  await page.fill('input[name="email"]', SUPERADMIN.email);
-  await page.getByRole("button", { name: "Adicionar" }).click();
-  await page.getByText(/não entra na equipe/).waitFor();
 });
 
 await passo("superadmin bloqueia um usuário e ele não entra mais", async () => {
-  await page.goto("/admin/usuarios");
+  await page.goto("/admin");
   const linha = page.locator(`li[data-usuario="${INTRUSO.email}"]`);
   await linha.getByRole("button", { name: "Bloquear acesso" }).click();
   await linha.getByText("Bloqueado").waitFor();

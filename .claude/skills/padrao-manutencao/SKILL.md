@@ -75,8 +75,9 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
 - Superadmin = **console de gerência** (`app/admin/`, fora do grupo `(app)`,
   casca própria em `components/admin/console.tsx`). Ele **não** entra no
   sistema das empresas: `getContexto()` o redireciona para `/admin` e ele não
-  pode ser membro de equipe (`admin_definir_membro` recusa). Seção nova do
-  console: item em `SECOES` + `app/admin/<seção>/page.tsx`.
+  pode ser membro de equipe (`admin_definir_membro` recusa). O dono quer
+  **uma tela só** (gerência dos usuários + bloco da versão em `app/admin/page.tsx`);
+  não crie telas novas no console sem ele pedir.
   - Toda página do console começa com `exigirSuperadminTela()`
     (`lib/admin-console.ts`) — layout e página rodam em paralelo, não confie
     só no layout. Dados pelos `carregar*()` do mesmo arquivo.

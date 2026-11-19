@@ -7,7 +7,6 @@ import {
   criarUsuario as criarLogin,
   definirSenha,
   encerrarSessoesDoUsuario,
-  usuarioPorEmail,
   usuarioPorId,
 } from "@/lib/auth/usuarios";
 import { createAdminClient } from "@/lib/db/admin";
@@ -24,7 +23,6 @@ import type { PapelMembro } from "@/lib/types";
 
 const PAPEIS: PapelMembro[] = ["proprietario", "gestor", "tecnico", "leitor"];
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const SUPERADMIN_FORA = "O superadmin só administra o sistema; ele não entra na equipe das empresas.";
 
 export type CredenciaisAdmin =
   | { ok: true; nome: string; email: string; senha: string | null; aviso?: string }
@@ -180,112 +178,6 @@ export async function adminExcluirUsuario(userId: string): Promise<Resultado> {
     if (error) return { ok: false, erro: error.message };
     await limpar(data as Limpeza);
     return pronto();
-  } catch (e) {
-    return falha(e);
-  }
-}
-
-// --- Empresas -------------------------------------------------------------------
-
-export async function adminCriarEmpresa(fd: FormData): Promise<Resultado> {
-  try {
-    const { admin } = await exigirSuperadmin();
-    const nome = textoObrigatorio(fd, "nome", "o nome da empresa");
-    const emailDono = texto(fd, "dono")?.toLowerCase() ?? null;
-
-    let dono: string | null = null;
-    if (emailDono) {
-      const usuario = await usuarioPorEmail(emailDono);
-      if (!usuario) return { ok: false, erro: "Nenhum usuário com este e-mail. Crie o usuário antes." };
-      if (usuario.superadmin) return { ok: false, erro: SUPERADMIN_FORA };
-      dono = usuario.id;
-    }
-
-    const { error } = await admin.rpc("admin_criar_empresa", { p_nome: nome, p_dono: dono });
-    if (error) return { ok: false, erro: error.message };
-    return pronto();
-  } catch (e) {
-    return falha(e);
-  }
-}
-
-export async function adminEditarEmpresa(fd: FormData): Promise<Resultado> {
-  try {
-    const { admin } = await exigirSuperadmin();
-    const { data, error } = await admin
-      .from("organizacoes")
-      .update({
-        nome: textoObrigatorio(fd, "nome", "o nome da empresa"),
-        cnpj: texto(fd, "cnpj"),
-        telefone: texto(fd, "telefone"),
-        endereco: texto(fd, "endereco"),
-      })
-      .eq("id", textoObrigatorio(fd, "id", "a empresa"))
-      .select("id");
-    if (error) return { ok: false, erro: error.message };
-    if (!data?.length) return { ok: false, erro: "Empresa não encontrada." };
-    revalidatePath("/", "layout");
-    return { ok: true };
-  } catch (e) {
-    return falha(e);
-  }
-}
-
-export async function adminExcluirEmpresa(orgId: string): Promise<Resultado> {
-  try {
-    const { admin } = await exigirSuperadmin();
-    const { data, error } = await admin.rpc("admin_excluir_empresa", { p_org: orgId });
-    if (error) return { ok: false, erro: error.message };
-    await limpar(data as Limpeza);
-    revalidatePath("/", "layout");
-    return { ok: true };
-  } catch (e) {
-    return falha(e);
-  }
-}
-
-/** Põe na empresa alguém que já tem login (pelo e-mail), com o papel escolhido. */
-export async function adminAdicionarMembro(fd: FormData): Promise<Resultado> {
-  try {
-    const { admin } = await exigirSuperadmin();
-    const orgId = textoObrigatorio(fd, "org_id", "a empresa");
-    const email = textoObrigatorio(fd, "email", "o e-mail").toLowerCase();
-    const papel = papelValido(texto(fd, "papel") ?? "tecnico");
-
-    const usuario = await usuarioPorEmail(email);
-    if (!usuario) return { ok: false, erro: "Nenhum usuário com este e-mail. Crie o usuário na tela Usuários." };
-    if (usuario.superadmin) return { ok: false, erro: SUPERADMIN_FORA };
-
-    const { error } = await admin.rpc("admin_definir_membro", { p_org: orgId, p_user: usuario.id, p_papel: papel });
-    if (error) return { ok: false, erro: error.message };
-    return pronto();
-  } catch (e) {
-    return falha(e);
-  }
-}
-
-export async function adminAlterarPapel(orgId: string, userId: string, papel: PapelMembro): Promise<Resultado> {
-  try {
-    const { admin } = await exigirSuperadmin();
-    const { error } = await admin.rpc("admin_definir_membro", {
-      p_org: orgId,
-      p_user: userId,
-      p_papel: papelValido(papel),
-    });
-    if (error) return { ok: false, erro: error.message };
-    return pronto();
-  } catch (e) {
-    return falha(e);
-  }
-}
-
-export async function adminRemoverMembro(orgId: string, userId: string): Promise<Resultado> {
-  try {
-    const { admin } = await exigirSuperadmin();
-    const { error } = await admin.rpc("admin_remover_membro", { p_org: orgId, p_user: userId });
-    if (error) return { ok: false, erro: error.message };
-    revalidatePath("/", "layout");
-    return { ok: true };
   } catch (e) {
     return falha(e);
   }
