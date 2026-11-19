@@ -52,6 +52,11 @@ function verdade(condicao, mensagem) {
 const respostaDeArquivo = (metodo) =>
   page.waitForResponse((r) => r.url().includes("/api/arquivos/") && r.request().method() === metodo);
 
+/** Em /manutencoes, o histórico fica na segunda aba (a primeira é a das periódicas). */
+async function abrirHistorico() {
+  await page.getByRole("button", { name: /Histórico realizado/ }).first().click();
+}
+
 async function entrar(conta) {
   await page.goto("/login");
   await page.fill("#email", conta.email);
@@ -104,6 +109,8 @@ await passo("a foto do ativo abre (link assinado)", async () => {
   // A miniatura da lista já usou o mesmo link (validade arredondada para a
   // hora cheia): a foto pode vir do cache, sem nova requisição. Por isso
   // confere a imagem na tela e baixa o link à parte.
+  // A foto fica na aba "Dados do ativo" (não é a aba aberta por padrão).
+  await page.getByRole("button", { name: /Dados do ativo/ }).first().click();
   const foto = page.locator('img[alt="Foto de Trator E2E"]');
   await foto.waitFor();
   await page.waitForFunction(() => {
@@ -129,6 +136,7 @@ await passo("registra manutenção com anexo PDF", async () => {
   await dialogo.locator('button[type="submit"]').click();
   verdade((await envio).status() === 201, `upload do anexo: ${(await envio).status()}`);
   await dialogo.waitFor({ state: "detached" });
+  await abrirHistorico();
   await page.getByText("Troca de óleo E2E").first().waitFor();
 });
 
@@ -182,6 +190,7 @@ await passo("técnico entra e vê a manutenção da empresa", async () => {
   await entrar(TECNICO);
   await page.getByText("Oficina E2E").first().waitFor();
   await page.goto("/manutencoes");
+  await abrirHistorico();
   await page.getByText("Troca de óleo E2E").first().waitFor();
 });
 
