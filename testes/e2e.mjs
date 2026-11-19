@@ -232,8 +232,14 @@ await passo("outra empresa não enxerga os dados da primeira", async () => {
 
 await passo("usuário comum não vê o painel do superadmin", async () => {
   verdade((await page.locator('a[href="/admin"]').count()) === 0, "menu Administração apareceu para usuário comum");
-  const r = await page.goto("/admin");
-  verdade(r.status() === 404, `/admin para usuário comum: ${r.status()}`);
+  // A tela interna é transmitida aos poucos (loading.tsx): o status HTTP já saiu
+  // 200 quando a página chama notFound(). Confere o conteúdo, não o status.
+  await page.goto("/admin");
+  await page.getByText("Página não encontrada").first().waitFor();
+  verdade(
+    (await page.getByText("Administração do sistema").count()) === 0,
+    "usuário comum abriu o painel do superadmin!",
+  );
 });
 
 await passo("superadmin (da stack) entra e vê todas as empresas e usuários", async () => {
