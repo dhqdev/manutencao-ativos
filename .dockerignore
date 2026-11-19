@@ -1,0 +1,12 @@
+.git
+.github
+node_modules
+.next
+whatsapp
+db
+infra
+testes
+*.md
+.env
+.env.*
+npm-debug.log*

@@ -1,0 +1,24 @@
+node_modules
+.next
+out
+build
+.DS_Store
+*.pem
+npm-debug.log*
+.env
+.env*.local
+next-env.d.ts
+.vercel
+*.tsbuildinfo
+
+# Segredos do servidor (nunca no Git)
+infra/.env
+*.htpasswd
+segredos*.env
+
+# Testes ponta a ponta
+testes/node_modules
+testes/resultados
+
+# Arquivos enviados em desenvolvimento
+.arquivos

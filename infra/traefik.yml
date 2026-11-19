@@ -1,0 +1,81 @@
+# Stack "traefik": porta de entrada da internet (80/443), HTTPS automático
+# com Let's Encrypt e o painel do Traefik protegido por senha.
+#
+#   docker stack deploy -c traefik.yml traefik     (o infra/deploy.sh já faz)
+#
+# Os serviços de outras stacks aparecem aqui quando estão na rede externa
+# "rede_publica" e têm o label traefik.enable=true.
+
+version: "3.8"
+
+services:
+  traefik:
+    image: traefik:v3.6
+    command:
+      - --providers.swarm.endpoint=unix:///var/run/docker.sock
+      - --providers.swarm.exposedByDefault=false
+      - --providers.swarm.network=rede_publica
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      # Uploads de até 25 MB e rotina do WhatsApp de alguns minutos.
+      - --entrypoints.websecure.transport.respondingTimeouts.readTimeout=300s
+      - --entrypoints.websecure.transport.respondingTimeouts.writeTimeout=300s
+      - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}
+      - --certificatesresolvers.letsencrypt.acme.storage=/certificados/acme.json
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+      - --certificatesresolvers.letsencrypt.acme.caserver=${ACME_CA:-https://acme-v02.api.letsencrypt.org/directory}
+      - --api.dashboard=true
+      - --ping=true
+      - --log.level=INFO
+      - --accesslog=true
+      - --accesslog.fields.headers.defaultmode=drop
+    ports:
+      # mode: host → o Traefik vê o IP real de quem acessa (limite de
+      # tentativas de login por IP depende disso).
+      - target: 80
+        published: 80
+        protocol: tcp
+        mode: host
+      - target: 443
+        published: 443
+        protocol: tcp
+        mode: host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - certificados:/certificados
+    networks:
+      - rede_publica
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
+      update_config:
+        order: stop-first
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.painel.rule=Host(`${TRAEFIK_DOMINIO}`)
+        - traefik.http.routers.painel.entrypoints=websecure
+        - traefik.http.routers.painel.tls.certresolver=letsencrypt
+        - traefik.http.routers.painel.service=api@internal
+        - traefik.http.routers.painel.middlewares=painel-senha
+        - traefik.http.middlewares.painel-senha.basicauth.users=${TRAEFIK_PAINEL_USUARIOS}
+        # Obrigatório no Swarm, mesmo sem uso (o painel é um serviço interno).
+        - traefik.http.services.painel.loadbalancer.server.port=8080
+
+networks:
+  rede_publica:
+    external: true
+
+volumes:
+  certificados:

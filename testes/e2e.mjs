@@ -1,0 +1,210 @@
+// Teste ponta a ponta num Chromium de verdade, contra a stack no ar.
+//   BASE_URL=https://manutencao.localhost node e2e.mjs
+// Em caso de falha, salva print e HTML em testes/resultados/.
+import { mkdir, writeFile } from "node:fs/promises";
+import { chromium } from "playwright";
+
+const BASE = process.env.BASE_URL ?? "https://manutencao.localhost";
+const sufixo = Date.now();
+const GESTOR = { email: `gestor-${sufixo}@teste.com.br`, senha: "Senha-E2E-2026" };
+const TECNICO = { email: `tecnico-${sufixo}@teste.com.br`, senha: "Tecnico-E2E-2026" };
+
+// PNG 1x1 e um PDF mínimo, gerados aqui (sem arquivos de apoio).
+const PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+  "base64",
+);
+const PDF = Buffer.from("%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n");
+
+await mkdir("resultados", { recursive: true });
+const navegador = await chromium.launch();
+const contexto = await navegador.newContext({ ignoreHTTPSErrors: true, baseURL: BASE, locale: "pt-BR" });
+const page = await contexto.newPage();
+page.setDefaultTimeout(30_000);
+
+const errosDoNavegador = [];
+page.on("pageerror", (e) => errosDoNavegador.push(e.message));
+page.on("console", (m) => m.type() === "error" && errosDoNavegador.push(m.text()));
+
+let n = 0;
+async function passo(nome, fn) {
+  n++;
+  process.stdout.write(`${String(n).padStart(2)}. ${nome} ... `);
+  try {
+    await fn();
+    console.log("ok");
+  } catch (e) {
+    console.log("FALHOU");
+    const base = `resultados/${String(n).padStart(2, "0")}`;
+    await page.screenshot({ path: `${base}.png`, fullPage: true }).catch(() => {});
+    await writeFile(`${base}.html`, await page.content().catch(() => "")).catch(() => {});
+    console.error(`\nURL: ${page.url()}\n`, e);
+    if (errosDoNavegador.length) console.error("Erros no navegador:\n", errosDoNavegador.join("\n"));
+    await navegador.close();
+    process.exit(1);
+  }
+}
+
+function verdade(condicao, mensagem) {
+  if (!condicao) throw new Error(mensagem);
+}
+
+const respostaDeArquivo = (metodo) =>
+  page.waitForResponse((r) => r.url().includes("/api/arquivos/") && r.request().method() === metodo);
+
+async function entrar(conta) {
+  await page.goto("/login");
+  await page.fill("#email", conta.email);
+  await page.fill("#senha", conta.senha);
+  await page.click('button[type="submit"]');
+  await page.waitForURL("**/dashboard");
+}
+
+await passo("cadastro de uma empresa nova cai no painel", async () => {
+  await page.goto("/cadastro");
+  await page.fill("#nome", "Gestor E2E");
+  await page.fill("#empresa", "Oficina E2E");
+  await page.fill("#email", GESTOR.email);
+  await page.fill("#senha", GESTOR.senha);
+  await page.fill("#confirmacao", GESTOR.senha);
+  await page.click('button[type="submit"]');
+  await page.waitForURL("**/dashboard");
+  await page.getByText("Oficina E2E").first().waitFor();
+});
+
+await passo("cookie de sessão é httpOnly e Secure", async () => {
+  const cookie = (await contexto.cookies()).find((c) => c.name === "sessao");
+  verdade(cookie, "sem cookie de sessão");
+  verdade(cookie.httpOnly && cookie.secure, `cookie inseguro: ${JSON.stringify(cookie)}`);
+});
+
+await passo("as 6 categorias padrão existem", async () => {
+  await page.goto("/ativos");
+  const total = await page.locator('a[href^="/ativos/categoria/"]').count();
+  verdade(total >= 6, `só ${total} links de categoria`);
+});
+
+await passo("cadastra um ativo com foto (upload para /api/arquivos)", async () => {
+  await page.locator('a[href^="/ativos/categoria/"]').first().click();
+  await page.waitForURL("**/ativos/categoria/**");
+  await page.getByRole("button", { name: "Novo ativo" }).first().click();
+  const dialogo = page.getByRole("dialog");
+  await dialogo.locator('input[name="nome"]').fill("Trator E2E");
+  await dialogo.locator('input[type="file"]').setInputFiles({ name: "foto.png", mimeType: "image/png", buffer: PNG });
+  const envio = respostaDeArquivo("PUT");
+  await dialogo.getByRole("button", { name: "Cadastrar ativo" }).click();
+  verdade((await envio).status() === 201, `upload da foto: ${(await envio).status()}`);
+  await dialogo.waitFor({ state: "detached" });
+  await page.getByText("Trator E2E").first().waitFor();
+});
+
+await passo("a foto do ativo abre (link assinado)", async () => {
+  const leitura = respostaDeArquivo("GET");
+  await page.getByText("Trator E2E").first().click();
+  await page.waitForURL(/\/ativos\/[0-9a-f-]{36}$/);
+  const r = await leitura;
+  verdade(r.status() === 200, `foto: ${r.status()}`);
+  verdade(r.headers()["content-type"] === "image/png", `tipo: ${r.headers()["content-type"]}`);
+});
+
+await passo("registra manutenção com anexo PDF", async () => {
+  await page.goto("/manutencoes");
+  await page.getByRole("button", { name: "Registrar manutenção" }).first().click();
+  const dialogo = page.getByRole("dialog");
+  const seletor = dialogo.locator('select[name="ativo_id"]');
+  const valor = await seletor.evaluate((s) => [...s.options].find((o) => o.text.includes("Trator E2E"))?.value);
+  verdade(valor, "o ativo não aparece na lista");
+  await seletor.selectOption(valor);
+  await dialogo.locator('textarea[name="descricao"], input[name="descricao"]').fill("Troca de óleo E2E");
+  await dialogo.locator('input[type="file"]').setInputFiles({ name: "nota.pdf", mimeType: "application/pdf", buffer: PDF });
+  const envio = respostaDeArquivo("PUT");
+  await dialogo.locator('button[type="submit"]').click();
+  verdade((await envio).status() === 201, `upload do anexo: ${(await envio).status()}`);
+  await dialogo.waitFor({ state: "detached" });
+  await page.getByText("Troca de óleo E2E").first().waitFor();
+});
+
+await passo("o anexo baixa como PDF", async () => {
+  await page.goto("/manutencoes");
+  const link = page.locator('a[href*="/api/arquivos/"]').first();
+  await link.waitFor({ state: "attached" });
+  const r = await page.request.get(await link.getAttribute("href"));
+  verdade(r.status() === 200, `anexo: ${r.status()}`);
+  verdade(r.headers()["content-type"] === "application/pdf", `tipo: ${r.headers()["content-type"]}`);
+});
+
+await passo("relatórios abrem", async () => {
+  await page.goto("/relatorios");
+  await page.getByRole("heading", { name: /Relatórios/ }).first().waitFor();
+});
+
+await passo("calendário e estoque abrem", async () => {
+  for (const rota of ["/calendario", "/estoque", "/dashboard"]) {
+    const r = await page.goto(rota);
+    verdade(r.status() === 200, `${rota}: ${r.status()}`);
+  }
+});
+
+await passo("gestor cria acesso para um técnico", async () => {
+  await page.goto("/configuracoes");
+  const form = page.locator("form").filter({ has: page.locator('input[placeholder="Nome da pessoa"]') });
+  await form.locator('input[name="nome"]').fill("Técnico E2E");
+  await form.locator('input[name="email"]').fill(TECNICO.email);
+  await form.locator('input[name="senha"]').fill(TECNICO.senha);
+  await form.getByRole("button", { name: "Criar acesso" }).click();
+  await page.getByText("Acesso pronto").waitFor();
+});
+
+await passo("sair encerra a sessão", async () => {
+  await page.goto("/auth/sair");
+  await page.waitForURL("**/login");
+  const r = await page.goto("/dashboard");
+  verdade(page.url().includes("/login"), `continuou logado: ${page.url()} (${r?.status()})`);
+});
+
+await passo("senha errada é recusada", async () => {
+  await page.goto("/login");
+  await page.fill("#email", TECNICO.email);
+  await page.fill("#senha", "senha-errada");
+  await page.click('button[type="submit"]');
+  await page.getByText("E-mail ou senha incorretos.").waitFor();
+});
+
+await passo("técnico entra e vê a manutenção da empresa", async () => {
+  await entrar(TECNICO);
+  await page.getByText("Oficina E2E").first().waitFor();
+  await page.goto("/manutencoes");
+  await page.getByText("Troca de óleo E2E").first().waitFor();
+});
+
+await passo("outra empresa não enxerga os dados da primeira", async () => {
+  await page.goto("/auth/sair");
+  await page.goto("/cadastro");
+  await page.fill("#nome", "Intruso");
+  await page.fill("#empresa", "Empresa Intrusa");
+  await page.fill("#email", `intruso-${sufixo}@teste.com.br`);
+  await page.fill("#senha", "Intruso-2026");
+  await page.fill("#confirmacao", "Intruso-2026");
+  await page.click('button[type="submit"]');
+  await page.waitForURL("**/dashboard");
+  await page.goto("/manutencoes");
+  verdade((await page.getByText("Troca de óleo E2E").count()) === 0, "vazou manutenção de outra empresa!");
+});
+
+await passo("muitas tentativas de login bloqueiam", async () => {
+  await page.goto("/auth/sair");
+  for (let i = 0; i < 9; i++) {
+    await page.goto("/login");
+    await page.fill("#email", GESTOR.email);
+    await page.fill("#senha", `errada-${i}`);
+    await page.click('button[type="submit"]');
+    await page.locator("text=/incorretos|Muitas tentativas/").first().waitFor();
+  }
+  await page.getByText(/Muitas tentativas/).first().waitFor();
+});
+
+const graves = errosDoNavegador.filter((e) => !/favicon|Failed to load resource: the server responded with a status of 4/.test(e));
+if (graves.length) console.log("\nAvisos do navegador:\n" + graves.join("\n"));
+
+await navegador.close();
+console.log(`\n${n} passos ok.`);

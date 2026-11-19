@@ -1,0 +1,21 @@
+{
+  "name": "gestao-manutencao-whatsapp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Servidor de WhatsApp (Baileys) do sistema de gestão de manutenção.",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --import ./test/registrar.mjs test/sessoes.test.mjs"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "baileys": "7.0.0-rc14",
+    "pino": "^9.6.0",
+    "qrcode": "^1.5.4"
+  }
+}

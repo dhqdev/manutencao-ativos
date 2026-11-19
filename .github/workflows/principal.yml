@@ -1,0 +1,197 @@
+# Build, testes e publicação — só na main.
+#
+#   1. verificar  tipos, build do Next e testes do serviço de WhatsApp
+#   2. stack      monta as 3 imagens (linux/arm64), sobe a stack inteira num
+#                 Docker Swarm, verifica segurança/cron/banco/backup, roda o
+#                 teste ponta a ponta no Chromium e, se tudo passar, publica
+#                 as imagens no GitHub Container Registry
+#   3. deploy     (opcional) atualiza o servidor por SSH — liga sozinho quando
+#                 a variável DEPLOY_HOST estiver configurada no repositório
+#
+# Tudo roda em runner ARM64 nativo (mesma arquitetura da Oracle Ampere).
+
+name: principal
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: principal-main
+  cancel-in-progress: false
+
+env:
+  IMAGEM_BASE: ghcr.io/${{ github.repository }}
+
+jobs:
+  verificar:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Dependências do app
+        run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+
+      - name: Guardar o lockfile atualizado
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-lock
+          path: package-lock.json
+
+      - name: Tipos (tsc)
+        run: npm run typecheck
+
+      - name: Build do Next
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+
+      - name: Testes do serviço de WhatsApp
+        working-directory: whatsapp
+        run: |
+          npm install --no-audit --no-fund
+          node --check src/index.js
+          npm test
+
+      - name: Scripts de shell
+        run: |
+          for f in db/scripts/*.sh; do sh -n "$f"; done
+          for f in infra/*.sh testes/*.sh; do bash -n "$f"; done
+
+  stack:
+    needs: verificar
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    env:
+      TAG: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Imagem app
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/arm64
+          load: true
+          tags: ${{ env.IMAGEM_BASE }}/app:${{ env.TAG }}
+          labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=gha,scope=app
+          cache-to: type=gha,scope=app,mode=max
+
+      - name: Imagem whatsapp
+        uses: docker/build-push-action@v6
+        with:
+          context: whatsapp
+          platforms: linux/arm64
+          load: true
+          tags: ${{ env.IMAGEM_BASE }}/whatsapp:${{ env.TAG }}
+          labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=gha,scope=whatsapp
+          cache-to: type=gha,scope=whatsapp,mode=max
+
+      - name: Imagem ops (migrador, cron, backup)
+        uses: docker/build-push-action@v6
+        with:
+          context: db
+          platforms: linux/arm64
+          load: true
+          tags: ${{ env.IMAGEM_BASE }}/ops:${{ env.TAG }}
+          labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=gha,scope=ops
+          cache-to: type=gha,scope=ops,mode=max
+
+      - name: Subir a stack num Swarm de teste
+        run: |
+          docker swarm init
+          testes/gerar-env-teste.sh > infra/.env
+          echo "127.0.0.1 manutencao.localhost traefik.localhost" | sudo tee -a /etc/hosts
+          RESOLVER_IMAGEM=never infra/deploy.sh
+
+      - name: Esperar tudo ficar de pé
+        run: |
+          for i in $(seq 1 90); do
+            if curl -sk --max-time 5 "https://manutencao.localhost/api/saude?banco=1" | grep -q '"banco":"ok"'; then
+              echo "No ar depois de $((i * 5))s"; exit 0
+            fi
+            sleep 5
+          done
+          echo "A stack não ficou de pé a tempo."; exit 1
+
+      - name: Verificações da stack
+        run: testes/verificar-stack.sh
+
+      - name: Teste ponta a ponta (Chromium)
+        working-directory: testes
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          BASE_URL=https://manutencao.localhost node e2e.mjs
+
+      - name: Diagnóstico (se falhou)
+        if: failure()
+        run: |
+          docker stack services manutencao || true
+          for s in $(docker stack services manutencao --format '{{.Name}}') traefik_traefik; do
+            echo "::group::$s"
+            docker service ps --no-trunc "$s" || true
+            docker service logs --tail 200 "$s" 2>&1 || true
+            echo "::endgroup::"
+          done
+
+      - name: Prints do teste (se falhou)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultados-e2e
+          path: testes/resultados/
+          if-no-files-found: ignore
+
+      - name: Publicar imagens no GHCR (só com tudo verde)
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          for imagem in app whatsapp ops; do
+            docker tag "$IMAGEM_BASE/$imagem:$TAG" "$IMAGEM_BASE/$imagem:latest"
+            docker push "$IMAGEM_BASE/$imagem:$TAG"
+            docker push "$IMAGEM_BASE/$imagem:latest"
+          done
+
+  deploy:
+    needs: stack
+    if: vars.DEPLOY_HOST != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: producao
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Chave SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+          if [ -n "${{ secrets.DEPLOY_KNOWN_HOSTS }}" ]; then
+            printf '%s\n' "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          else
+            ssh-keyscan -H "${{ vars.DEPLOY_HOST }}" > ~/.ssh/known_hosts
+          fi
+
+      - name: Atualizar o servidor
+        env:
+          DESTINO: ${{ vars.DEPLOY_USUARIO || 'ubuntu' }}@${{ vars.DEPLOY_HOST }}
+          PASTA: ${{ vars.DEPLOY_PASTA || '/opt/manutencao' }}
+        run: |
+          SSH="ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes"
+          $SSH "$DESTINO" "mkdir -p $PASTA/infra"
+          scp -i ~/.ssh/deploy -o IdentitiesOnly=yes infra/stack.yml infra/traefik.yml infra/deploy.sh "$DESTINO:$PASTA/infra/"
+          $SSH "$DESTINO" "cd $PASTA/infra && chmod +x deploy.sh && TAG=${{ github.sha }} ./deploy.sh"

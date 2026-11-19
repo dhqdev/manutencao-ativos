@@ -1,0 +1,40 @@
+# Banco + PostgREST para desenvolvimento (docker compose, não Swarm):
+#   docker compose -f infra/dev.yml up -d --build
+#   cp .env.example .env.local && npm run dev
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: manutencao
+      POSTGRES_PASSWORD: dev-postgres
+    ports: ["127.0.0.1:5433:5432"]
+    volumes: [dev_db:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d manutencao"]
+      interval: 3s
+      retries: 20
+
+  migrador:
+    build: ../db
+    command: ["migrar"]
+    environment:
+      PGHOST: db
+      PGPASSWORD: dev-postgres
+      AUTHENTICATOR_PASSWORD: devauthenticator
+    depends_on:
+      db: { condition: service_healthy }
+
+  rest:
+    image: postgrest/postgrest:v14.13
+    environment:
+      PGRST_DB_URI: postgres://authenticator:devauthenticator@db:5432/manutencao
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: dev-jwt-secret-com-pelo-menos-32-caracteres-aqui
+      PGRST_OPENAPI_MODE: disabled
+    ports: ["127.0.0.1:3002:3000"]
+    depends_on:
+      migrador: { condition: service_completed_successfully }
+
+volumes:
+  dev_db:

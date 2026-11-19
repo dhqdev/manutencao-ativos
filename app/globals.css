@@ -1,0 +1,359 @@
+@import "tailwindcss";
+@import "./tema-escuro.css";
+
+@theme {
+  --font-sans: var(--fonte-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+
+  /* Azul de navegação e estado. A ação principal usa grafite (slate-900). */
+  --color-marca-50: #eff6ff;
+  --color-marca-100: #dbeafe;
+  --color-marca-200: #bfdbfe;
+  --color-marca-300: #93c5fd;
+  --color-marca-400: #60a5fa;
+  --color-marca-500: #3b82f6;
+  --color-marca-600: #2563eb;
+  --color-marca-700: #1d4ed8;
+  --color-marca-800: #1e40af;
+  --color-marca-900: #1e3a8a;
+  --color-marca-950: #172554;
+
+  /* Fundo de cartões, folhas e campos. No modo escuro vira um azul-grafite. */
+  --color-superficie: #ffffff;
+
+  /* Sombras discretas — profundidade sem "caixa flutuante" */
+  --shadow-suave: 0 1px 2px 0 rgb(15 23 42 / 0.04), 0 1px 3px 0 rgb(15 23 42 / 0.03);
+  --shadow-elevada: 0 4px 12px -2px rgb(15 23 42 / 0.08), 0 2px 6px -2px rgb(15 23 42 / 0.04);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background-color: var(--color-slate-50);
+  color: var(--color-slate-900);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  text-rendering: optimizeLegibility;
+}
+
+/* Números alinham em colunas — importante em tabelas de custo */
+.tabular-nums,
+table,
+.card p {
+  font-variant-numeric: tabular-nums;
+}
+
+h1,
+h2,
+h3 {
+  letter-spacing: -0.015em;
+}
+
+::selection {
+  background-color: var(--color-marca-100);
+  color: var(--color-marca-900);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, var(--color-slate-400) 55%, transparent);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-slate-500);
+  background-clip: content-box;
+  border: 3px solid transparent;
+}
+
+@utility card {
+  background-color: var(--color-superficie);
+  border-radius: 0.75rem;
+  border: 1px solid var(--color-slate-200);
+  box-shadow: var(--shadow-suave);
+}
+
+@utility campo {
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-slate-300);
+  background-color: var(--color-superficie);
+  padding: 0.5rem 0.75rem;
+  /* 16px no celular: abaixo disso o Safari dá zoom na tela ao focar o campo. */
+  font-size: 1rem;
+  line-height: 1.35rem;
+  color: var(--color-slate-900);
+  outline: none;
+  transition:
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
+}
+@utility campo {
+  @media (width >= 40rem) {
+    font-size: 0.875rem;
+  }
+  /* Select com a mesma cara do campo também no iPhone (o nativo ignora padding). */
+  &:is(select) {
+    appearance: none;
+    -webkit-appearance: none;
+    min-height: 2.5rem;
+    padding-right: 2.25rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.7rem center;
+    background-size: 1rem;
+  }
+  &::placeholder {
+    color: var(--color-slate-400);
+  }
+  &:hover:not(:disabled):not(:focus) {
+    border-color: var(--color-slate-400);
+  }
+  &:focus {
+    border-color: var(--color-slate-900);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-slate-900) 10%, transparent);
+  }
+  &:disabled {
+    background-color: var(--color-slate-50);
+    color: var(--color-slate-500);
+  }
+}
+
+@utility rotulo {
+  display: block;
+  margin-bottom: 0.375rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-slate-700);
+}
+
+/* ---------------------------------------------------------------------------
+   Movimento
+   No celular as folhas sobem a partir da borda inferior; no desktop o diálogo
+   só aparece com um leve avanço. Quem pediu menos animação recebe menos.
+--------------------------------------------------------------------------- */
+@keyframes surgir {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes subir-folha {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes aproximar {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@utility veu {
+  animation: surgir 0.2s ease-out;
+}
+
+@utility folha {
+  animation: subir-folha 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@utility dialogo {
+  animation: aproximar 0.18s ease-out;
+}
+
+@keyframes subir-suave {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes reluzir {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
+
+/*
+ * Cada tela entra com um leve avanço (a chave do container muda por rota).
+ * Preenchimento "backwards", nunca "both": um transform que fica aplicado
+ * depois da animação vira referência para os filhos `position: fixed` — e os
+ * modais, que moram dentro das telas, deixariam de cobrir a janela inteira.
+ */
+@utility entrada-pagina {
+  animation: subir-suave 0.24s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+/* Filhos aparecem um depois do outro — inspirado no "Animated List" do React Bits. */
+@utility lista-escalonada {
+  & > * {
+    animation: subir-suave 0.28s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+  & > *:nth-child(1) { animation-delay: 0.01s; }
+  & > *:nth-child(2) { animation-delay: 0.03s; }
+  & > *:nth-child(3) { animation-delay: 0.05s; }
+  & > *:nth-child(4) { animation-delay: 0.07s; }
+  & > *:nth-child(5) { animation-delay: 0.09s; }
+  & > *:nth-child(6) { animation-delay: 0.11s; }
+  & > *:nth-child(7) { animation-delay: 0.13s; }
+  & > *:nth-child(8) { animation-delay: 0.15s; }
+  & > *:nth-child(n + 9) { animation-delay: 0.17s; }
+}
+
+/* Clique "afunda" o elemento por um instante. */
+@utility pressionavel {
+  transition-property: transform, color, background-color, border-color, box-shadow, opacity;
+  transition-duration: 0.15s;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  &:active:not(:disabled) {
+    transform: scale(0.96);
+  }
+}
+
+/* Cartão que levanta ao passar o mouse. */
+@utility cartao-vivo {
+  transition:
+    transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.25s ease,
+    border-color 0.25s ease;
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-elevada);
+    border-color: var(--color-slate-300);
+  }
+}
+
+@utility pop-in {
+  animation: pop 0.16s ease-out both;
+}
+
+/* Esqueleto com brilho passando, no lugar do pulsar. */
+@utility reluzente {
+  background-image: linear-gradient(
+    90deg,
+    var(--color-slate-200) 0%,
+    var(--color-slate-100) 50%,
+    var(--color-slate-200) 100%
+  );
+  background-size: 200% 100%;
+  animation: reluzir 1.4s ease-in-out infinite;
+}
+
+/* Ilustração animada das telas de entrada */
+@keyframes girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes apertar {
+  0%,
+  100% {
+    transform: rotate(-18deg);
+  }
+  50% {
+    transform: rotate(14deg);
+  }
+}
+
+@keyframes piscar {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@utility anim-girar {
+  animation: girar 12s linear infinite;
+}
+
+@utility anim-girar-reverso {
+  animation: girar 8s linear infinite reverse;
+}
+
+@utility anim-apertar {
+  animation: apertar 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+@utility anim-faisca {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: piscar 1.8s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .veu,
+  .folha,
+  .dialogo,
+  .entrada-pagina,
+  .lista-escalonada > *,
+  .pop-in,
+  .reluzente,
+  .anim-girar,
+  .anim-girar-reverso,
+  .anim-apertar,
+  .anim-faisca {
+    animation: none !important;
+  }
+  .pressionavel:active,
+  .cartao-vivo:hover {
+    transform: none !important;
+  }
+}
+
+/* Respiro para as barras do sistema no app instalado */
+@utility area-segura-inferior {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@utility area-segura-superior {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
