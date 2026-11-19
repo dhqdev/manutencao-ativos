@@ -12,7 +12,7 @@
 # Antes: DNS do domínio → IP da VM, e acesso às imagens do ghcr.io (veja o fim do arquivo).
 # Gere cada chave com: openssl rand -hex 32
 #
-# ATUALIZAR: Administração → "Atualizar sistema" (o serviço manutencao-atualizador
+# ATUALIZAR: console do superadmin → botão "Atualizar para vX" (o serviço manutencao-atualizador
 # aplica a release nova). À mão: troque a tag das linhas "image:" do ghcr.io pela
 # release nova (github.com/dhqdev/manutencao-ativos/releases) e clique em
 # Update the stack. O migrador roda sozinho.
