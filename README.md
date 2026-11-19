@@ -214,6 +214,7 @@ db/                 SQL + imagem "ops" (migrador, cron, backup + Backblaze B2, i
 whatsapp/           serviço Baileys
 infra/              stacks do Swarm (stack.yml com .env, portainer.yml para colar no Portainer), Traefik, deploy
 testes/             verificação da stack e teste ponta a ponta (Playwright)
+.claude/skills/      padrão do projeto para o Claude seguir (padrao-manutencao)
 ```
 
 ## 6. Comandos
