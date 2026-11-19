@@ -143,6 +143,8 @@ await passo("registra manutenção com anexo PDF", async () => {
   await seletor.selectOption(valor);
   await dialogo.locator('textarea[name="descricao"], input[name="descricao"]').fill("Troca de óleo E2E");
   await dialogo.locator('input[type="file"]').setInputFiles({ name: "nota.pdf", mimeType: "application/pdf", buffer: PDF });
+  // O anexo escolhido precisa aparecer na lista antes de salvar.
+  await dialogo.getByText("nota.pdf").waitFor();
   const envio = respostaDeArquivo("PUT");
   await dialogo.locator('button[type="submit"]').click();
   verdade((await envio).status() === 201, `upload do anexo: ${(await envio).status()}`);

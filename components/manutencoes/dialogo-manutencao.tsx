@@ -379,7 +379,11 @@ export function DialogoManutencao({
                   accept="image/*,application/pdf"
                   className="hidden"
                   onChange={(e) => {
-                    setArquivos((atual) => [...atual, ...Array.from(e.target.files ?? [])]);
+                    // Copia a lista ANTES de limpar o campo: o React pode rodar o
+                    // atualizador depois, quando e.target.files já estaria vazio
+                    // (e o anexo sumia sem aviso).
+                    const novos = Array.from(e.target.files ?? []);
+                    setArquivos((atual) => [...atual, ...novos]);
                     e.target.value = "";
                   }}
                 />
