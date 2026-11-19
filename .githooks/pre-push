@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Antes de subir, roda a mesma verificação do job "verificar" do Actions
+# (scripts/verificar.sh). Ativado pelo `npm install` (script "prepare").
+# Para pular numa emergência: git push --no-verify
+set -euo pipefail
+exec "$(git rev-parse --show-toplevel)/scripts/verificar.sh"
