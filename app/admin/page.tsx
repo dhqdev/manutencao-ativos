@@ -10,7 +10,7 @@ export const metadata = { title: "Usuários · Console do superadmin" };
 
 /**
  * A única tela do console do superadmin: a gerência dos usuários. A versão do
- * sistema (com o botão Atualizar) fica num bloco no topo.
+ * sistema (com o botão Atualizar) fica num bloco abaixo da lista.
  */
 export default async function ConsoleAdmin({ searchParams }: { searchParams: Promise<{ filtro?: string }> }) {
   const sessao = await exigirSuperadminTela();
@@ -26,11 +26,8 @@ export default async function ConsoleAdmin({ searchParams }: { searchParams: Pro
     <>
       <Cabecalho
         titulo="Usuários"
-        descricao="Todos os logins do sistema: criar, editar, trocar senha, encerrar sessões, bloquear e excluir."
+        descricao="Todos os logins do sistema. Clique num usuário para ver os detalhes, as empresas e as ações."
       />
-      <div className="mb-5">
-        <CartaoAtualizacao situacao={atualizacao} />
-      </div>
       {erro ? (
         <p className="card px-5 py-4 text-sm text-red-700">
           Não foi possível carregar os usuários: {erro}. Confira se o migrador da versão nova rodou.
@@ -45,6 +42,9 @@ export default async function ConsoleAdmin({ searchParams }: { searchParams: Pro
           agora={Date.now()}
         />
       )}
+      <div className="mt-6">
+        <CartaoAtualizacao situacao={atualizacao} />
+      </div>
     </>
   );
 }

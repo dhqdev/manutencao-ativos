@@ -182,3 +182,55 @@ export async function adminExcluirUsuario(userId: string): Promise<Resultado> {
     return falha(e);
   }
 }
+
+// --- Empresas de um usuário (gaveta de detalhes) ----------------------------------
+
+/** O superadmin só administra: não entra na equipe de nenhuma empresa. */
+const SUPERADMIN_FORA = "O superadmin só administra o sistema; ele não entra na equipe das empresas.";
+
+/** Põe o usuário numa empresa (ou troca o papel, se já estiver nela). */
+export async function adminVincularEmpresa(fd: FormData): Promise<Resultado> {
+  try {
+    const { admin } = await exigirSuperadmin();
+    const userId = textoObrigatorio(fd, "user_id", "o usuário");
+    const orgId = textoObrigatorio(fd, "org_id", "a empresa");
+    const papel = papelValido(texto(fd, "papel") ?? "tecnico");
+
+    const alvo = await usuarioPorId(userId);
+    if (!alvo) return { ok: false, erro: "Usuário não encontrado." };
+    if (alvo.superadmin) return { ok: false, erro: SUPERADMIN_FORA };
+
+    const { error } = await admin.rpc("admin_definir_membro", { p_org: orgId, p_user: userId, p_papel: papel });
+    if (error) return { ok: false, erro: error.message };
+    return pronto();
+  } catch (e) {
+    return falha(e);
+  }
+}
+
+export async function adminAlterarPapel(orgId: string, userId: string, papel: PapelMembro): Promise<Resultado> {
+  try {
+    const { admin } = await exigirSuperadmin();
+    const { error } = await admin.rpc("admin_definir_membro", {
+      p_org: orgId,
+      p_user: userId,
+      p_papel: papelValido(papel),
+    });
+    if (error) return { ok: false, erro: error.message };
+    return pronto();
+  } catch (e) {
+    return falha(e);
+  }
+}
+
+/** Tira o usuário da empresa. Se era o proprietário, a próxima pessoa assume. */
+export async function adminRemoverMembro(orgId: string, userId: string): Promise<Resultado> {
+  try {
+    const { admin } = await exigirSuperadmin();
+    const { error } = await admin.rpc("admin_remover_membro", { p_org: orgId, p_user: userId });
+    if (error) return { ok: false, erro: error.message };
+    return pronto();
+  } catch (e) {
+    return falha(e);
+  }
+}

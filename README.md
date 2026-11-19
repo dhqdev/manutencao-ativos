@@ -175,17 +175,27 @@ empresas (dashboard, ativos, manutenções…). Qualquer tela do sistema o devol
 ao console, e ele não pode fazer parte da equipe de nenhuma empresa.
 
 O console tem **uma tela só, a gerência dos usuários** (todos, de todas as
-empresas), com filtros (entraram em 7 dias, nunca entraram, sem empresa,
-bloqueados): criar login (numa empresa nova ou numa existente, com qualquer
-papel), editar nome e e-mail, definir/gerar senha, encerrar sessões,
-**bloquear/desbloquear** e excluir. No topo fica o bloco **Versão do sistema**
-(a que está no ar e a última publicada no GitHub Packages, com o botão
-**Atualizar**).
+empresas):
+
+- **Cartões no topo** que também filtram: usuários no sistema, entraram em 7
+  dias, nunca entraram, sem empresa e bloqueados.
+- **Lista** com busca (nome, e-mail, telefone, empresa), filtro por empresa,
+  ordenação (último acesso, nome, mais novos), situação de cada um e
+  **exportar CSV** (abre no Excel) da lista filtrada.
+- **Novo usuário** numa empresa nova ou numa existente, com qualquer papel; no
+  fim aparecem e-mail e senha para copiar ou mandar no WhatsApp.
+- **Detalhe do usuário** (clique na linha): editar nome e e-mail, definir/gerar
+  senha, encerrar sessões, **bloquear/desbloquear**, ver criação, último
+  acesso e sessões, **empresas** (pôr em outra empresa, trocar o papel, tirar)
+  e excluir.
+
+Abaixo da lista fica o bloco **Versão do sistema** (a que está no ar e a
+última publicada no GitHub Packages, com o botão **Atualizar**).
 
 #### Atualizar pelo console
 
 Cada push verde na `main` publica as imagens com a tag `vAAAA.MM.DD-N` no
-ghcr.io. O bloco **Versão do sistema**, no topo do console, compara a versão no ar (gravada na imagem do app)
+ghcr.io. O bloco **Versão do sistema**, no console, compara a versão no ar (gravada na imagem do app)
 com a maior tag publicada e, quando há uma nova, mostra **Atualizar para
 vX**. O clique só grava o pedido no banco (`sistema_atualizacoes`); o serviço
 `atualizador` da stack pega o pedido e:

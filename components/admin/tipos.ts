@@ -86,3 +86,30 @@ export function passaNoFiltro(u: UsuarioAdmin, filtro: FiltroUsuario, agora: num
 
 export const ehFiltroUsuario = (v: unknown): v is FiltroUsuario =>
   typeof v === "string" && Object.hasOwn(FILTROS_USUARIO, v);
+
+/**
+ * "há 5 min", "há 3 dias"… A partir do instante do servidor (`agora`), para o
+ * texto sair igual no servidor e no navegador (sem erro de hidratação).
+ */
+export function tempoRelativo(iso: string | null, agora: number) {
+  if (!iso) return "nunca";
+  const seg = Math.max(0, Math.round((agora - new Date(iso).getTime()) / 1000));
+  if (seg < 60) return "agora há pouco";
+  const min = Math.round(seg / 60);
+  if (min < 60) return `há ${min} min`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `há ${h} h`;
+  const d = Math.round(h / 24);
+  if (d < 30) return `há ${d} dia${d > 1 ? "s" : ""}`;
+  const m = Math.round(d / 30);
+  if (m < 12) return `há ${m} ${m > 1 ? "meses" : "mês"}`;
+  const a = Math.round(m / 12);
+  return `há ${a} ano${a > 1 ? "s" : ""}`;
+}
+
+export const ORDENS = {
+  acesso: "Último acesso",
+  nome: "Nome",
+  novos: "Mais novos",
+} as const;
+export type Ordem = keyof typeof ORDENS;

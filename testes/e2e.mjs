@@ -270,11 +270,29 @@ await passo("console: bloco da versão do sistema com o atualizador", async () =
   verdade((await page.getByText("não está rodando na stack").count()) === 0, "painel diz que o atualizador não está na stack");
 });
 
+await passo("console: detalhe do usuário troca o papel na empresa", async () => {
+  await page.locator(`li[data-usuario="${TECNICO.email}"] button`).click();
+  const detalhe = page.locator(`[data-detalhe="${TECNICO.email}"]`);
+  const papel = detalhe.getByLabel("Papel em Oficina E2E");
+  await papel.selectOption("leitor");
+  await page.waitForLoadState("networkidle");
+  // Depois do refresh o valor vem do banco: se a troca não gravou, volta a Técnico.
+  await page.reload();
+  await page.locator(`li[data-usuario="${TECNICO.email}"] button`).click();
+  verdade((await papel.inputValue()) === "leitor", "papel não mudou para Leitor");
+  await papel.selectOption("tecnico");
+  await page.waitForLoadState("networkidle");
+  await page.keyboard.press("Escape");
+});
+
 await passo("superadmin bloqueia um usuário e ele não entra mais", async () => {
   await page.goto("/admin");
-  const linha = page.locator(`li[data-usuario="${INTRUSO.email}"]`);
-  await linha.getByRole("button", { name: "Bloquear acesso" }).click();
-  await linha.getByText("Bloqueado").waitFor();
+  await page.locator(`li[data-usuario="${INTRUSO.email}"] button`).click();
+  const detalhe = page.locator(`[data-detalhe="${INTRUSO.email}"]`);
+  await detalhe.getByRole("button", { name: "Bloquear", exact: true }).click();
+  await detalhe.getByRole("button", { name: "Desbloquear", exact: true }).waitFor();
+  await page.keyboard.press("Escape");
+  await page.locator(`li[data-usuario="${INTRUSO.email}"]`).getByText("Bloqueado").first().waitFor();
   await page.goto("/auth/sair");
   await page.goto("/login");
   await page.fill("#email", INTRUSO.email);
