@@ -12,9 +12,10 @@
 # Antes: DNS do domínio → IP da VM, e acesso às imagens do ghcr.io (veja o fim do arquivo).
 # Gere cada chave com: openssl rand -hex 32
 #
-# ATUALIZAR: troque a tag (use a da release, ex.: v2026.11.19-8, em vez de latest)
-# pela release nova (github.com/dhqdev/manutencao-ativos/releases)
-# nas 4 linhas "image:" e clique em Update the stack. O migrador roda sozinho.
+# ATUALIZAR: Administração → "Atualizar sistema" (o serviço manutencao-atualizador
+# aplica a release nova). À mão: troque a tag das linhas "image:" do ghcr.io pela
+# release nova (github.com/dhqdev/manutencao-ativos/releases) e clique em
+# Update the stack. O migrador roda sozinho.
 #
 # NÃO TROQUE depois do primeiro deploy: POSTGRES_PASSWORD (o banco só lê na criação).
 # Trocar SESSAO_SECRET desloga todo mundo; as outras chaves podem ser trocadas.
@@ -215,6 +216,32 @@ services:
       placement:
         constraints:
           - node.role == manager
+
+  # --- Botão "Atualizar" do painel do superadmin (menu Administração) ----------
+  #     Lê o pedido no banco e troca a tag das imagens app/whatsapp/ops desta
+  #     stack (roda o migrador primeiro). Usa o socket do Docker; não abre porta.
+  manutencao-atualizador:
+    image: ghcr.io/dhqdev/manutencao-ativos/ops:latest
+    command: ["atualizador"]
+    environment:
+      - PGHOST=manutencao-db
+      - PGUSER=postgres
+      - PGDATABASE=manutencao
+      - PGPASSWORD=TROQUE-senha-do-postgres
+      - ATUALIZADOR_SERVICO={{.Service.Name}}
+      - TZ=America/Sao_Paulo
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - interna
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      update_config:
+        order: stop-first
 
 volumes:
   manutencao_db_dados:

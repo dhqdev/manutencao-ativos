@@ -279,3 +279,21 @@ As chaves de criptografia de cada número conectado ficam na tabela
 `authenticated` leem nada. Só o serviço de WhatsApp (como `service_role`)
 acessa. Quem tiver essas linhas consegue mandar mensagem como a empresa —
 trate o `JWT_SECRET` e os backups com o mesmo cuidado.
+
+## Atualizador (botão Atualizar do console)
+
+O serviço `atualizador` monta `/var/run/docker.sock` — quem controla o Docker
+controla o servidor. Por isso:
+
+- O app **não** tem acesso ao Docker. O botão só grava um pedido em
+  `sistema_atualizacoes` (RLS ligado, nenhuma policy, só `service_role`), depois
+  de conferir na sessão do banco que quem pediu é o superadmin e que a versão
+  é a última publicada.
+- O atualizador não abre porta e fica só na rede interna; ele lê o pedido no
+  banco. A versão é conferida duas vezes no padrão `vAAAA.MM.DD-N` (constraint
+  da tabela e o script), então nada de texto livre vira argumento do Docker.
+- Ele só troca a imagem de serviços da **própria stack** cujas imagens vêm da
+  mesma base que a dele (ex.: `ghcr.io/dhqdev/manutencao-ativos/*`). Banco,
+  PostgREST e Traefik não mudam.
+- Uma atualização por vez (índice único); pedido interrompido vira erro quando
+  o atualizador reinicia.

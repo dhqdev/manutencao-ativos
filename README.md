@@ -20,7 +20,7 @@ internet ─► Traefik (HTTPS, Let's Encrypt)
                     │   └ arquivos (volume) │
                     └──► whatsapp (Baileys) ┘
 
-migrador · cron (resumo do WhatsApp) · backup diário
+migrador · cron (resumo do WhatsApp) · backup diário · atualizador
 ```
 
 | Peça | O que faz |
@@ -32,6 +32,7 @@ migrador · cron (resumo do WhatsApp) · backup diário
 | **migrador** | Aplica `db/sql/*.sql` a cada deploy (idempotente) e cria/atualiza o superadmin |
 | **cron** | Chama a rotina do resumo diário do WhatsApp de hora em hora |
 | **backup** | `pg_dump` + arquivos todo dia, com retenção, e cópia no Backblaze B2 (opcional) |
+| **atualizador** | Aplica a release nova quando o superadmin clica em **Atualizar** no console (tem o socket do Docker; não abre porta) |
 | **traefik** | Porta de entrada, HTTPS automático, painel protegido por senha |
 
 Instalação no servidor (Oracle Cloud ARM64): **[INSTALACAO.md](INSTALACAO.md)**.
@@ -185,7 +186,28 @@ tem:
 - **Empresas**: lista com busca e uma tela por empresa com números, dados
   (editar), equipe (adicionar pessoa, trocar papel, trocar o proprietário,
   remover) e excluir (com fotos, anexos e WhatsApp).
-- **Sistema**: saúde do banco, sessões e WhatsApp, e como o superadmin é definido.
+- **Sistema**: **versão do sistema** (a que está no ar e a última publicada no
+  GitHub Packages, com o botão **Atualizar**), saúde do banco, sessões e
+  WhatsApp, e como o superadmin é definido.
+
+#### Atualizar pelo console
+
+Cada push verde na `main` publica as imagens com a tag `vAAAA.MM.DD-N` no
+ghcr.io. A tela **Sistema** compara a versão no ar (gravada na imagem do app)
+com a maior tag publicada e, quando há uma nova, mostra **Atualizar para
+vX**. O clique só grava o pedido no banco (`sistema_atualizacoes`); o serviço
+`atualizador` da stack pega o pedido e:
+
+1. baixa as imagens `app`, `whatsapp` e `ops` da versão (se faltar uma, para
+   sem mexer em nada);
+2. roda o migrador da versão nova e espera terminar;
+3. troca a imagem dos outros serviços, um de cada vez (o app volta sozinho
+   para a versão anterior se a nova não subir);
+4. por último troca a própria imagem.
+
+O andamento aparece na tela. Só as imagens mudam: variável nova ou serviço
+novo na stack ainda pedem um deploy pela stack (`deploy.sh` ou Portainer).
+Sem o serviço `atualizador` na stack, a tela avisa e o botão fica desligado.
 
 A cada deploy o migrador tira o superadmin das empresas: a empresa vazia que o
 cadastro monta para ele é apagada; nas empresas com mais gente ele só sai (se

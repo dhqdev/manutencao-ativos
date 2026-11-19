@@ -4,9 +4,11 @@
 #   backup             pg_dump + arquivos, todo dia, com retenção (e Backblaze B2)
 #   backup-agora       um backup na hora (local + B2) e sai
 #   importar-supabase  traz dados e arquivos do Supabase antigo (uma vez)
+#   atualizador        aplica a versão nova pedida no painel do superadmin
+#                      (precisa do socket do Docker; veja atualizador.sh)
 FROM postgres:17-alpine
 
-RUN apk add --no-cache curl tzdata rclone
+RUN apk add --no-cache curl tzdata rclone docker-cli
 
 ENV TZ=America/Sao_Paulo
 COPY sql/ /ops/sql/

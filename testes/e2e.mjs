@@ -261,6 +261,18 @@ await passo("console: usuários e empresas de todo o sistema", async () => {
   await page.locator(`li[data-membro="${GESTOR.email}"]`).waitFor();
 });
 
+await passo("console: tela Sistema mostra a versão e o atualizador", async () => {
+  await page.goto("/admin/sistema");
+  await page.getByRole("heading", { name: "Versão do sistema" }).waitFor();
+  const versao = (await page.locator("[data-versao-atual]").textContent())?.trim();
+  verdade(/^v\d{4}\.\d{2}\.\d{2}-\d+$/.test(versao ?? ""), `versão no ar fora do padrão: ${versao}`);
+  // O serviço atualizador da stack manda sinal de vida: sem ele aparece o aviso.
+  verdade((await page.getByText("não está rodando na stack").count()) === 0, "painel diz que o atualizador não está na stack");
+  await page.goto("/admin/empresas");
+  await page.getByRole("link", { name: /Oficina E2E/ }).click();
+  await page.getByRole("heading", { name: "Oficina E2E" }).waitFor();
+});
+
 await passo("console: superadmin não entra na equipe de uma empresa", async () => {
   await page.fill('input[name="email"]', SUPERADMIN.email);
   await page.getByRole("button", { name: "Adicionar" }).click();

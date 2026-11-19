@@ -7,6 +7,7 @@
 #   migrador  aplica o SQL a cada deploy e termina
 #   cron      chama a rotina do WhatsApp de hora em hora
 #   backup    copia banco e arquivos todo dia (e manda para o Backblaze B2)
+#   atualizador  aplica a versão nova quando o superadmin clica em "Atualizar"
 #
 # Variáveis: infra/.env (modelo em infra/.env.exemplo). Subir: infra/deploy.sh
 
@@ -191,6 +192,26 @@ services:
       replicas: 1
       placement:
         constraints: [node.role == manager]
+
+  # Botão "Atualizar" do painel do superadmin: lê o pedido no banco e troca a
+  # tag das imagens app/whatsapp/ops desta stack. Tem o socket do Docker, por
+  # isso NÃO fica na rede pública e não abre porta nenhuma (só fala com o banco).
+  atualizador:
+    image: ${IMAGEM_BASE:-ghcr.io/dhqdev/manutencao-ativos}/ops:${TAG:-latest}
+    command: ["atualizador"]
+    environment:
+      <<: *banco
+      ATUALIZADOR_SERVICO: "{{.Service.Name}}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks: [interna]
+    logging: *log
+    deploy:
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
+      update_config:
+        order: stop-first
 
 networks:
   interna:

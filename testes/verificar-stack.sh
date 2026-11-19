@@ -54,6 +54,18 @@ interno -H "Authorization: Bearer $WHATSAPP_API_KEY" http://whatsapp:3000/sessoe
 echo "— migrador terminou"
 docker service ps manutencao_migrador --format '{{.CurrentState}}' | head -1 | grep -q "Complete" && ok "migrador: Complete" || erro "migrador: $(docker service ps manutencao_migrador --format '{{.CurrentState}} {{.Error}}' | head -3)"
 
+echo "— atualizador (botão Atualizar do console do superadmin)"
+banco() { docker exec -i "$(docker ps -qf name=manutencao_db -n 1)" psql -U postgres -d manutencao -qtA "$@"; }
+for _ in $(seq 1 30); do banco -c "select 1 from sistema_atualizador where visto_em > now() - interval '1 minute'" | grep -q 1 && break; sleep 2; done
+banco -c "select stack from sistema_atualizador" | grep -qx manutencao && ok "atualizador no ar (sinal de vida no banco)" || erro "atualizador sem sinal: $(docker service logs --tail 5 manutencao_atualizador 2>&1)"
+# Versão que não existe no registro: tem que recusar sem mexer em nenhum serviço.
+banco -c "insert into sistema_atualizacoes (versao) values ('v2000.01.01-1')" >/dev/null
+for _ in $(seq 1 30); do [ "$(banco -c "select estado from sistema_atualizacoes order by id desc limit 1")" = "erro" ] && break; sleep 2; done
+r=$(banco -c "select estado || ': ' || coalesce(mensagem, '') from sistema_atualizacoes order by id desc limit 1")
+echo "$r" | grep -q "^erro: .*não foi encontrada" && ok "versão inexistente recusada sem alterar nada" || erro "atualizador com versão inexistente: $r"
+docker service inspect --format '{{.Spec.TaskTemplate.ContainerSpec.Image}}' manutencao_app | grep -q ":$TAG" && ok "app continua na versão testada" || erro "atualizador mexeu no app"
+banco -c "insert into sistema_atualizacoes (versao) values ('x; rm -rf /')" >/dev/null 2>&1 && erro "banco aceitou versão fora do padrão" || ok "banco recusa versão fora do padrão"
+
 echo "— backup (pg_dump 17 contra o banco da stack)"
 docker run --rm --network manutencao_interna -e PGHOST=db -e PGPASSWORD="$POSTGRES_PASSWORD" \
   --entrypoint sh "$IMAGEM_BASE/ops:$TAG" -c '. /ops/comum.sh && pg_dump -Fc -f /tmp/b.dump && test -s /tmp/b.dump && pg_restore -l /tmp/b.dump | grep -q "TABLE DATA public ativos"' \

@@ -7,5 +7,6 @@ case "${1:-migrar}" in
   backup)            exec /ops/backup.sh ;;
   backup-agora)      exec /ops/backup.sh agora ;;
   importar-supabase) exec /ops/importar-supabase.sh ;;
+  atualizador)       exec /ops/atualizador.sh ;;
   *)                 exec "$@" ;;
 esac

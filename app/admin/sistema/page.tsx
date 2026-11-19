@@ -1,16 +1,18 @@
 import { CircleCheck, CircleX } from "lucide-react";
+import { CartaoAtualizacao } from "@/components/admin/atualizacao";
 import { Cabecalho, Secao } from "@/components/ui";
+import { situacaoAtualizacao } from "@/lib/atualizacao";
 import { carregarResumo, exigirSuperadminTela } from "@/lib/admin-console";
 
 export const metadata = { title: "Sistema · Console do superadmin" };
 
 /**
- * Estado do sistema. Seções novas de operação (ex.: atualizar para a versão
- * nova da main) entram aqui como mais um <Secao>.
+ * Estado do sistema: versão (com o botão de atualizar), saúde e superadmin.
+ * Seções novas de operação entram aqui como mais um <Secao>.
  */
 export default async function SistemaAdmin() {
   const sessao = await exigirSuperadminTela();
-  const resumo = await carregarResumo();
+  const [resumo, atualizacao] = await Promise.all([carregarResumo(), situacaoAtualizacao()]);
 
   const itens: { rotulo: string; ok: boolean; detalhe: string }[] = [
     {
@@ -32,9 +34,11 @@ export default async function SistemaAdmin() {
 
   return (
     <>
-      <Cabecalho titulo="Sistema" descricao="Saúde do servidor e como o superadmin é definido." />
+      <Cabecalho titulo="Sistema" descricao="Versão, saúde do servidor e como o superadmin é definido." />
 
       <div className="space-y-5">
+        <CartaoAtualizacao situacao={atualizacao} />
+
         <Secao titulo="Saúde">
           <ul className="divide-y divide-slate-100">
             {itens.map((i) => (

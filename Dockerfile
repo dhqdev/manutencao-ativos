@@ -29,6 +29,12 @@ COPY --from=build --chown=node:node /app/.next/standalone ./
 COPY --from=build --chown=node:node /app/.next/static ./.next/static
 COPY --from=build --chown=node:node /app/public ./public
 
+# Versão da release (vAAAA.MM.DD-N), passada pelo GitHub Actions. O painel do
+# superadmin compara com a última publicada no ghcr.io. Fica no fim para não
+# invalidar o cache das camadas de cima.
+ARG VERSAO=dev
+ENV APP_VERSAO=$VERSAO
+
 USER node
 EXPOSE 3000
 

@@ -97,6 +97,7 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   - `10-schema.sql` tabelas, RLS, views, triggers do sistema
   - `20-auth.sql` funções `auth_*` (login, sessão, senha)
   - `30-superadmin.sql` superadmin vindo da stack e funções `admin_*`
+  - `40-atualizacoes.sql` pedidos do botão Atualizar e sinal do atualizador
   - Coisa nova grande: crie `40-<assunto>.sql` em vez de inchar os outros.
 - Tabela nova: `org_id ... references organizacoes on delete cascade`, índice
   em `org_id`, `enable row level security` e policies separadas por comando
@@ -153,6 +154,12 @@ Variável nova de ambiente ⇒ atualize **todos** estes lugares no mesmo commit:
   nada de bash-ismos. Comando novo da imagem ⇒ `entrypoint.sh`.
 - Backup: `db/scripts/backup.sh` (local + Backblaze B2 via `rclone` com
   configuração por variáveis de ambiente, sem arquivo de config).
+- Atualização pelo console: o app **nunca** fala com o Docker. A ação grava
+  em `sistema_atualizacoes`; o serviço `atualizador` (`db/scripts/atualizador.sh`,
+  socket do Docker, sem porta) aplica: migrador primeiro, depois os outros,
+  ele por último. Versão atual = `APP_VERSAO` (build-arg do CI); última =
+  maior tag `vAAAA.MM.DD-N` do ghcr.io (`lib/atualizacao.ts`). Serviço novo que
+  usa imagem nossa entra sozinho na atualização (é achado pela base da imagem).
 
 ## 6. Testes e CI
 

@@ -99,8 +99,10 @@ ou mais caracteres): é o login que administra todas as empresas e usuários pel
 
 > **Portainer com um Traefik que já existe na VM?** Use
 > [`infra/portainer.yml`](infra/portainer.yml): troque os valores `TROQUE-...`,
-> cole em *Stacks → Add stack* e faça o Deploy. Para atualizar, troque a tag das
-> 4 linhas `image:` pela release nova e clique em *Update the stack*.
+> cole em *Stacks → Add stack* e faça o Deploy. Para atualizar: console do
+> superadmin → **Sistema** → **Atualizar** (serviço `manutencao-atualizador`), ou
+> troque a tag das linhas `image:` do ghcr.io pela release nova e clique em
+> *Update the stack*.
 
 ## 6. Subir
 
@@ -176,14 +178,19 @@ O job `deploy` copia `stack.yml`, `traefik.yml` e `deploy.sh` e roda
 
 ## Operação
 
-**Atualizar:** push na `main` (com deploy automático) ou, na VM, `./deploy.sh`.
+**Atualizar:** console do superadmin → **Sistema** → **Atualizar para vX**
+(o serviço `atualizador` aplica a última release publicada no ghcr.io), push na
+`main` (com deploy automático) ou, na VM, `./deploy.sh`. O botão troca só as
+imagens: quando a release muda o arquivo da stack (variável ou serviço novo),
+atualize a stack também. Stack antiga, sem o serviço `atualizador`: atualize a
+stack uma vez com o arquivo novo e o botão passa a funcionar.
 
 **Voltar uma versão:** escolha a release na aba *Releases* do GitHub e rode
 `TAG=v2026.11.19-12 ./deploy.sh` (cada imagem tem a tag da release, do commit
 e `latest`).
 
 **Logs:** `docker service logs -f manutencao_<serviço>` (app, rest, db,
-whatsapp, cron, backup, migrador) e `docker service logs -f traefik_traefik`.
+whatsapp, cron, backup, migrador, atualizador) e `docker service logs -f traefik_traefik`.
 
 **Painel do Traefik:** `https://TRAEFIK_DOMINIO` (usuário e senha no arquivo de chaves).
 
@@ -312,6 +319,9 @@ SMTP, a tela "Esqueci minha senha" orienta a pedir uma senha nova ao gestor.
 - Login com limite de tentativas (8 por e-mail e 30 por IP a cada 15 min),
   senhas em bcrypt, sessões revogáveis no banco, cookie `httpOnly` + `Secure`.
 - Fotos e anexos só abrem com link assinado de 1 hora.
+- O `atualizador` tem o socket do Docker (= root no servidor), por isso não abre
+  porta nem entra na rede pública: só lê pedidos no banco, aceita apenas tags
+  `vAAAA.MM.DD-N` e só troca imagens da própria stack vindas do mesmo registro.
 
 ### Trocar chaves
 
