@@ -8,11 +8,12 @@ import type { PapelMembro } from "@/lib/types";
 
 export const metadata = { title: "Equipe · Gestão de Manutenção" };
 
-type LinhaMembro = {
-  user_id: string;
-  papel: PapelMembro;
-  created_at: string;
-  profiles: { nome: string | null; email: string | null; cargo: string | null; telefone: string | null } | null;
+type Perfil = {
+  id: string;
+  nome: string | null;
+  email: string | null;
+  cargo: string | null;
+  telefone: string | null;
 };
 
 type Acesso = { user_id: string; ultimo_acesso: string | null; sessoes_ativas: number };
@@ -21,26 +22,27 @@ export default async function EquipePage() {
   const { orgId, userId, papel, organizacao } = await getContexto();
   const db = await createClient();
 
-  const [{ data: membros }, { data: acessos }] = await Promise.all([
-    db
-      .from("org_membros")
-      .select("user_id, papel, created_at, profiles(nome, email, cargo, telefone)")
-      .eq("org_id", orgId)
-      .order("created_at"),
+  // org_membros aponta para auth.users (fora da API), não para profiles: o
+  // PostgREST não consegue embutir o perfil. Por isso os perfis vêm à parte
+  // (o RLS de profiles já limita a quem divide empresa com o usuário).
+  const [{ data: membros }, { data: perfis }, { data: acessos }] = await Promise.all([
+    db.from("org_membros").select("user_id, papel, created_at").eq("org_id", orgId).order("created_at"),
+    db.from("profiles").select("id, nome, email, cargo, telefone"),
     // Último acesso e sessões abertas moram no schema auth (db/sql/60-equipe.sql).
     db.rpc("equipe_acessos", { p_org: orgId }),
   ]);
 
   const porUsuario = new Map(((acessos ?? []) as Acesso[]).map((a) => [a.user_id, a]));
+  const perfilDe = new Map(((perfis ?? []) as Perfil[]).map((p) => [p.id, p]));
 
-  const equipe: Membro[] = ((membros ?? []) as unknown as LinhaMembro[]).map((m) => ({
+  const equipe: Membro[] = (membros ?? []).map((m) => ({
     user_id: m.user_id,
-    papel: m.papel,
+    papel: m.papel as PapelMembro,
     created_at: m.created_at,
-    nome: m.profiles?.nome ?? null,
-    email: m.profiles?.email ?? null,
-    cargo: m.profiles?.cargo ?? null,
-    telefone: m.profiles?.telefone ?? null,
+    nome: perfilDe.get(m.user_id)?.nome ?? null,
+    email: perfilDe.get(m.user_id)?.email ?? null,
+    cargo: perfilDe.get(m.user_id)?.cargo ?? null,
+    telefone: perfilDe.get(m.user_id)?.telefone ?? null,
     ultimo_acesso: porUsuario.get(m.user_id)?.ultimo_acesso ?? null,
     sessoes_ativas: porUsuario.get(m.user_id)?.sessoes_ativas ?? 0,
   }));
