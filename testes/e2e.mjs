@@ -250,8 +250,9 @@ await passo("superadmin (da stack) entra e vê todas as empresas e usuários", a
   await page.getByRole("heading", { name: "Administração do sistema" }).waitFor();
   await page.getByText(GESTOR.email).first().waitFor();
   await page.getByRole("button", { name: /^Empresas/ }).click();
-  await page.getByText("Oficina E2E").first().waitFor();
-  await page.getByText("Empresa Intrusa").first().waitFor();
+  // exact: os selos "Empresa · Papel" da aba Usuários (escondida) não contam.
+  await page.getByText("Oficina E2E", { exact: true }).first().waitFor();
+  await page.getByText("Empresa Intrusa", { exact: true }).first().waitFor();
 });
 
 await passo("superadmin bloqueia um usuário e ele não entra mais", async () => {
