@@ -15,6 +15,7 @@ import {
   type LucideIcon,
   Package,
   Settings,
+  Sparkles,
   LayoutGrid,
   TriangleAlert,
   Users,
@@ -39,6 +40,7 @@ const MENU: Item[] = [
   { href: "/calendario", rotulo: "Calendário", Icone: CalendarDays, grupo: "Operação" },
   { href: "/estoque", rotulo: "Estoque", Icone: CircleDot, grupo: "Operação" },
   { href: "/relatorios", rotulo: "Relatórios", Icone: ChartColumn, grupo: "Análise" },
+  { href: "/assistente", rotulo: "Assistente", Icone: Sparkles, grupo: "Análise" },
   { href: "/equipe", rotulo: "Equipe", Icone: Users, grupo: "Administração" },
   { href: "/configuracoes", rotulo: "Configurações", Icone: Settings, grupo: "Administração" },
 ];

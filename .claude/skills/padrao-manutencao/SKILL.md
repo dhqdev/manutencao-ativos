@@ -88,7 +88,8 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   casca própria em `components/admin/console.tsx`). Ele **não** entra no
   sistema das empresas: `getContexto()` o redireciona para `/admin` e ele não
   pode ser membro de equipe (`admin_definir_membro` recusa). O dono quer
-  **uma tela só** (`app/admin/page.tsx`: abas Usuários e Clientes e uso + bloco da versão);
+  **uma tela só** (`app/admin/page.tsx`: abas Usuários, Clientes e uso e
+  Integrações + bloco da versão);
   não crie telas novas no console sem ele pedir.
   - Toda página do console começa com `exigirSuperadminTela()`
     (`lib/admin-console.ts`) — layout e página rodam em paralelo, não confie
@@ -96,6 +97,18 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   - Toda ação começa com `exigirSuperadmin()` (`lib/actions/admin.ts`), que
     confere `obterSessao().superadmin` — o posto vem do banco a cada
     requisição, nunca do cookie.
+- Credenciais de serviços externos (Groq, Backblaze...) **não** viram
+  variável da stack: o superadmin cola na aba **Integrações** do console
+  (`components/admin/integracoes.tsx`, um cartão por serviço dentro de
+  `IntegracoesAdmin`). Ficam em `sistema_credenciais` (chave/valor, só
+  `service_role`, `db/sql/70-integracoes.sql`); leia no servidor com
+  `obterCredenciais()` (`lib/integracoes.ts`) e mande para a tela só se existe
+  e o final (nunca o valor). Campo de chave em branco = manter a atual.
+- Assistente de IA (`/assistente`, Groq): o modelo só chama as ferramentas de
+  `lib/assistente-ferramentas.ts` (tabelas/colunas em lista fechada, só
+  leitura) e `lib/assistente.ts` executa com `createClient()` + `org_id` da
+  empresa aberta. Tabela nova que o cliente deveria poder perguntar ⇒ entre
+  em `TABELAS` (sem colunas sensíveis: caminho de arquivo, ids de usuário).
 - Arquivos: o navegador sobe direto para `/api/arquivos` com token de envio
   (`criarUploadAssinado`); o caminho começa sempre por `{org_id}/`. Ao apagar
   linhas com anexos/fotos, chame `removerArquivos()` depois.
@@ -116,6 +129,7 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
     estranho não derruba o deploy. Regra nova de valor vai lá.
   - `60-equipe.sql` `equipe_acessos()`: último acesso e sessões abertas da
     equipe (dados de `auth.*` que o PostgREST não expõe)
+  - `70-integracoes.sql` `sistema_credenciais` (chaves do console)
   - Coisa nova grande: crie `40-<assunto>.sql` em vez de inchar os outros.
 - Tabela nova: `org_id ... references organizacoes on delete cascade`, índice
   em `org_id`, `enable row level security` e policies separadas por comando

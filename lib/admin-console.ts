@@ -7,6 +7,8 @@ import { obterSessao } from "@/lib/auth/sessao";
 import { createAdminClient } from "@/lib/db/admin";
 import type { EmpresaAdmin, UsoEmpresa, UsuarioAdmin } from "@/components/admin/tipos";
 import { diretorioBase } from "@/lib/arquivos";
+import type { SituacaoGroq } from "@/components/admin/integracoes";
+import { resumoGroq } from "@/lib/integracoes";
 
 /**
  * Console do superadmin (/admin). Layout e páginas rodam em paralelo no Next,
@@ -92,4 +94,15 @@ export const carregarUso = cache(async (orgIds: string[]): Promise<Dados<Record<
     };
   });
   return { dados: uso, erro: null };
+});
+
+/** Situação do Groq para a aba Integrações (nunca a chave inteira). */
+export const carregarGroq = cache(async (): Promise<Dados<SituacaoGroq>> => {
+  await exigirSuperadminTela();
+  try {
+    const { chave, modelo } = await resumoGroq();
+    return { dados: { ...chave, modelo }, erro: null };
+  } catch (e) {
+    return { dados: null, erro: e instanceof Error ? e.message : String(e) };
+  }
 });

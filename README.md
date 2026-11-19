@@ -49,6 +49,7 @@ Todo o SQL fica em [`db/sql/`](db/sql/) e é aplicado pelo migrador:
 | `10-schema.sql` | Tabelas, RLS, views, funções e triggers do sistema |
 | `20-auth.sql` | Funções de login, sessão, senha e recuperação (só o servidor chama) |
 | `30-superadmin.sql` | Login do superadmin (vindo da stack) e funções `admin_*` do painel de administração |
+| `70-integracoes.sql` | `sistema_credenciais`: chaves de serviços externos (Groq...) salvas pelo console |
 
 Cadastro automático: ao criar conta, o usuário ganha empresa, perfil e as 6
 categorias padrão.
@@ -137,6 +138,20 @@ Podem ser por **dias**, **meses** ou **horas de uso** (horímetro/km):
 Ao registrar uma manutenção vinculada a um plano, o sistema **avança sozinho** a
 próxima data (ou o próximo horímetro) e atualiza o horímetro do ativo.
 
+### Assistente de IA
+
+A tela **Assistente** (grupo Análise do menu) é um chat em que qualquer pessoa
+da equipe pergunta em português sobre a empresa: "quais manutenções estão
+atrasadas?", "quanto gastei por ativo este mês?", "pneus com sulco abaixo de
+3 mm". A IA é do **Groq**, ligada pelo superadmin na aba **Integrações** do
+console (sem chave, a tela avisa que ainda não está disponível).
+
+O modelo não fala com o banco: ele pede uma consulta (tabela, colunas,
+filtros) e o servidor executa **com o login de quem perguntou**, sempre na
+empresa aberta. Ele enxerga ativos, categorias, planos, manutenções, anexos
+(só o nome), pneus e movimentações, e **não grava nada**. A conversa fica só
+na aba do navegador.
+
 ### Relatórios e WhatsApp
 
 - **Baixar PDF** — salva o arquivo.
@@ -209,6 +224,11 @@ comparando os clientes), quantos ativos e manutenções tem e se o **WhatsApp
 está conectado** (com o número). No topo, os totais: clientes, espaço usado,
 quanto é arquivo e quanto é banco, e quantos estão com WhatsApp.
 
+Na aba **Integrações** ficam as chaves de serviços externos, guardadas no
+banco (`sistema_credenciais`) e nunca devolvidas à tela (só o final aparece):
+hoje o **Groq** do assistente de IA (chave, modelo e botão **Testar
+conexão**).
+
 Abaixo fica o bloco **Versão do sistema** (a que está no ar e a
 última publicada no GitHub Packages, com o botão **Atualizar**).
 
@@ -254,7 +274,7 @@ quantos registros vão sair e pede para digitar APAGAR.
 ```
 app/
   (app)/            telas internas (dashboard, ativos, manutenções, calendário, relatórios, configurações)
-  admin/            console do superadmin (uma tela: gerência dos usuários e versão)
+  admin/            console do superadmin (uma tela: usuários, clientes e uso, integrações e versão)
   api/arquivos/     envio e leitura de fotos/anexos (links assinados)
   api/notificacoes/ rotina diária do WhatsApp (chamada pelo serviço cron)
   auth/             login, cadastro, recuperação de senha e logout

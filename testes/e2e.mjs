@@ -187,6 +187,11 @@ await passo("relatórios abrem", async () => {
   await page.getByRole("heading", { name: /Relatórios/ }).first().waitFor();
 });
 
+await passo("assistente abre e avisa que o Groq ainda não foi ligado", async () => {
+  await page.goto("/assistente");
+  await page.getByText("Assistente ainda não disponível").waitFor();
+});
+
 await passo("calendário e estoque abrem", async () => {
   for (const rota of ["/calendario", "/estoque", "/dashboard"]) {
     const r = await page.goto(rota);
@@ -302,6 +307,19 @@ await passo("console: uso de cada cliente (arquivos e banco) e WhatsApp", async 
   await linha.getByText(/[1-9]\d* arquivo\(s\)/).waitFor();
   verdade(!/^0 B$/.test((await linha.locator("[data-uso-total]").textContent())?.trim() ?? ""), "uso zerado");
   await linha.locator('[data-whatsapp="desligado"]').waitFor();
+});
+
+await passo("console: aba Integrações guarda a chave do Groq sem devolvê-la à tela", async () => {
+  const chave = "gsk_e2eTesteDeChaveFalsa0000abcd";
+  await page.goto("/admin?aba=integracoes");
+  await page.locator('input[name="chave"]').fill(chave);
+  await page.getByRole("button", { name: "Salvar", exact: true }).click();
+  await page.getByText("Chave salva terminando em").waitFor();
+  await page.getByText("…abcd").waitFor();
+  verdade(!(await page.content()).includes(chave), "a chave inteira apareceu na página");
+  await page.getByRole("button", { name: "Remover", exact: true }).click();
+  await page.getByRole("button", { name: "Excluir", exact: true }).click();
+  await page.getByText("Chave salva terminando em").waitFor({ state: "detached" });
 });
 
 await passo("superadmin bloqueia um usuário e ele não entra mais", async () => {
