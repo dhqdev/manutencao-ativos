@@ -357,3 +357,22 @@ h3 {
     display: none !important;
   }
 }
+
+/*
+ * Autopreenchimento do navegador: o Chrome pinta o campo de azul-claro (e no
+ * tema escuro fica um bloco claro com texto claro). A sombra interna cobre o
+ * fundo com a cor da superfície; a cor do texto acompanha o tema.
+ */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--color-slate-900);
+  caret-color: var(--color-slate-900);
+  box-shadow: 0 0 0 1000px var(--color-superficie) inset;
+  transition: background-color 9999s ease-out 0s;
+}
+input.campo:-webkit-autofill:focus {
+  box-shadow:
+    0 0 0 1000px var(--color-superficie) inset,
+    0 0 0 3px color-mix(in oklab, var(--color-slate-900) 10%, transparent);
+}

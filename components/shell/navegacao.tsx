@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Bell,
   CalendarDays,
+  ChevronLeft,
   ChartColumn,
   CircleDot,
   ClipboardList,
@@ -21,6 +22,7 @@ import { Assinatura, Logo } from "@/components/marca";
 import { cn } from "@/components/ui";
 import { AlternarTema } from "@/components/tema/alternar-tema";
 import { iniciais } from "@/lib/format";
+import { salvarMenuRecolhido } from "@/lib/menu-lateral";
 
 type Item = { href: string; rotulo: string; Icone: LucideIcon };
 
@@ -42,12 +44,14 @@ export function Navegacao({
   emailUsuario,
   nomeEmpresa,
   alertas,
+  recolhidoInicial,
   children,
 }: {
   nomeUsuario: string;
   emailUsuario: string;
   nomeEmpresa: string;
   alertas: number;
+  recolhidoInicial: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -55,7 +59,31 @@ export function Navegacao({
   const NO_MENU = menu.slice(4);
   const [menuAberto, setMenuAberto] = useState(false);
 
+  const [recolhido, setRecolhido] = useState(recolhidoInicial);
+
   useEffect(() => setMenuAberto(false), [pathname]);
+
+  const alternarMenu = useCallback(() => {
+    setRecolhido((atual) => {
+      salvarMenuRecolhido(!atual);
+      return !atual;
+    });
+  }, []);
+
+  // Ctrl+B / ⌘+B recolhe e expande, como nos editores. Fora de campos de texto,
+  // para não brigar com o atalho de negrito de quem estiver digitando.
+  useEffect(() => {
+    const atalho = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "b" || e.altKey || e.shiftKey)
+        return;
+      const alvo = e.target as HTMLElement | null;
+      if (alvo?.closest("input, textarea, select, [contenteditable='true']")) return;
+      e.preventDefault();
+      alternarMenu();
+    };
+    document.addEventListener("keydown", atalho);
+    return () => document.removeEventListener("keydown", atalho);
+  }, [alternarMenu]);
 
   useEffect(() => {
     if (!menuAberto) return;
@@ -75,19 +103,62 @@ export function Navegacao({
   return (
     <div className="min-h-dvh lg:flex">
       {/* ---------------- Sidebar (desktop) ---------------- */}
-      <aside className="tema-original no-print fixed inset-y-0 left-0 z-30 hidden w-64 flex-col bg-slate-900 lg:flex">
-        <Link href="/dashboard" className="flex items-center gap-3 px-5 py-5">
-          <Logo tom="claro" />
-          <Assinatura empresa={nomeEmpresa} tom="claro" />
-        </Link>
+      <aside
+        className={cn(
+          "tema-original no-print fixed inset-y-0 left-0 z-30 hidden flex-col bg-slate-900 transition-[width] duration-200 ease-out lg:flex",
+          recolhido ? "w-[4.5rem]" : "w-64",
+        )}
+        aria-label="Menu lateral"
+      >
+        <div
+          className={cn("flex items-center py-5", recolhido ? "justify-center px-3" : "gap-3 px-5")}
+        >
+          <Link
+            href="/dashboard"
+            className="group relative flex min-w-0 flex-1 items-center gap-3"
+            aria-label={recolhido ? `${nomeEmpresa} · Dashboard` : undefined}
+          >
+            <Logo tom="claro" />
+            {recolhido ? (
+              <Dica>{nomeEmpresa}</Dica>
+            ) : (
+              <Assinatura empresa={nomeEmpresa} tom="claro" />
+            )}
+          </Link>
+        </div>
 
-        <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-2">
+        {/* Botão na borda: sempre no mesmo lugar, aberto ou recolhido. */}
+        <button
+          type="button"
+          onClick={alternarMenu}
+          aria-expanded={!recolhido}
+          aria-label={recolhido ? "Expandir menu" : "Recolher menu"}
+          title={`${recolhido ? "Expandir" : "Recolher"} menu (Ctrl+B)`}
+          className="pressionavel absolute -right-3 top-[1.85rem] z-10 flex h-6 w-6 items-center justify-center rounded-full border border-white/15 bg-slate-800 text-slate-300 shadow-md transition-colors hover:bg-slate-700 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca-400"
+        >
+          <ChevronLeft
+            className={cn(
+              "h-3.5 w-3.5 transition-transform duration-200",
+              recolhido && "rotate-180",
+            )}
+          />
+        </button>
+
+        <nav
+          className={cn(
+            "flex flex-1 flex-col gap-0.5 px-3 py-2",
+            // A dica sai para fora do menu; com rolagem ela seria cortada.
+            recolhido ? "overflow-visible" : "overflow-y-auto",
+          )}
+        >
           {menu.map(({ href, rotulo, Icone }) => (
             <Link
               key={href}
               href={href}
+              aria-current={ativo(href) ? "page" : undefined}
               className={cn(
-                "pressionavel group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm",
+                "pressionavel group relative flex items-center rounded-lg py-2.5 text-sm",
+                recolhido ? "justify-center px-0" : "gap-3 px-3",
                 ativo(href)
                   ? "bg-white/10 font-medium text-white"
                   : "text-slate-400 hover:bg-white/5 hover:text-slate-100",
@@ -96,38 +167,74 @@ export function Navegacao({
               {ativo(href) && (
                 <span className="pop-in absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-r-full bg-marca-400" />
               )}
-              <Icone
-                className={cn(
-                  "h-[18px] w-[18px] shrink-0 transition-colors",
-                  ativo(href)
-                    ? "text-marca-400"
-                    : "text-slate-500 group-hover:translate-x-0.5 group-hover:text-slate-300",
+              <span className="relative">
+                <Icone
+                  className={cn(
+                    "h-[18px] w-[18px] shrink-0 transition-colors",
+                    ativo(href)
+                      ? "text-marca-400"
+                      : cn(
+                          "text-slate-500 group-hover:text-slate-300",
+                          !recolhido && "group-hover:translate-x-0.5",
+                        ),
+                  )}
+                />
+                {recolhido && href === "/manutencoes" && alertas > 0 && (
+                  <span className="absolute -right-1.5 -top-1.5 h-2.5 w-2.5 rounded-full bg-amber-500 ring-2 ring-slate-900" />
                 )}
-              />
-              <span className="flex-1">{rotulo}</span>
-              {href === "/manutencoes" && alertas > 0 && (
+              </span>
+              <span className={recolhido ? "sr-only" : "flex-1 truncate"}>{rotulo}</span>
+              {!recolhido && href === "/manutencoes" && alertas > 0 && (
                 <span className="min-w-5 rounded-full bg-amber-500/90 px-1.5 py-0.5 text-center text-[11px] font-semibold leading-none text-slate-950">
                   {alertas > 99 ? "99+" : alertas}
                 </span>
+              )}
+              {recolhido && (
+                <Dica>
+                  {rotulo}
+                  {href === "/manutencoes" && alertas > 0 && (
+                    <span className="ml-1.5 text-amber-400">
+                      · {alertas > 99 ? "99+" : alertas}
+                    </span>
+                  )}
+                </Dica>
               )}
             </Link>
           ))}
         </nav>
 
         <div className="border-t border-white/10 p-3">
-          <div className="flex items-center gap-3 rounded-lg px-2 py-2">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-semibold text-white ring-1 ring-white/15">
-              {iniciais(nomeUsuario)}
+          <div
+            className={cn(
+              "flex rounded-lg px-2 py-2",
+              recolhido ? "flex-col items-center gap-1 px-0" : "items-center gap-3",
+            )}
+          >
+            <div className="group relative" tabIndex={recolhido ? 0 : undefined}>
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-semibold text-white ring-1 ring-white/15">
+                {iniciais(nomeUsuario)}
+              </div>
+              {recolhido && (
+                <Dica>
+                  <span className="block">{nomeUsuario}</span>
+                  <span className="block font-normal text-slate-400">{emailUsuario}</span>
+                </Dica>
+              )}
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium leading-tight text-white">{nomeUsuario}</p>
-              <p className="truncate text-xs leading-tight text-slate-400">{emailUsuario}</p>
-            </div>
+            {!recolhido && (
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium leading-tight text-white">
+                  {nomeUsuario}
+                </p>
+                <p className="truncate text-xs leading-tight text-slate-400">{emailUsuario}</p>
+              </div>
+            )}
             <AlternarTema className="text-slate-400 hover:bg-white/10 hover:text-white" />
             <Link
               href="/auth/sair"
               prefetch={false}
               title="Sair"
+              aria-label="Sair"
               className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
             >
               <LogOut className="h-4 w-4" />
@@ -136,7 +243,12 @@ export function Navegacao({
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col lg:ml-64">
+      <div
+        className={cn(
+          "flex min-w-0 flex-1 flex-col transition-[padding] duration-200 ease-out",
+          recolhido ? "lg:pl-[4.5rem]" : "lg:pl-64",
+        )}
+      >
         {/* ---------------- Topo (celular) ---------------- */}
         <header className="no-print area-segura-superior sticky top-0 z-20 border-b border-slate-200 bg-superficie/95 backdrop-blur lg:hidden">
           <div className="flex items-center gap-2.5 px-4 py-2">
@@ -286,5 +398,21 @@ export function Navegacao({
         </div>
       </nav>
     </div>
+  );
+}
+
+/**
+ * Rótulo que aparece ao lado do ícone com o menu recolhido (mouse ou teclado).
+ * O pai precisa de `group relative`. É só visual: o nome acessível vem do
+ * texto `sr-only` / aria-label do próprio link.
+ */
+function Dica({ children }: { children: React.ReactNode }) {
+  return (
+    <span
+      aria-hidden
+      className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-x-1 -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-800 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg ring-1 ring-white/10 transition-all duration-150 group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:opacity-100"
+    >
+      {children}
+    </span>
   );
 }

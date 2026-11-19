@@ -31,6 +31,7 @@ export function FormLogin({ destino, avisoInicial }: { destino?: string; avisoIn
           inputMode="email"
           autoCapitalize="none"
           autoComplete="email"
+          autoFocus
           required
           placeholder="voce@empresa.com.br"
         />

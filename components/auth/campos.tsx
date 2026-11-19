@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ComponentProps, type FormEvent } from "react";
-import { Eye, EyeOff, Lock, type LucideIcon } from "lucide-react";
+import { ArrowBigUp, Eye, EyeOff, Lock, type LucideIcon } from "lucide-react";
 import { cn } from "@/components/ui";
 
 /**
@@ -30,25 +30,47 @@ export function CampoIcone({
   );
 }
 
-export function CampoSenha({ className, ...props }: ComponentProps<"input">) {
+export function CampoSenha({ className, onKeyUp, onBlur, ...props }: ComponentProps<"input">) {
   const [ver, setVer] = useState(false);
+  // Caps Lock ligado é a causa mais comum de "senha incorreta" — e conta como
+  // tentativa no bloqueio por excesso. Avisar antes poupa a pessoa.
+  const [capsLock, setCapsLock] = useState(false);
 
   return (
-    <div className="group relative">
-      <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-slate-900" />
-      <input
-        {...props}
-        type={ver ? "text" : "password"}
-        className={cn("campo h-12 pl-11 pr-12", className)}
-      />
-      <button
-        type="button"
-        onClick={() => setVer((v) => !v)}
-        className="absolute inset-y-0 right-0 flex w-12 items-center justify-center rounded-r-lg text-slate-400 transition-colors hover:text-slate-700"
-        aria-label={ver ? "Ocultar senha" : "Mostrar senha"}
-      >
-        {ver ? <EyeOff className="h-[18px] w-[18px]" /> : <Eye className="h-[18px] w-[18px]" />}
-      </button>
+    <div>
+      <div className="group relative">
+        <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-slate-900" />
+        <input
+          {...props}
+          type={ver ? "text" : "password"}
+          className={cn("campo h-12 pl-11 pr-12", className)}
+          onKeyUp={(e) => {
+            setCapsLock(e.getModifierState?.("CapsLock") ?? false);
+            onKeyUp?.(e);
+          }}
+          onBlur={(e) => {
+            setCapsLock(false);
+            onBlur?.(e);
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => setVer((v) => !v)}
+          className="absolute inset-y-0 right-0 flex w-12 items-center justify-center rounded-r-lg text-slate-400 transition-colors hover:text-slate-700"
+          aria-label={ver ? "Ocultar senha" : "Mostrar senha"}
+        >
+          {ver ? <EyeOff className="h-[18px] w-[18px]" /> : <Eye className="h-[18px] w-[18px]" />}
+        </button>
+      </div>
+      {capsLock && (
+        <p
+          className="pop-in mt-1.5 flex items-center gap-1.5 text-xs font-medium text-amber-600"
+          role="status"
+        >
+          <ArrowBigUp className="h-3.5 w-3.5" />
+          Caps Lock está ligado
+        </p>
+      )}
     </div>
   );
 }
@@ -65,12 +87,32 @@ export function ForcaSenha({ senha }: { senha: string }) {
 
   const nivel =
     senha.length < 6
-      ? { rotulo: "Muito curta", cor: "bg-red-500", texto: "text-red-600", n: 1 }
+      ? {
+          rotulo: "Muito curta",
+          cor: "bg-red-500",
+          texto: "text-red-600",
+          n: 1,
+        }
       : pontos <= 1
-        ? { rotulo: "Fraca", cor: "bg-amber-500", texto: "text-amber-600", n: 2 }
+        ? {
+            rotulo: "Fraca",
+            cor: "bg-amber-500",
+            texto: "text-amber-600",
+            n: 2,
+          }
         : pontos <= 2
-          ? { rotulo: "Boa", cor: "bg-emerald-500", texto: "text-emerald-600", n: 3 }
-          : { rotulo: "Forte", cor: "bg-emerald-500", texto: "text-emerald-600", n: 4 };
+          ? {
+              rotulo: "Boa",
+              cor: "bg-emerald-500",
+              texto: "text-emerald-600",
+              n: 3,
+            }
+          : {
+              rotulo: "Forte",
+              cor: "bg-emerald-500",
+              texto: "text-emerald-600",
+              n: 4,
+            };
 
   return (
     <div className="mt-2 flex items-center gap-2" aria-live="polite">
@@ -78,7 +120,10 @@ export function ForcaSenha({ senha }: { senha: string }) {
         {[1, 2, 3, 4].map((i) => (
           <span
             key={i}
-            className={cn("h-1 flex-1 rounded-full transition-colors", i <= nivel.n ? nivel.cor : "bg-slate-200")}
+            className={cn(
+              "h-1 flex-1 rounded-full transition-colors",
+              i <= nivel.n ? nivel.cor : "bg-slate-200",
+            )}
           />
         ))}
       </div>

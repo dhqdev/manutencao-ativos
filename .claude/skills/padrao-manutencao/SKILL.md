@@ -129,6 +129,15 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
 - Tem que funcionar no celular (é PWA): barra inferior + menu "Mais"; modais
   viram folha de baixo para cima. Item novo de menu vai em `MENU` de
   `components/shell/navegacao.tsx`.
+- Menu lateral (desktop) recolhe para só ícones (botão na borda ou Ctrl+B).
+  O estado vai no cookie `menu_lateral` (`lib/menu-lateral.ts`), lido no
+  `app/(app)/layout.tsx`: assim o servidor já entrega a largura certa, sem o
+  menu "pular" depois de hidratar. Preferência visual nova segue o mesmo
+  caminho (cookie, como o tema), não `localStorage`. Com o menu recolhido, o
+  nome vem da `Dica` (hover/foco) e de um texto `sr-only` no link.
+- Telas de entrada (`/login`, `/cadastro`, `/recuperar-senha`, `/nova-senha`)
+  usam `MolduraAuth` (`components/auth/moldura.tsx`) e os campos de
+  `components/auth/campos.tsx` (`CampoSenha` já avisa Caps Lock ligado).
 - Formulário cliente: `useTransition` + chamar a action + mostrar `erro` +
   `router.refresh()` no sucesso (veja `FormModal` em `components/admin/comum.tsx`).
 - Tela restrita: confira no servidor e chame `notFound()` (não só esconder o botão).

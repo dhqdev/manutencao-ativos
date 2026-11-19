@@ -100,6 +100,17 @@ await passo("cookie de sessão é httpOnly e Secure", async () => {
   verdade(cookie.httpOnly && cookie.secure, `cookie inseguro: ${JSON.stringify(cookie)}`);
 });
 
+await passo("menu lateral recolhe, mostra a dica e lembra depois de recarregar", async () => {
+  await page.goto("/dashboard");
+  await page.getByRole("button", { name: "Recolher menu" }).click();
+  const menu = page.getByRole("complementary", { name: "Menu lateral" });
+  await menu.locator('a[href="/ativos"]').hover();
+  await menu.getByText("Ativos", { exact: true }).last().waitFor();
+  await page.reload();
+  await page.getByRole("button", { name: "Expandir menu" }).click();
+  await page.getByRole("button", { name: "Recolher menu" }).waitFor();
+});
+
 await passo("as 6 categorias padrão existem", async () => {
   await page.goto("/ativos");
   const total = await page.locator('a[href^="/ativos/categoria/"]').count();
