@@ -82,7 +82,16 @@ com as variáveis de `whatsapp/src/config.js`).
 | **Calendário** | Mês a mês, com realizadas (verde), programadas (azul) e atrasadas (vermelho). Filtra por categoria e por situação |
 | **Estoque** | Pneus com número de fogo, medida, DOT, sulco, valor e situação (estoque, em uso, recapagem, descarte). Movimentações com veículo, posição e KM, e histórico de cada pneu |
 | **Relatórios** | Filtra por período, uma ou mais categorias, ativo e tipo. Histórico com horímetro/KM e seção de pneus (gastos, movimentações, sulco baixo). Gera PDF e compartilha no WhatsApp |
-| **Configurações** | Dados da empresa, perfil, senha, **WhatsApp** (com horário do envio), equipe e acessos, empresa ativa |
+| **Equipe** | Quem tem acesso, com que papel, último acesso e quem está conectado. Busca, filtro por papel, criar acesso, trocar papel, editar dados, gerar senha nova, desconectar e remover |
+| **Configurações** | Dados da empresa, perfil, senha, aparência (tema e decoração de Natal), **WhatsApp** (com horário do envio), empresa ativa |
+
+### Natal
+
+De 15 de novembro até o Dia de Reis (6 de janeiro) o sistema ganha luzinhas no
+menu, neve leve, gorro no logo, uma faixa de boas festas no Dashboard e um
+trenó que atravessa o alto da tela de vez em quando. Depois some sozinho. Cada
+aparelho pode desligar em **Configurações → Aparência**, e quem pediu menos
+animação no sistema operacional não vê neve nem trenó.
 
 ### Aplicativo no celular (PWA)
 
@@ -139,12 +148,17 @@ próxima data (ou o próximo horímetro) e atualiza o horímetro do ativo.
 
 ## 4. Equipe e acessos
 
-Em **Configurações → Equipe e acessos**, o proprietário ou gestor cria o login
-da pessoa (nome, e-mail, senha opcional e papel). No final o sistema mostra
+Em **Equipe** (no menu), o proprietário ou gestor clica em **Nova pessoa** e
+cria o login (nome, e-mail, senha opcional e papel). No final o sistema mostra
 e-mail e senha para copiar ou mandar no WhatsApp. A pessoa já entra na empresa
 certa. Se o e-mail já tinha conta, ela só é adicionada à equipe.
 
-Na mesma tela dá para trocar o papel, gerar uma senha nova e remover o acesso.
+Na mesma tela aparecem o último acesso de cada pessoa, quem está conectado
+agora e quem ainda não entrou. Dá para buscar, filtrar por papel, trocar o
+papel, corrigir nome/cargo/telefone, gerar uma senha nova, desconectar de todos
+os aparelhos e remover o acesso. Senha, dados e desconexão só valem para quem
+participa **apenas** desta empresa (assim o gestor de uma empresa não mexe na
+conta do dono de outra).
 
 | Papel | Pode |
 |---|---|

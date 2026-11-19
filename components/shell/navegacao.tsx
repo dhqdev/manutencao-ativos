@@ -16,25 +16,41 @@ import {
   Package,
   Settings,
   LayoutGrid,
+  TriangleAlert,
+  Users,
   X,
 } from "lucide-react";
 import { Assinatura, Logo } from "@/components/marca";
+import { CartaoNatal, Gorro, NeveMenu, PiscaPisca, Treno } from "@/components/natal/decoracao";
 import { cn } from "@/components/ui";
 import { AlternarTema } from "@/components/tema/alternar-tema";
 import { iniciais } from "@/lib/format";
 import { salvarMenuRecolhido } from "@/lib/menu-lateral";
+import type { PapelMembro } from "@/lib/types";
 
-type Item = { href: string; rotulo: string; Icone: LucideIcon };
+type Grupo = "Operação" | "Análise" | "Administração";
+type Item = { href: string; rotulo: string; Icone: LucideIcon; grupo: Grupo };
 
+/** A ordem vale também para o celular: os 4 primeiros vão na barra inferior. */
 const MENU: Item[] = [
-  { href: "/dashboard", rotulo: "Dashboard", Icone: LayoutDashboard },
-  { href: "/ativos", rotulo: "Ativos", Icone: Package },
-  { href: "/manutencoes", rotulo: "Manutenções", Icone: ClipboardList },
-  { href: "/calendario", rotulo: "Calendário", Icone: CalendarDays },
-  { href: "/estoque", rotulo: "Estoque", Icone: CircleDot },
-  { href: "/relatorios", rotulo: "Relatórios", Icone: ChartColumn },
-  { href: "/configuracoes", rotulo: "Configurações", Icone: Settings },
+  { href: "/dashboard", rotulo: "Dashboard", Icone: LayoutDashboard, grupo: "Operação" },
+  { href: "/ativos", rotulo: "Ativos", Icone: Package, grupo: "Operação" },
+  { href: "/manutencoes", rotulo: "Manutenções", Icone: ClipboardList, grupo: "Operação" },
+  { href: "/calendario", rotulo: "Calendário", Icone: CalendarDays, grupo: "Operação" },
+  { href: "/estoque", rotulo: "Estoque", Icone: CircleDot, grupo: "Operação" },
+  { href: "/relatorios", rotulo: "Relatórios", Icone: ChartColumn, grupo: "Análise" },
+  { href: "/equipe", rotulo: "Equipe", Icone: Users, grupo: "Administração" },
+  { href: "/configuracoes", rotulo: "Configurações", Icone: Settings, grupo: "Administração" },
 ];
+
+const GRUPOS: Grupo[] = ["Operação", "Análise", "Administração"];
+
+const NOME_PAPEL: Record<PapelMembro, string> = {
+  proprietario: "Proprietário",
+  gestor: "Gestor",
+  tecnico: "Técnico",
+  leitor: "Leitor",
+};
 
 /** Na barra inferior cabem 4 com conforto; o resto vai para o menu suspenso. */
 const NA_BARRA = MENU.slice(0, 4);
@@ -43,15 +59,20 @@ export function Navegacao({
   nomeUsuario,
   emailUsuario,
   nomeEmpresa,
+  papel,
   alertas,
   recolhidoInicial,
+  natal,
   children,
 }: {
   nomeUsuario: string;
   emailUsuario: string;
   nomeEmpresa: string;
+  papel: PapelMembro;
   alertas: number;
   recolhidoInicial: boolean;
+  /** Decoração de Natal ligada (lib/natal.ts) e dias até o dia 25. */
+  natal: { ligado: boolean; dias: number | null };
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -110,15 +131,24 @@ export function Navegacao({
         )}
         aria-label="Menu lateral"
       >
+        {natal.ligado && (
+          <>
+            <NeveMenu />
+            <PiscaPisca className="top-0" quantidade={recolhido ? 3 : 9} />
+          </>
+        )}
         <div
-          className={cn("flex items-center py-5", recolhido ? "justify-center px-3" : "gap-3 px-5")}
+          className={cn("relative flex items-center py-5", recolhido ? "justify-center px-3" : "gap-3 px-5")}
         >
           <Link
             href="/dashboard"
             className="group relative flex min-w-0 flex-1 items-center gap-3"
             aria-label={recolhido ? `${nomeEmpresa} · Dashboard` : undefined}
           >
-            <Logo tom="claro" />
+            <span className="relative">
+              <Logo tom="claro" />
+              {natal.ligado && <Gorro className="absolute -right-2 -top-3 h-6 w-6 rotate-[18deg]" />}
+            </span>
             {recolhido ? (
               <Dica>{nomeEmpresa}</Dica>
             ) : (
@@ -146,64 +176,55 @@ export function Navegacao({
 
         <nav
           className={cn(
-            "flex flex-1 flex-col gap-0.5 px-3 py-2",
+            "relative flex flex-1 flex-col px-3 py-2",
             // A dica sai para fora do menu; com rolagem ela seria cortada.
             recolhido ? "overflow-visible" : "overflow-y-auto",
           )}
         >
-          {menu.map(({ href, rotulo, Icone }) => (
-            <Link
-              key={href}
-              href={href}
-              aria-current={ativo(href) ? "page" : undefined}
-              className={cn(
-                "pressionavel group relative flex items-center rounded-lg py-2.5 text-sm",
-                recolhido ? "justify-center px-0" : "gap-3 px-3",
-                ativo(href)
-                  ? "bg-white/10 font-medium text-white"
-                  : "text-slate-400 hover:bg-white/5 hover:text-slate-100",
+          {GRUPOS.map((grupo, g) => (
+            <div key={grupo} className={cn("flex flex-col gap-0.5", g > 0 && "mt-4")}>
+              {recolhido ? (
+                g > 0 && <span className="mx-auto mb-2 h-px w-6 bg-white/10" aria-hidden />
+              ) : (
+                <p className="mb-1 px-3 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                  {grupo}
+                </p>
               )}
-            >
-              {ativo(href) && (
-                <span className="pop-in absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-r-full bg-marca-400" />
-              )}
-              <span className="relative">
-                <Icone
-                  className={cn(
-                    "h-[18px] w-[18px] shrink-0 transition-colors",
-                    ativo(href)
-                      ? "text-marca-400"
-                      : cn(
-                          "text-slate-500 group-hover:text-slate-300",
-                          !recolhido && "group-hover:translate-x-0.5",
-                        ),
-                  )}
-                />
-                {recolhido && href === "/manutencoes" && alertas > 0 && (
-                  <span className="absolute -right-1.5 -top-1.5 h-2.5 w-2.5 rounded-full bg-amber-500 ring-2 ring-slate-900" />
-                )}
-              </span>
-              <span className={recolhido ? "sr-only" : "flex-1 truncate"}>{rotulo}</span>
-              {!recolhido && href === "/manutencoes" && alertas > 0 && (
-                <span className="min-w-5 rounded-full bg-amber-500/90 px-1.5 py-0.5 text-center text-[11px] font-semibold leading-none text-slate-950">
-                  {alertas > 99 ? "99+" : alertas}
-                </span>
-              )}
-              {recolhido && (
-                <Dica>
-                  {rotulo}
-                  {href === "/manutencoes" && alertas > 0 && (
-                    <span className="ml-1.5 text-amber-400">
-                      · {alertas > 99 ? "99+" : alertas}
-                    </span>
-                  )}
-                </Dica>
-              )}
-            </Link>
+              {menu
+                .filter((i) => i.grupo === grupo)
+                .map((item) => (
+                  <ItemMenu
+                    key={item.href}
+                    item={item}
+                    ativo={ativo(item.href)}
+                    recolhido={recolhido}
+                    alertas={item.href === "/manutencoes" ? alertas : 0}
+                  />
+                ))}
+            </div>
           ))}
+
+          {alertas > 0 && !recolhido && (
+            <Link
+              href="/manutencoes?filtro=alertas"
+              className="pressionavel group mt-6 flex items-start gap-2.5 rounded-xl bg-amber-500/10 px-3 py-2.5 ring-1 ring-amber-400/20 transition-colors hover:bg-amber-500/15"
+            >
+              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+              <span className="min-w-0 text-xs">
+                <span className="block font-semibold text-amber-200">
+                  {alertas} {alertas === 1 ? "manutenção pede" : "manutenções pedem"} atenção
+                </span>
+                <span className="block text-amber-200/70 group-hover:text-amber-100">
+                  Vencendo ou atrasadas · ver lista
+                </span>
+              </span>
+            </Link>
+          )}
         </nav>
 
-        <div className="border-t border-white/10 p-3">
+        {natal.ligado && !recolhido && <CartaoNatal dias={natal.dias} />}
+
+        <div className="relative border-t border-white/10 p-3">
           <div
             className={cn(
               "flex rounded-lg px-2 py-2",
@@ -217,7 +238,9 @@ export function Navegacao({
               {recolhido && (
                 <Dica>
                   <span className="block">{nomeUsuario}</span>
-                  <span className="block font-normal text-slate-400">{emailUsuario}</span>
+                  <span className="block font-normal text-slate-400">
+                    {NOME_PAPEL[papel]} · {emailUsuario}
+                  </span>
                 </Dica>
               )}
             </div>
@@ -226,7 +249,9 @@ export function Navegacao({
                 <p className="truncate text-sm font-medium leading-tight text-white">
                   {nomeUsuario}
                 </p>
-                <p className="truncate text-xs leading-tight text-slate-400">{emailUsuario}</p>
+                <p className="truncate text-xs leading-tight text-slate-400" title={emailUsuario}>
+                  {NOME_PAPEL[papel]} · {emailUsuario}
+                </p>
               </div>
             )}
             <AlternarTema className="text-slate-400 hover:bg-white/10 hover:text-white" />
@@ -251,8 +276,12 @@ export function Navegacao({
       >
         {/* ---------------- Topo (celular) ---------------- */}
         <header className="no-print area-segura-superior sticky top-0 z-20 border-b border-slate-200 bg-superficie/95 backdrop-blur lg:hidden">
+          {natal.ligado && <PiscaPisca className="-bottom-[9px]" quantidade={11} />}
           <div className="flex items-center gap-2.5 px-4 py-2">
-            <Logo tamanho="sm" />
+            <span className="relative">
+              <Logo tamanho="sm" />
+              {natal.ligado && <Gorro className="absolute -right-2 -top-2.5 h-5 w-5 rotate-[18deg]" />}
+            </span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold leading-tight text-slate-900">
                 {nomeEmpresa}
@@ -281,6 +310,8 @@ export function Navegacao({
           </div>
         </main>
       </div>
+
+      {natal.ligado && <Treno />}
 
       {/* ---------------- Menu suspenso (celular) ---------------- */}
       {menuAberto && (
@@ -398,6 +429,62 @@ export function Navegacao({
         </div>
       </nav>
     </div>
+  );
+}
+
+function ItemMenu({
+  item: { href, rotulo, Icone },
+  ativo,
+  recolhido,
+  alertas,
+}: {
+  item: Item;
+  ativo: boolean;
+  recolhido: boolean;
+  alertas: number;
+}) {
+  const contagem = alertas > 99 ? "99+" : String(alertas);
+  return (
+    <Link
+      href={href}
+      aria-current={ativo ? "page" : undefined}
+      className={cn(
+        "pressionavel group relative flex items-center rounded-lg py-2.5 text-sm",
+        recolhido ? "justify-center px-0" : "gap-3 px-3",
+        ativo
+          ? "bg-gradient-to-r from-white/[0.12] to-white/[0.04] font-medium text-white ring-1 ring-inset ring-white/10"
+          : "text-slate-400 hover:bg-white/5 hover:text-slate-100",
+      )}
+    >
+      {ativo && (
+        <span className="pop-in absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-marca-400 shadow-[0_0_10px_var(--color-marca-400)]" />
+      )}
+      <span className="relative">
+        <Icone
+          className={cn(
+            "h-[18px] w-[18px] shrink-0 transition-[color,transform]",
+            ativo
+              ? "text-marca-400"
+              : cn("text-slate-500 group-hover:text-slate-300", !recolhido && "group-hover:translate-x-0.5"),
+          )}
+        />
+        {recolhido && alertas > 0 && (
+          <span className="absolute -right-1.5 -top-1.5 h-2.5 w-2.5 rounded-full bg-amber-500 ring-2 ring-slate-900" />
+        )}
+      </span>
+      <span className={recolhido ? "sr-only" : "flex-1 truncate"}>{rotulo}</span>
+      {!recolhido && alertas > 0 && (
+        <span className="min-w-5 rounded-full bg-amber-500/90 px-1.5 py-0.5 text-center text-[11px] font-semibold leading-none text-slate-950">
+          {contagem}
+        </span>
+      )}
+      {recolhido && (
+        <Dica>
+          {rotulo}
+          {alertas > 0 && <span className="ml-1.5 text-amber-400">· {contagem}</span>}
+        </Dica>
+      )}
+    </Link>
   );
 }
 

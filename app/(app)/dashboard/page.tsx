@@ -1,9 +1,15 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import {
+  CalendarCheck,
   CalendarClock,
+  ChartColumn,
   ChevronRight,
   ClipboardList,
+  Gift,
   Package,
+  Snowflake,
+  TreePine,
   TrendingUp,
   TriangleAlert,
   Wallet,
@@ -23,6 +29,7 @@ import {
   numero,
   primeiroDiaDoMes,
 } from "@/lib/format";
+import { COOKIE_NATAL, diasParaONatal, natalLigado } from "@/lib/natal";
 import { getContexto } from "@/lib/session";
 import { createClient } from "@/lib/db/server";
 import type { ManutencaoCompleta, PlanoStatus } from "@/lib/types";
@@ -30,8 +37,9 @@ import type { ManutencaoCompleta, PlanoStatus } from "@/lib/types";
 export const metadata = { title: "Dashboard · Gestão de Manutenção" };
 
 export default async function DashboardPage() {
-  const { orgId, profile } = await getContexto();
+  const [{ orgId, profile }, biscoitos] = await Promise.all([getContexto(), cookies()]);
   const db = await createClient();
+  const natal = natalLigado(biscoitos.get(COOKIE_NATAL)?.value);
 
   // Meses de Brasília: o container roda em UTC, e na virada do mês (depois das
   // 21h do último dia) o servidor já estaria no mês seguinte.
@@ -119,10 +127,12 @@ export default async function DashboardPage() {
   return (
     <>
       <Cabecalho
-        titulo={primeiroNome ? `Olá, ${primeiroNome}` : "Dashboard"}
-        descricao="Visão geral da manutenção dos seus ativos."
+        titulo={`${saudacao()}${primeiroNome ? `, ${primeiroNome}` : ""}`}
+        descricao={`${hojePorExtenso()} · visão geral da manutenção dos seus ativos.`}
         acoes={<BotaoLink href="/relatorios" variante="secundario">Gerar relatório</BotaoLink>}
       />
+
+      {natal && <FaixaNatal dias={diasParaONatal()} />}
 
       {/* Indicadores */}
       <div className="lista-escalonada grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
@@ -167,9 +177,11 @@ export default async function DashboardPage() {
         <Secao titulo="Gastos com manutenção — últimos 6 meses">
           {meses.every((m) => m.valor === 0) ? (
             // Sem gasto, nem baixa a biblioteca de gráficos.
-            <div className="flex h-64 items-center justify-center px-6 text-center text-sm text-slate-500">
-              Nenhum gasto registrado nos últimos 6 meses.
-            </div>
+            <VazioPainel
+              icone={<ChartColumn className="h-5 w-5" />}
+              titulo="Sem gastos nos últimos 6 meses"
+              texto="Ao registrar uma manutenção com valor, o gráfico aparece aqui."
+            />
           ) : (
             <GraficoMensalLazy dados={meses} />
           )}
@@ -201,9 +213,12 @@ export default async function DashboardPage() {
           }
         >
           {alertas.length === 0 ? (
-            <p className="px-5 py-10 text-center text-sm text-slate-500">
-              Nenhuma manutenção próxima do vencimento. Tudo em dia.
-            </p>
+            <VazioPainel
+              icone={<CalendarCheck className="h-5 w-5" />}
+              tom="ok"
+              titulo="Tudo em dia"
+              texto="Nenhuma manutenção perto do vencimento."
+            />
           ) : (
             <ul className="divide-y divide-slate-100">
               {alertas.slice(0, 6).map((p) => (
@@ -254,14 +269,12 @@ export default async function DashboardPage() {
           }
         >
           {historicoRecente.length === 0 ? (
-            <div className="px-5 py-6">
-              <EstadoVazio
-                icone={<ClipboardList className="h-6 w-6" />}
-                titulo="Nenhuma manutenção registrada"
-                descricao="Registre o primeiro serviço para acompanhar custos e histórico."
-                acao={<BotaoLink href="/manutencoes">Registrar manutenção</BotaoLink>}
-              />
-            </div>
+            <VazioPainel
+              icone={<ClipboardList className="h-5 w-5" />}
+              titulo="Nenhuma manutenção registrada"
+              texto="Registre o primeiro serviço para acompanhar custos e histórico."
+              acao={<BotaoLink href="/manutencoes" tamanho="sm">Registrar manutenção</BotaoLink>}
+            />
           ) : (
             <ul className="divide-y divide-slate-100">
               {historicoRecente.map((m) => (
@@ -303,6 +316,80 @@ export default async function DashboardPage() {
         </div>
       )}
     </>
+  );
+}
+
+/** Bom dia / boa tarde / boa noite no horário de Brasília (o servidor roda em UTC). */
+function saudacao() {
+  const hora = Number(
+    new Date().toLocaleString("pt-BR", { hour: "numeric", hour12: false, timeZone: "America/Sao_Paulo" }),
+  );
+  return hora < 5 ? "Boa noite" : hora < 12 ? "Bom dia" : hora < 18 ? "Boa tarde" : "Boa noite";
+}
+
+function hojePorExtenso() {
+  const texto = new Date().toLocaleDateString("pt-BR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone: "America/Sao_Paulo",
+  });
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
+/** Painel vazio sem moldura dentro de outra moldura (o card já é a Secao). */
+function VazioPainel({
+  icone,
+  titulo,
+  texto,
+  acao,
+  tom = "neutro",
+}: {
+  icone: React.ReactNode;
+  titulo: string;
+  texto: string;
+  acao?: React.ReactNode;
+  tom?: "neutro" | "ok";
+}) {
+  return (
+    <div className="flex min-h-56 flex-col items-center justify-center px-6 py-10 text-center">
+      <span
+        className={`flex h-11 w-11 items-center justify-center rounded-full ${
+          tom === "ok" ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-400"
+        }`}
+      >
+        {icone}
+      </span>
+      <p className="mt-3 text-sm font-semibold text-slate-900">{titulo}</p>
+      <p className="mt-1 max-w-xs text-sm text-slate-500">{texto}</p>
+      {acao && <div className="mt-4">{acao}</div>}
+    </div>
+  );
+}
+
+function FaixaNatal({ dias }: { dias: number | null }) {
+  const contagem =
+    dias === null
+      ? "Que o ano novo venha com tudo em dia."
+      : dias === 0
+        ? "Hoje é Natal! Bom descanso para toda a equipe."
+        : `${dias === 1 ? "Falta 1 dia" : `Faltam ${dias} dias`} para o Natal. Que tal deixar as preventivas em dia antes das festas?`;
+
+  return (
+    <div className="relative mb-4 flex items-center gap-3 overflow-hidden rounded-xl border border-red-200/70 bg-gradient-to-r from-red-50 via-superficie to-emerald-50 px-4 py-3 sm:mb-6">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-600 text-white shadow-sm">
+        <Gift className="h-[18px] w-[18px]" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-slate-900">Boas festas!</p>
+        <p className="text-xs text-slate-600 sm:text-[13px]">{contagem}</p>
+      </div>
+      <div className="hidden items-center gap-2 text-emerald-600 sm:flex" aria-hidden>
+        <Snowflake className="h-4 w-4 text-sky-400" />
+        <TreePine className="h-6 w-6" />
+        <Snowflake className="h-3 w-3 text-sky-300" />
+      </div>
+    </div>
   );
 }
 

@@ -116,6 +116,10 @@ chave de serviço define. Ler de `raw_user_meta_data` (preenchido pelo
 formulário público de cadastro) deixaria qualquer pessoa se colocar dentro de
 outra empresa. A troca de senha pelo gestor só vale para quem participa
 apenas daquela empresa, para um gestor não tomar a conta do dono de outra.
+A mesma trava (`alvoDaEquipe` em `lib/actions/equipe.ts`) vale para editar
+nome/cargo/telefone e para desconectar alguém da equipe. O último acesso e as
+sessões abertas da tela Equipe vêm de `equipe_acessos()` (`db/sql/60-equipe.sql`),
+que só responde para membros da empresa pedida e devolve só esses dois dados.
 
 ### 10. Entrada do navegador ia crua para o banco
 

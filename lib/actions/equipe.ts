@@ -5,7 +5,13 @@ import { getContexto } from "@/lib/session";
 import { createClient } from "@/lib/db/server";
 import { createAdminClient } from "@/lib/db/admin";
 import { gerarSenhaLegivel as gerarSenha, senhaValida } from "@/lib/auth/senhas";
-import { criarUsuario as criarLogin, definirSenha, excluirUsuario, usuarioPorId } from "@/lib/auth/usuarios";
+import {
+  criarUsuario as criarLogin,
+  definirSenha,
+  encerrarSessoesDoUsuario,
+  excluirUsuario,
+  usuarioPorId,
+} from "@/lib/auth/usuarios";
 import {
   emailValido,
   erroBanco,
@@ -22,6 +28,12 @@ const PAPEIS_CONVIDAVEIS: PapelMembro[] = ["gestor", "tecnico", "leitor"];
 export type Credenciais =
   | { ok: true; nome: string; email: string; senha: string | null; aviso?: string }
   | { ok: false; erro: string };
+
+/** A tela da equipe e o atalho em Configurações (que mostra o total de pessoas). */
+function revalidarEquipe() {
+  revalidatePath("/equipe");
+  revalidatePath("/configuracoes");
+}
 
 /** Papel escolhido ao convidar: vazio vira técnico (o padrão da tela). */
 function papelValido(valor: string | null): PapelMembro {
@@ -89,7 +101,7 @@ export async function criarUsuario(fd: FormData): Promise<Credenciais> {
       });
       if (erroMembro) return erroBanco(erroMembro);
 
-      revalidatePath("/configuracoes");
+      revalidarEquipe();
       return {
         ok: true,
         nome,
@@ -109,7 +121,7 @@ export async function criarUsuario(fd: FormData): Promise<Credenciais> {
       .upsert({ org_id: orgId, user_id: novoId, papel }, { onConflict: "org_id,user_id" });
     await admin.from("organizacoes").delete().eq("criado_por", novoId).neq("id", orgId);
 
-    revalidatePath("/configuracoes");
+    revalidarEquipe();
     return { ok: true, nome, email, senha };
   } catch (e) {
     return { ok: false, erro: mensagemErro(e) };
@@ -133,7 +145,7 @@ export async function adicionarMembro(fd: FormData): Promise<Resultado> {
 
     if (error) return erroBanco(error);
 
-    revalidatePath("/configuracoes");
+    revalidarEquipe();
     return { ok: true };
   } catch (e) {
     return { ok: false, erro: mensagemErro(e) };
@@ -154,7 +166,7 @@ export async function alterarPapel(userId: string, papel: PapelMembro): Promise<
     });
     if (error) return erroBanco(error);
 
-    revalidatePath("/configuracoes");
+    revalidarEquipe();
     return { ok: true };
   } catch (e) {
     return { ok: false, erro: mensagemErro(e) };
@@ -162,46 +174,100 @@ export async function alterarPapel(userId: string, papel: PapelMembro): Promise<
 }
 
 /**
- * Gera uma senha nova para alguém da equipe.
+ * Confere se o gestor pode mexer na conta (senha, sessões, nome) desta pessoa.
  *
  * Só vale para quem participa APENAS desta empresa: sem essa trava, o gestor
  * de uma empresa poderia trocar a senha de alguém que é dono de outra — e
  * entrar nos dados dela.
  */
+async function alvoDaEquipe(
+  userId: string,
+  oQue: string,
+): Promise<{ ok: true; orgId: string } | { ok: false; erro: string }> {
+  exigirId(userId, "a pessoa");
+  const { orgId, userId: eu } = await exigirGestor();
+  if (userId === eu) return { ok: false, erro: "Para mexer na sua própria conta, use as Configurações." };
+
+  const { data: vinculos } = await createAdminClient()
+    .from("org_membros")
+    .select("org_id, papel")
+    .eq("user_id", userId);
+
+  const aqui = vinculos?.find((v) => v.org_id === orgId);
+  if (!aqui) return { ok: false, erro: "Esta pessoa não faz parte da equipe." };
+  if (aqui.papel === "proprietario") {
+    return { ok: false, erro: `Não é possível ${oQue} do proprietário por aqui.` };
+  }
+  if ((vinculos?.length ?? 0) > 1) {
+    return {
+      ok: false,
+      erro: `Esta pessoa também participa de outra empresa, então não dá para ${oQue} por aqui. Para a senha, ela pode usar "Esqueci minha senha" no login.`,
+    };
+  }
+  return { ok: true, orgId };
+}
+
+/** Gera uma senha nova para alguém da equipe (derruba as sessões abertas). */
 export async function redefinirSenha(userId: string): Promise<Credenciais> {
   try {
-    exigirId(userId, "a pessoa");
-    const { orgId, userId: eu } = await exigirGestor();
-    if (userId === eu) return { ok: false, erro: "Para trocar a sua senha, use \"Alterar senha\"." };
-
-    const admin = createAdminClient();
-    const { data: vinculos } = await admin
-      .from("org_membros")
-      .select("org_id, papel")
-      .eq("user_id", userId);
-
-    const aqui = vinculos?.find((v) => v.org_id === orgId);
-    if (!aqui) return { ok: false, erro: "Esta pessoa não faz parte da equipe." };
-    if (aqui.papel === "proprietario") {
-      return { ok: false, erro: "A senha do proprietário não pode ser trocada por aqui." };
-    }
-    if ((vinculos?.length ?? 0) > 1) {
-      return {
-        ok: false,
-        erro: "Esta pessoa também participa de outra empresa. Peça para ela usar \"Esqueci minha senha\" no login.",
-      };
-    }
+    const alvoOk = await alvoDaEquipe(userId, "trocar a senha");
+    if (!alvoOk.ok) return alvoOk;
 
     const alvo = await usuarioPorId(userId);
     if (!alvo) return { ok: false, erro: "Usuário não encontrado." };
 
-    // Senha nova derruba as sessões abertas da pessoa.
     const senha = gerarSenha();
     await definirSenha(userId, senha);
 
-    const { data: perfil } = await admin.from("profiles").select("nome").eq("id", userId).maybeSingle();
+    const { data: perfil } = await createAdminClient()
+      .from("profiles")
+      .select("nome")
+      .eq("id", userId)
+      .maybeSingle();
 
     return { ok: true, nome: perfil?.nome ?? "", email: alvo.email ?? "", senha };
+  } catch (e) {
+    return { ok: false, erro: mensagemErro(e) };
+  }
+}
+
+/** Encerra todas as sessões abertas da pessoa (celular perdido, saiu do turno...). */
+export async function desconectarMembro(userId: string): Promise<Resultado> {
+  try {
+    const alvoOk = await alvoDaEquipe(userId, "desconectar a conta");
+    if (!alvoOk.ok) return alvoOk;
+
+    await encerrarSessoesDoUsuario(userId);
+
+    revalidarEquipe();
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, erro: mensagemErro(e) };
+  }
+}
+
+/**
+ * Corrige nome, cargo e telefone de alguém da equipe. O perfil só é gravável
+ * pelo próprio dono no RLS; por isso a chave de serviço, depois da trava acima.
+ */
+export async function editarMembro(userId: string, fd: FormData): Promise<Resultado> {
+  try {
+    const alvoOk = await alvoDaEquipe(userId, "editar os dados");
+    if (!alvoOk.ok) return alvoOk;
+
+    const { error } = await createAdminClient()
+      .from("profiles")
+      .update({
+        nome: textoObrigatorio(fd, "nome", "o nome"),
+        cargo: texto(fd, "cargo"),
+        telefone: texto(fd, "telefone"),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId);
+    if (error) return erroBanco(error);
+
+    revalidarEquipe();
+    return { ok: true };
   } catch (e) {
     return { ok: false, erro: mensagemErro(e) };
   }
@@ -241,7 +307,7 @@ export async function removerMembro(userId: string): Promise<Resultado> {
       console.error("[equipe] remover login", e);
     }
 
-    revalidatePath("/configuracoes");
+    revalidarEquipe();
     return { ok: true };
   } catch (e) {
     return { ok: false, erro: mensagemErro(e) };

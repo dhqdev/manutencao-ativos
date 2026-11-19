@@ -114,6 +114,8 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   - `50-validacoes.sql` travas `check` (valores não negativos, cor #RRGGBB)
     criadas como `not valid` por `pg_temp.trava()`: base antiga com dado
     estranho não derruba o deploy. Regra nova de valor vai lá.
+  - `60-equipe.sql` `equipe_acessos()`: último acesso e sessões abertas da
+    equipe (dados de `auth.*` que o PostgREST não expõe)
   - Coisa nova grande: crie `40-<assunto>.sql` em vez de inchar os outros.
 - Tabela nova: `org_id ... references organizacoes on delete cascade`, índice
   em `org_id`, `enable row level security` e policies separadas por comando
@@ -140,10 +142,22 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   `RodapeModal`, `BotaoExcluir` (confirmação), `Abas`, `FormularioSalvar`.
   Inputs com a classe `campo`, rótulos com `rotulo`, cartões com `card`.
 - Ícones só do `lucide-react`. Cores: grafite (`slate-900`) é ação, `marca-*`
-  é navegação/estado; badges de papel seguem `PAPEIS` de `components/configuracoes/equipe.tsx`.
+  é navegação/estado; badges de papel seguem `PAPEIS` de `components/configuracoes/equipe.tsx`
+  (o quadro "O que cada papel pode fazer" ali espelha `lib/permissoes.ts`).
+- Equipe tem tela própria (`/equipe`, no grupo Administração do menu). Ação que
+  mexe na conta de outra pessoa (senha, dados, sessões) passa por
+  `alvoDaEquipe()` em `lib/actions/equipe.ts`: só quem participa **apenas**
+  desta empresa e não é proprietário.
+- Nada de efeito em todo clique (as faíscas foram tiradas a pedido do dono).
+  Enfeite é discreto, `aria-hidden`, `pointer-events-none`, `no-print` e some
+  com `prefers-reduced-motion`.
+- Natal: `lib/natal.ts` decide a época (15/11 a 6/1, fuso de Brasília) e o
+  cookie `natal` deixa cada aparelho desligar. Decoração em
+  `components/natal/decoracao.tsx` (luzes, neve no menu, gorro, trenó).
 - Tem que funcionar no celular (é PWA): barra inferior + menu "Mais"; modais
   viram folha de baixo para cima. Item novo de menu vai em `MENU` de
-  `components/shell/navegacao.tsx`.
+  `components/shell/navegacao.tsx`, com o `grupo` (Operação, Análise,
+  Administração); os 4 primeiros vão na barra inferior do celular.
 - Menu lateral (desktop) recolhe para só ícones (botão na borda ou Ctrl+B).
   O estado vai no cookie `menu_lateral` (`lib/menu-lateral.ts`), lido no
   `app/(app)/layout.tsx`: assim o servidor já entrega a largura certa, sem o

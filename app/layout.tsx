@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { cookies } from "next/headers";
-import { FaiscaClique } from "@/components/efeitos/faisca-clique";
 import { RegistrarServiceWorker } from "@/components/registrar-sw";
 import { COOKIE_TEMA, COR_BARRA, classeTema, lerTema } from "@/lib/tema";
 import "./globals.css";
@@ -63,7 +62,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className="font-sans">
         {children}
         <RegistrarServiceWorker />
-        <FaiscaClique />
       </body>
     </html>
   );

@@ -323,6 +323,70 @@ h3 {
   animation: piscar 1.8s ease-out infinite;
 }
 
+/* ---------------------------------------------------------------------------
+   Natal (components/natal/decoracao.tsx). Só aparece na época (lib/natal.ts).
+--------------------------------------------------------------------------- */
+@keyframes natal-piscar {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 6px 1px currentColor;
+  }
+  50% {
+    opacity: 0.35;
+    box-shadow: none;
+  }
+}
+
+@keyframes natal-cair {
+  from {
+    transform: translate3d(0, -1rem, 0) rotate(0deg);
+  }
+  to {
+    transform: translate3d(1.5rem, 100dvh, 0) rotate(240deg);
+  }
+}
+
+/* Atravessa da esquerda para a direita, saindo inteiro dos dois lados. */
+@keyframes natal-voar {
+  from {
+    transform: translate3d(-280px, 0, 0);
+  }
+  to {
+    transform: translate3d(calc(100vw + 40px), -24px, 0);
+  }
+}
+
+@keyframes natal-balancar {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1.5deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(1.5deg);
+  }
+}
+
+@utility natal-luz {
+  animation: natal-piscar 1.8s ease-in-out infinite;
+}
+
+@utility natal-neve {
+  animation-name: natal-cair;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-fill-mode: backwards;
+}
+
+@utility natal-treno {
+  animation: natal-voar 13s linear forwards;
+  will-change: transform;
+}
+
+@utility natal-balanco {
+  animation: natal-balancar 1.6s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .veu,
   .folha,
@@ -334,8 +398,15 @@ h3 {
   .anim-girar,
   .anim-girar-reverso,
   .anim-apertar,
-  .anim-faisca {
+  .anim-faisca,
+  .natal-luz,
+  .natal-balanco {
     animation: none !important;
+  }
+  /* Neve e trenó parados não fazem sentido: somem. */
+  .natal-neve,
+  .natal-treno {
+    display: none !important;
   }
   .pressionavel:active,
   .cartao-vivo:hover {

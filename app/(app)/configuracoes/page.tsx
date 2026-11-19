@@ -1,37 +1,33 @@
 import Link from "next/link";
-import { Building2, FolderOpen, ShieldCheck } from "lucide-react";
-import { PainelEquipe } from "@/components/configuracoes/equipe";
+import { cookies } from "next/headers";
+import { Building2, ChevronRight, FolderOpen, ShieldCheck, Users } from "lucide-react";
 import { FormularioSalvar } from "@/components/configuracoes/formulario-salvar";
 import { PainelWhatsapp, type ConexaoAtual } from "@/components/configuracoes/whatsapp";
 import { ZonaPerigo } from "@/components/configuracoes/zona-perigo";
 import { SeletorTema } from "@/components/tema/alternar-tema";
+import { AlternarNatal } from "@/components/natal/decoracao";
 import { Cabecalho, Campo, Secao } from "@/components/ui";
 import { alterarSenha, salvarEmpresa, salvarPerfil, trocarEmpresa } from "@/lib/actions/configuracoes";
 import { dataBR } from "@/lib/format";
 import { podeGerenciar } from "@/lib/permissoes";
+import { COOKIE_NATAL, epocaDeNatal, natalLigado } from "@/lib/natal";
 import { getContexto } from "@/lib/session";
-import { urlSite } from "@/lib/auth/config";
 import { createClient } from "@/lib/db/server";
-import type { PapelMembro } from "@/lib/types";
 
 export const metadata = { title: "Configurações · Gestão de Manutenção" };
 
 export default async function ConfiguracoesPage() {
-  const { orgId, userId, email, profile, organizacao, papel, empresas } = await getContexto();
-  const db = await createClient();
+  const { orgId, email, profile, organizacao, papel, empresas } = await getContexto();
+  const [db, biscoitos] = await Promise.all([createClient(), cookies()]);
 
   const [
-    { data: membros },
+    { count: totalMembros },
     { data: categorias },
     { count: totalAtivos },
     { count: totalManutencoes },
     { data: conexaoWhatsapp },
   ] = await Promise.all([
-    db
-      .from("org_membros")
-      .select("user_id, papel, created_at, profiles(nome, email, cargo)")
-      .eq("org_id", orgId)
-      .order("created_at"),
+    db.from("org_membros").select("user_id", { count: "exact", head: true }).eq("org_id", orgId),
     db.from("categorias").select("id, nome, cor").eq("org_id", orgId).order("ordem").order("nome"),
     db.from("ativos").select("id", { count: "exact", head: true }).eq("org_id", orgId),
     db.from("manutencoes").select("id", { count: "exact", head: true }).eq("org_id", orgId),
@@ -62,15 +58,6 @@ export default async function ConfiguracoesPage() {
   const empresasMantidas = empresas
     .filter((e) => (pessoasPorEmpresa.get(e.id) ?? 1) > 1)
     .map((e) => e.nome);
-
-  type LinhaMembro = {
-    user_id: string;
-    papel: PapelMembro;
-    created_at: string;
-    profiles: { nome: string | null; email: string | null; cargo: string | null } | null;
-  };
-
-  const equipe = (membros ?? []) as unknown as LinhaMembro[];
 
   return (
     <>
@@ -206,8 +193,11 @@ export default async function ConfiguracoesPage() {
             <p className="mb-3 text-sm text-slate-500">
               Escolha o tema deste aparelho. &quot;Automático&quot; segue o modo do celular ou computador.
             </p>
-            <div className="max-w-md">
+            <div className="max-w-md space-y-3">
               <SeletorTema />
+              {epocaDeNatal() && (
+                <AlternarNatal ligado={natalLigado(biscoitos.get(COOKIE_NATAL)?.value)} />
+              )}
             </div>
           </div>
         </Secao>
@@ -229,22 +219,23 @@ export default async function ConfiguracoesPage() {
         )}
       </div>
 
-      {/* Equipe */}
-      <div className="mt-4">
-        <PainelEquipe
-          membros={equipe.map((m) => ({
-            user_id: m.user_id,
-            papel: m.papel,
-            created_at: m.created_at,
-            nome: m.profiles?.nome ?? null,
-            email: m.profiles?.email ?? null,
-            cargo: m.profiles?.cargo ?? null,
-          }))}
-          userId={userId}
-          podeGerenciar={gestor}
-          urlSistema={urlSite()}
-        />
-      </div>
+      {/* Equipe: tela própria em /equipe */}
+      <Link
+        href="/equipe"
+        className="card pressionavel group mt-4 flex items-center gap-4 px-4 py-4 transition-colors hover:border-slate-300 sm:px-5"
+      >
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-marca-50 text-marca-600">
+          <Users className="h-5 w-5" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-slate-900">Equipe e acessos</span>
+          <span className="block truncate text-xs text-slate-500">
+            {totalMembros ?? 0} pessoa(s) ·{" "}
+            {gestor ? "adicione pessoas, troque papéis e senhas" : "veja quem tem acesso e com que papel"}
+          </span>
+        </span>
+        <ChevronRight className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5" />
+      </Link>
 
       <div className="mt-4 flex items-start gap-3 rounded-xl border border-slate-200 bg-superficie p-4 text-sm text-slate-600">
         <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
