@@ -70,6 +70,9 @@ echo "— backup (pg_dump 17 contra o banco da stack)"
 docker run --rm --network manutencao_interna -e PGHOST=db -e PGPASSWORD="$POSTGRES_PASSWORD" \
   --entrypoint sh "$IMAGEM_BASE/ops:$TAG" -c '. /ops/comum.sh && pg_dump -Fc -f /tmp/b.dump && test -s /tmp/b.dump && pg_restore -l /tmp/b.dump | grep -q "TABLE DATA public ativos"' \
   && ok "pg_dump gera um backup restaurável" || erro "backup falhou"
+docker run --rm --network manutencao_interna -e PGHOST=db -e PGPASSWORD="$POSTGRES_PASSWORD" -e BACKUP_DIR=/tmp/bk \
+  --entrypoint sh "$IMAGEM_BASE/ops:$TAG" -c '/ops/backup.sh agora >/dev/null && grep -q "^.* ok banco-" /tmp/bk/ULTIMO-BACKUP.txt' \
+  && ok "backup-agora termina com sucesso e registra o status" || erro "backup-agora falhou"
 
 echo
 if [ "$falhas" -gt 0 ]; then echo "$falhas verificação(ões) falharam."; exit 1; fi

@@ -95,12 +95,24 @@ enviar_b2() {
   $RC delete "$REMOTO/arquivos-removidos" --min-age "${B2_DIAS}d" --rmdirs 2>/dev/null || true
 }
 
+# Resultado da última rodada, para quem olha o volume (ou um monitor) saber
+# se o backup está em dia sem precisar ler o log.
+registrar_status() {
+  printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M')" "$1" >"$DESTINO/ULTIMO-BACKUP.txt" 2>/dev/null || true
+}
+
 fazer_backup() {
   carimbo=$(date +%Y%m%d-%H%M)
+  banco_ok=false
   echo "[backup] $carimbo começando"
 
-  if pg_dump -Fc -f "$DESTINO/banco-$carimbo.dump.parcial"; then
+  # O dump só vale se o pg_restore conseguir ler o índice dele: um arquivo
+  # truncado (disco cheio, conexão caída) passaria por "ok" e só seria
+  # descoberto na hora de restaurar.
+  if pg_dump -Fc -f "$DESTINO/banco-$carimbo.dump.parcial" \
+    && pg_restore --list "$DESTINO/banco-$carimbo.dump.parcial" >/dev/null; then
     mv "$DESTINO/banco-$carimbo.dump.parcial" "$DESTINO/banco-$carimbo.dump"
+    banco_ok=true
     echo "[backup] banco ok ($(du -h "$DESTINO/banco-$carimbo.dump" | cut -f1))"
   else
     rm -f "$DESTINO/banco-$carimbo.dump.parcial"
@@ -117,10 +129,25 @@ fazer_backup() {
     fi
   fi
 
-  find "$DESTINO" -maxdepth 1 \( -name 'banco-*.dump' -o -name 'arquivos-*.tar.gz' \) -mtime +"$DIAS" -delete
+  # Retenção só depois de um backup bom: se o banco ficar dias falhando, as
+  # cópias antigas são justamente as únicas que restam — não podem sumir.
+  if [ "$banco_ok" = true ]; then
+    find "$DESTINO" -maxdepth 1 \( -name 'banco-*.dump' -o -name 'arquivos-*.tar.gz' \) -mtime +"$DIAS" -delete
+  else
+    echo "[backup] retenção adiada: nenhuma cópia antiga é apagada enquanto o backup do banco falhar" >&2
+  fi
+  # Sobras de rodadas interrompidas (container parado no meio do dump).
+  find "$DESTINO" -maxdepth 1 -name '*.parcial' -mmin +360 -delete 2>/dev/null || true
 
   enviar_b2 "$carimbo"
+
+  if [ "$banco_ok" = true ]; then
+    registrar_status "ok banco-$carimbo.dump"
+  else
+    registrar_status "FALHOU (veja o log do serviço backup)"
+  fi
   echo "[backup] $carimbo terminado"
+  [ "$banco_ok" = true ]
 }
 
 segundos_ate_a_hora() {
@@ -133,8 +160,10 @@ segundos_ate_a_hora() {
 aguardar_banco
 
 if [ "${1:-}" = "agora" ]; then
+  # Código de saída de verdade: quem roda à mão (ou num script antes de mexer
+  # no servidor) precisa saber se o backup falhou.
   fazer_backup
-  exit 0
+  exit $?
 fi
 
 if [ "$B2_LIGADO" = true ]; then
@@ -149,9 +178,9 @@ if [ "$B2_LIGADO" = true ]; then
 fi
 
 echo "[backup] no ar: todo dia às ${HORA}h30, mantendo ${DIAS} dias em $DESTINO"
-[ "${BACKUP_AO_INICIAR:-false}" = "true" ] && fazer_backup
+if [ "${BACKUP_AO_INICIAR:-false}" = "true" ]; then fazer_backup || true; fi
 
 while true; do
   sleep "$(segundos_ate_a_hora)"
-  fazer_backup
+  fazer_backup || true
 done

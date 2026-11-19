@@ -72,7 +72,7 @@ async function registrar(
   hoje: string,
   r: { sucesso: boolean; quantidade?: number; detalhe: string | null },
 ) {
-  await db.from("whatsapp_envios").upsert(
+  const { error } = await db.from("whatsapp_envios").upsert(
     {
       org_id: orgId,
       data_referencia: hoje,
@@ -83,6 +83,9 @@ async function registrar(
     },
     { onConflict: "org_id,data_referencia" },
   );
+  // Sem o registro, a reserva do dia pode ficar presa em "enviando": que
+  // apareça no log do app em vez de sumir em silêncio.
+  if (error) console.error(`[whatsapp] registrar envio ${orgId}:`, error.message);
 }
 
 /**
@@ -172,9 +175,12 @@ export async function GET(request: NextRequest) {
         return;
       }
 
-      const { data: pendencias } = await db.rpc("whatsapp_pendencias", {
+      const { data: pendencias, error: erroPendencias } = await db.rpc("whatsapp_pendencias", {
         p_org: conexao.org_id,
       });
+      // Erro no banco não pode virar "nada pendente": isso fechava o dia sem
+      // avisar ninguém. Lançando, a falha fica registrada e a próxima hora tenta.
+      if (erroPendencias) throw new Error(`pendências: ${erroPendencias.message}`);
 
       const lista = (pendencias ?? []) as Pendencia[];
 
@@ -223,6 +229,13 @@ export async function GET(request: NextRequest) {
 
   for (let i = 0; i < conexoes.length; i += EM_PARALELO) {
     await Promise.all(conexoes.slice(i, i + EM_PARALELO).map(atender));
+  }
+
+  if (resultado.falhas.length) {
+    console.warn(
+      `[whatsapp] rotina das ${hora}h: ${resultado.enviadas} enviada(s), ${resultado.falhas.length} falha(s):`,
+      resultado.falhas.map((f) => `${f.org} (${f.motivo})`).join("; "),
+    );
   }
 
   return NextResponse.json(resultado);

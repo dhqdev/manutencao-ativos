@@ -203,6 +203,11 @@ Todo dia às 3h30 (`BACKUP_HORA`), mantendo 14 dias (`BACKUP_DIAS`), no volume
 sudo ls -lh /var/lib/docker/volumes/manutencao_backups/_data/
 ```
 
+O arquivo `ULTIMO-BACKUP.txt` no mesmo volume diz como foi a última rodada
+(`ok banco-AAAAMMDD-HHMM.dump` ou `FALHOU`). O dump só é aceito se o
+`pg_restore` consegue lê-lo, e enquanto o backup do banco estiver falhando
+nenhuma cópia antiga é apagada pela retenção.
+
 **Copie para fora da VM** — um backup no mesmo disco não salva de um disco
 perdido. O serviço de backup já manda tudo para o **Backblaze B2** quando as
 variáveis `B2_*` estão preenchidas.

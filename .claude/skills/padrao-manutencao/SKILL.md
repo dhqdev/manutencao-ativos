@@ -163,7 +163,10 @@ Variável nova de ambiente ⇒ atualize **todos** estes lugares no mesmo commit:
 - Scripts da imagem `ops` (`db/scripts/*.sh`) são `sh` POSIX (Alpine/busybox):
   nada de bash-ismos. Comando novo da imagem ⇒ `entrypoint.sh`.
 - Backup: `db/scripts/backup.sh` (local + Backblaze B2 via `rclone` com
-  configuração por variáveis de ambiente, sem arquivo de config).
+  configuração por variáveis de ambiente, sem arquivo de config). O dump só
+  conta se o `pg_restore --list` o lê; a retenção só apaga cópias antigas
+  depois de um backup bom; `ULTIMO-BACKUP.txt` no volume diz o resultado da
+  última rodada; `backup-agora` sai com erro se falhar.
 - Atualização pelo console: o app **nunca** fala com o Docker. A ação grava
   em `sistema_atualizacoes`; o serviço `atualizador` (`db/scripts/atualizador.sh`,
   socket do Docker, sem porta) aplica: migrador primeiro, depois os outros,
