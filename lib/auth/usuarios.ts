@@ -13,6 +13,8 @@ export type UsuarioAdmin = {
   email: string;
   user_metadata: Record<string, unknown>;
   app_metadata: Record<string, unknown>;
+  superadmin?: boolean;
+  bloqueado?: boolean;
 };
 
 export type ResultadoCriacao =
@@ -43,7 +45,7 @@ export async function criarUsuario(entrada: {
 
 export async function usuarioPorEmail(email: string) {
   const { data } = await createAdminClient().rpc("auth_usuario_por_email", { p_email: email });
-  return (data as { id: string; email: string; hash: string | null } | null) ?? null;
+  return (data as { id: string; email: string; hash: string | null; bloqueado?: boolean } | null) ?? null;
 }
 
 export async function usuarioPorId(id: string) {

@@ -195,7 +195,7 @@ jobs:
         run: |
           pasta="manutencao-$VERSAO"
           mkdir -p "pacote/$pasta/infra"
-          cp infra/stack.yml infra/traefik.yml infra/deploy.sh infra/preparar-servidor.sh infra/.env.exemplo "pacote/$pasta/infra/"
+          cp infra/stack.yml infra/portainer.yml infra/traefik.yml infra/deploy.sh infra/preparar-servidor.sh infra/.env.exemplo "pacote/$pasta/infra/"
           cp INSTALACAO.md WHATSAPP.md SEGURANCA.md "pacote/$pasta/"
           tar -czf "infra-$VERSAO.tar.gz" -C pacote "$pasta"
 

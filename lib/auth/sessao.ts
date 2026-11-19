@@ -30,7 +30,7 @@ export type { DadosCookie } from "./sessao-cookie";
  * redirecionamentos; toda tela e ação confere a sessão no banco aqui.
  */
 
-export type Sessao = { sessaoId: string; userId: string; email: string };
+export type Sessao = { sessaoId: string; userId: string; email: string; superadmin: boolean };
 
 /** Sessão válida da requisição atual (uma consulta ao banco por requisição). */
 export const obterSessao = cache(async (): Promise<Sessao | null> => {
@@ -40,8 +40,13 @@ export const obterSessao = cache(async (): Promise<Sessao | null> => {
   const { data, error } = await createAdminClient().rpc("auth_validar_sessao", { p_sessao: dados.sid });
   if (error || !data) return null;
 
-  const sessao = data as { user_id: string; email: string };
-  return { sessaoId: dados.sid, userId: sessao.user_id, email: sessao.email };
+  const sessao = data as { user_id: string; email: string; superadmin?: boolean };
+  return {
+    sessaoId: dados.sid,
+    userId: sessao.user_id,
+    email: sessao.email,
+    superadmin: sessao.superadmin === true,
+  };
 });
 
 /** IP real do cliente. O Traefik substitui o X-Forwarded-For vindo de fora. */

@@ -40,7 +40,7 @@ stable
 security definer
 set search_path = public, auth
 as $$
-  select json_build_object('id', u.id, 'email', u.email, 'hash', u.encrypted_password)
+  select json_build_object('id', u.id, 'email', u.email, 'hash', u.encrypted_password, 'bloqueado', u.bloqueado)
     from auth.users u
    where lower(u.email) = lower(trim(p_email))
    limit 1
@@ -57,7 +57,9 @@ as $$
            'id', u.id,
            'email', u.email,
            'user_metadata', u.raw_user_meta_data,
-           'app_metadata', u.raw_app_meta_data
+           'app_metadata', u.raw_app_meta_data,
+           'superadmin', u.superadmin,
+           'bloqueado', u.bloqueado
          )
     from auth.users u
    where u.id = p_id
@@ -101,6 +103,10 @@ as $$
 declare
   v_id uuid;
 begin
+  if exists (select 1 from auth.users where id = p_user and bloqueado) then
+    raise exception 'Acesso bloqueado.' using errcode = '42501';
+  end if;
+
   delete from auth.sessoes where user_id = p_user and expira_em < now();
 
   insert into auth.sessoes (user_id, expira_em, ip, agente)
@@ -112,7 +118,8 @@ begin
 end;
 $$;
 
--- Devolve { user_id, email } se a sessão vale, ou null. Renova a validade
+-- Devolve { user_id, email, superadmin } se a sessão vale, ou null (usuário
+-- bloqueado também dá null). Renova a validade
 -- (no máximo uma gravação por hora por sessão, para não escrever a cada clique).
 create or replace function public.auth_validar_sessao(p_sessao uuid)
 returns json
@@ -123,13 +130,13 @@ as $$
 declare
   v record;
 begin
-  select s.id, s.user_id, s.expira_em, s.ultimo_uso, u.email
+  select s.id, s.user_id, s.expira_em, s.ultimo_uso, u.email, u.superadmin, u.bloqueado
     into v
     from auth.sessoes s
     join auth.users u on u.id = s.user_id
    where s.id = p_sessao;
 
-  if not found or v.expira_em < now() then
+  if not found or v.expira_em < now() or v.bloqueado then
     return null;
   end if;
 
@@ -139,7 +146,7 @@ begin
      where id = p_sessao;
   end if;
 
-  return json_build_object('user_id', v.user_id, 'email', v.email);
+  return json_build_object('user_id', v.user_id, 'email', v.email, 'superadmin', v.superadmin);
 end;
 $$;
 

@@ -291,12 +291,12 @@ function NovoUsuario({ aoCriar }: { aoCriar: (c: Extract<Credenciais, { ok: true
   );
 }
 
-function JanelaCredenciais({
+export function JanelaCredenciais({
   credenciais,
   urlSistema,
   aoFechar,
 }: {
-  credenciais: Extract<Credenciais, { ok: true }> | null;
+  credenciais: { nome: string; email: string; senha: string | null; aviso?: string } | null;
   urlSistema: string;
   aoFechar: () => void;
 }) {

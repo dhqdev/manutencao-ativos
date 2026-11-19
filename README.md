@@ -29,9 +29,9 @@ migrador · cron (resumo do WhatsApp) · backup diário
 | **rest** | PostgREST: API do banco, **só na rede interna**. O app chama com um JWT curto do usuário; o RLS do Postgres filtra cada linha pela empresa |
 | **db** | PostgreSQL 17 com RLS em todas as tabelas e autenticação própria (schema `auth`) |
 | **whatsapp** | Servidor Baileys sempre ligado (QR, "digitando", reconexão) |
-| **migrador** | Aplica `db/sql/*.sql` a cada deploy (idempotente) |
+| **migrador** | Aplica `db/sql/*.sql` a cada deploy (idempotente) e cria/atualiza o superadmin |
 | **cron** | Chama a rotina do resumo diário do WhatsApp de hora em hora |
-| **backup** | `pg_dump` + arquivos todo dia, com retenção |
+| **backup** | `pg_dump` + arquivos todo dia, com retenção, e cópia no Backblaze B2 (opcional) |
 | **traefik** | Porta de entrada, HTTPS automático, painel protegido por senha |
 
 Instalação no servidor (Oracle Cloud ARM64): **[INSTALACAO.md](INSTALACAO.md)**.
@@ -47,6 +47,7 @@ Todo o SQL fica em [`db/sql/`](db/sql/) e é aplicado pelo migrador:
 | `00-fundacao.sql` | Papéis (`anon`, `authenticated`, `service_role`, `authenticator`), schema `auth` (usuários, sessões, tokens, tentativas) e `auth.uid()` |
 | `10-schema.sql` | Tabelas, RLS, views, funções e triggers do sistema |
 | `20-auth.sql` | Funções de login, sessão, senha e recuperação (só o servidor chama) |
+| `30-superadmin.sql` | Login do superadmin (vindo da stack) e funções `admin_*` do painel de administração |
 
 Cadastro automático: ao criar conta, o usuário ganha empresa, perfil e as 6
 categorias padrão.
@@ -153,6 +154,37 @@ Na mesma tela dá para trocar o papel, gerar uma senha nova e remover o acesso.
 As regras valem no banco (RLS), não só na tela. Quem participa de mais de uma
 empresa escolhe qual está ativa em **Configurações → Empresa ativa**.
 
+### Superadmin (administração do sistema inteiro)
+
+O superadmin é um login definido **na stack**, no serviço `migrador`:
+
+```yaml
+- SUPERADMIN_EMAIL=voce@suaempresa.com.br
+- SUPERADMIN_SENHA=uma-senha-forte-com-8-ou-mais-caracteres
+```
+
+A cada deploy o migrador cria esse login (se ainda não existir), garante que
+ele é o superadmin e acerta a senha para a da stack. Trocar a senha na stack e
+dar *Update* derruba as sessões abertas dele. Trocar o e-mail passa o posto
+para o e-mail novo; deixar as duas vazias tira o posto de todo mundo. O login
+ganha também uma empresa própria, "Administração", para usar o sistema normal.
+
+Entrando com ele aparece o menu **Administração** (`/admin`), com:
+
+- **Números do sistema**: usuários, empresas, ativos, manutenções, sessões abertas e WhatsApps conectados.
+- **Usuários** (todos, de todas as empresas): criar login (numa empresa nova ou
+  numa existente, com qualquer papel), editar nome e e-mail, definir/gerar senha,
+  encerrar sessões, **bloquear/desbloquear** e excluir.
+- **Empresas**: criar, editar dados, excluir (com fotos, anexos e WhatsApp),
+  ver e mexer na equipe (adicionar pessoa, trocar papel, trocar o proprietário,
+  remover) e **Abrir no sistema** para trabalhar dentro dela (o superadmin entra
+  na equipe como gestor).
+
+Quem não é superadmin não vê o menu e recebe 404 em `/admin`. Cada ação confere
+no banco, pela sessão, se quem pediu é o superadmin; as funções `admin_*` só são
+executáveis pela chave de servidor. Usuário bloqueado não entra e perde as
+sessões na hora.
+
 ### Limpar histórico
 
 Em **Manutenções**, o gestor pode apagar o histórico de um período (tudo ou só
@@ -166,6 +198,7 @@ quantos registros vão sair e pede para digitar APAGAR.
 ```
 app/
   (app)/            telas internas (dashboard, ativos, manutenções, calendário, relatórios, configurações)
+  (app)/admin/      painel do superadmin (todas as empresas e usuários)
   api/arquivos/     envio e leitura de fotos/anexos (links assinados)
   api/notificacoes/ rotina diária do WhatsApp (chamada pelo serviço cron)
   auth/             login, cadastro, recuperação de senha e logout
@@ -177,9 +210,9 @@ lib/
   arquivos.ts       armazenamento em volume + links assinados
   session.ts        usuário + empresa atual
 proxy.ts            protege as rotas e renova o cookie de sessão
-db/                 SQL + imagem "ops" (migrador, cron, backup, importação do Supabase)
+db/                 SQL + imagem "ops" (migrador, cron, backup + Backblaze B2, importação do Supabase)
 whatsapp/           serviço Baileys
-infra/              stacks do Swarm, Traefik, deploy e preparação do servidor
+infra/              stacks do Swarm (stack.yml com .env, portainer.yml para colar no Portainer), Traefik, deploy
 testes/             verificação da stack e teste ponta a ponta (Playwright)
 ```
 

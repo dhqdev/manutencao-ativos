@@ -31,7 +31,10 @@ const TIPOS: Record<string, string> = {
 };
 
 export function diretorioBase() {
-  return path.resolve(process.env.ARQUIVOS_DIR?.trim() || "/dados/arquivos");
+  // turbopackIgnore: o caminho vem do ambiente em tempo de execução. Sem isso o
+  // build copia o projeto inteiro para .next/standalone (imagem maior e com o
+  // código-fonte dentro).
+  return path.resolve(/*turbopackIgnore: true*/ process.env.ARQUIVOS_DIR?.trim() || "/dados/arquivos");
 }
 
 const FORMATO = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[A-Za-z0-9._/-]{1,400}$/i;

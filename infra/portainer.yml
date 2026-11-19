@@ -1,0 +1,245 @@
+# Stack do Sistema de Manutenção de Ativos (Swarm + Traefik) — manutencao.seudominio.com.br
+#
+# Para quem já tem um Traefik rodando na VM (rede network_public, resolver
+# letsencryptresolver) e sobe pelo Portainer. Tudo desta stack é novo e só
+# dela: banco (manutencao-db), API do banco (manutencao-rest), app,
+# WhatsApp/Baileys, migrador, cron e backup.
+#
+# Nomes com prefixo "manutencao-" para não colidir com serviços de outras stacks.
+# Só o app entra na network_public; banco, API e WhatsApp ficam na rede interna.
+#
+# Portainer → Stacks → Add stack → nome: manutencao → cole este arquivo → Deploy.
+# Antes: DNS do domínio → IP da VM, e acesso às imagens do ghcr.io (veja o fim do arquivo).
+# Gere cada chave com: openssl rand -hex 32
+#
+# ATUALIZAR: troque a tag (use a da release, ex.: v2026.11.19-8, em vez de latest)
+# pela release nova (github.com/dhqdev/manutencao-ativos/releases)
+# nas 4 linhas "image:" e clique em Update the stack. O migrador roda sozinho.
+#
+# NÃO TROQUE depois do primeiro deploy: POSTGRES_PASSWORD (o banco só lê na criação).
+# Trocar SESSAO_SECRET desloga todo mundo; as outras chaves podem ser trocadas.
+# SUPERADMIN_EMAIL / SUPERADMIN_SENHA: o migrador cria esse login a cada deploy
+# (ou acerta a senha) e ele ganha o menu "Administração" (todas as empresas e usuários).
+version: "3.8"
+
+services:
+  # --- Banco de dados (PostgreSQL 17) ---------------------------------------------
+  manutencao-db:
+    image: postgres:17-alpine
+    environment:
+      - POSTGRES_DB=manutencao
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=TROQUE-senha-do-postgres
+      - TZ=America/Sao_Paulo
+    command: ["postgres", "-c", "shared_buffers=256MB", "-c", "max_connections=100", "-c", "log_min_duration_statement=2000"]
+    volumes:
+      - manutencao_db_dados:/var/lib/postgresql/data
+    networks:
+      - interna
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d manutencao"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      update_config:
+        order: stop-first
+
+  # --- Aplica o SQL (cria/atualiza tabelas e o superadmin) e termina. Fica 0/1 depois: normal.
+  manutencao-migrador:
+    image: ghcr.io/dhqdev/manutencao-ativos/ops:latest
+    command: ["migrar"]
+    environment:
+      - PGHOST=manutencao-db
+      - PGUSER=postgres
+      - PGDATABASE=manutencao
+      - PGPASSWORD=TROQUE-senha-do-postgres
+      - AUTHENTICATOR_PASSWORD=TROQUE-so-letras-e-numeros
+      # --- Superadmin (menu "Administração"): login criado/atualizado a cada deploy ---
+      # Senha com pelo menos 8 caracteres. Trocar a senha aqui derruba as sessões dele.
+      - SUPERADMIN_EMAIL=voce@seudominio.com.br
+      - SUPERADMIN_SENHA=TROQUE-senha-forte-do-superadmin
+    networks:
+      - interna
+    deploy:
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 20
+
+  # --- API do banco (PostgREST) — só na rede interna, nunca exposta ----------------
+  manutencao-rest:
+    image: postgrest/postgrest:v14.13
+    environment:
+      - PGRST_DB_URI=postgres://authenticator:TROQUE-so-letras-e-numeros@manutencao-db:5432/manutencao
+      - PGRST_DB_SCHEMAS=public
+      - PGRST_DB_ANON_ROLE=anon
+      - PGRST_JWT_SECRET=TROQUE-openssl-rand-hex-32
+      - PGRST_DB_POOL=20
+      - PGRST_OPENAPI_MODE=disabled
+      - PGRST_SERVER_PORT=3000
+      - PGRST_LOG_LEVEL=warn
+    networks:
+      - interna
+    deploy:
+      mode: replicated
+      replicas: 1
+      update_config:
+        order: start-first
+
+  # --- Aplicação (Next.js) ------------------------------------------------------
+  manutencao-app:
+    image: ghcr.io/dhqdev/manutencao-ativos/app:latest
+    environment:
+      - SITE_URL=https://manutencao.seudominio.com.br
+      - POSTGREST_URL=http://manutencao-rest:3000
+      - JWT_SECRET=TROQUE-openssl-rand-hex-32
+      - SESSAO_SECRET=TROQUE-openssl-rand-hex-32
+      - ARQUIVOS_SECRET=TROQUE-openssl-rand-hex-32
+      - CRON_SECRET=TROQUE-openssl-rand-hex-32
+      - WHATSAPP_API_URL=http://manutencao-whatsapp:3000
+      - WHATSAPP_API_KEY=TROQUE-openssl-rand-hex-32
+      # false = só entra quem o superadmin ou um gestor criar
+      - CADASTRO_ABERTO=false
+      # --- E-mail (opcional, só para "Esqueci minha senha") ---
+      - SMTP_HOST=
+      - SMTP_PORTA=587
+      - SMTP_USUARIO=
+      - SMTP_SENHA=
+      - SMTP_REMETENTE=Gestão de Manutenção <nao-responda@seudominio.com.br>
+      - ARQUIVOS_DIR=/dados/arquivos
+      - TZ=America/Sao_Paulo
+    volumes:
+      - manutencao_arquivos:/dados/arquivos
+    networks:
+      - interna
+      - network_public
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      update_config:
+        order: start-first
+        failure_action: rollback
+        monitor: 30s
+      labels:
+        # --- Configuração do Traefik ---
+        - "traefik.enable=true"
+        - "traefik.docker.network=network_public"
+        - "traefik.http.routers.manutencao.rule=Host(`manutencao.seudominio.com.br`)"
+        - "traefik.http.routers.manutencao.entrypoints=websecure"
+        - "traefik.http.routers.manutencao.service=manutencao-service"
+        - "traefik.http.routers.manutencao.tls.certresolver=letsencryptresolver"
+        - "traefik.http.routers.manutencao.middlewares=manutencao-compressao"
+        - "traefik.http.middlewares.manutencao-compressao.compress=true"
+        - "traefik.http.services.manutencao-service.loadbalancer.server.port=3000"
+
+  # --- WhatsApp (Baileys). UMA réplica só: duas com a mesma sessão se derrubam. ----
+  manutencao-whatsapp:
+    image: ghcr.io/dhqdev/manutencao-ativos/whatsapp:latest
+    environment:
+      - WHATSAPP_API_KEY=TROQUE-openssl-rand-hex-32
+      - POSTGREST_URL=http://manutencao-rest:3000
+      - JWT_SECRET=TROQUE-openssl-rand-hex-32
+      - WHATSAPP_SEMPRE_ONLINE=true
+      - WHATSAPP_DIGITANDO=true
+      - WHATSAPP_REJEITAR_CHAMADAS=false
+      - WHATSAPP_NOME_APARELHO=Gestão de Manutenção
+      - TZ=America/Sao_Paulo
+    networks:
+      - interna
+    deploy:
+      mode: replicated
+      replicas: 1
+      update_config:
+        order: stop-first
+      restart_policy:
+        condition: any
+        delay: 5s
+
+  # --- Chama o resumo diário do WhatsApp de hora em hora ------------------------
+  manutencao-cron:
+    image: ghcr.io/dhqdev/manutencao-ativos/ops:latest
+    command: ["cron"]
+    environment:
+      - APP_URL=http://manutencao-app:3000
+      - CRON_SECRET=TROQUE-openssl-rand-hex-32
+    networks:
+      - interna
+    deploy:
+      mode: replicated
+      replicas: 1
+
+  # --- Backup diário (banco + fotos/anexos), 3h30, mantém 14 dias no servidor ----
+  #     e, com as variáveis B2_* preenchidas, manda uma cópia para o Backblaze B2.
+  manutencao-backup:
+    image: ghcr.io/dhqdev/manutencao-ativos/ops:latest
+    command: ["backup"]
+    environment:
+      - PGHOST=manutencao-db
+      - PGUSER=postgres
+      - PGDATABASE=manutencao
+      - PGPASSWORD=TROQUE-senha-do-postgres
+      - BACKUP_DIAS=14
+      - BACKUP_HORA=3
+      - ARQUIVOS_DIR=/dados/arquivos
+      - TZ=America/Sao_Paulo
+      # --- Backblaze B2 (deixe vazio para só o backup local) ---
+      # Backblaze → Buckets → Create a Bucket (Private). Depois Application Keys →
+      # Add a New Application Key, só para esse bucket, Read and Write.
+      - B2_KEY_ID=
+      - B2_APP_KEY=
+      - B2_BUCKET=
+      - B2_PASTA=manutencao
+      # Dias que os dumps do banco ficam no B2
+      - B2_DIAS=30
+      # Opcional: criptografa antes de enviar. GUARDE: sem ela o backup não abre.
+      - B2_SENHA_CRIPTOGRAFIA=
+    volumes:
+      - manutencao_backups:/backups
+      - manutencao_arquivos:/dados/arquivos:ro
+    networks:
+      - interna
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+
+volumes:
+  manutencao_db_dados:
+    name: manutencao_db_dados
+  manutencao_arquivos:
+    name: manutencao_arquivos
+  manutencao_backups:
+    name: manutencao_backups
+
+networks:
+  interna:
+    driver: overlay
+    attachable: true
+    name: manutencao_interna
+  network_public:
+    external: true
+    name: network_public
+
+# -----------------------------------------------------------------------------
+# ACESSO ÀS IMAGENS (ghcr.io/dhqdev/manutencao-ativos/...): escolha um
+#  a) GitHub → seu perfil → Packages → app, whatsapp, ops → Package settings →
+#     Change visibility → Public  (as imagens não têm nenhuma chave dentro)
+#  b) Portainer → Registries → Add registry → Custom: URL ghcr.io, usuário dhqdev,
+#     senha = token do GitHub com o escopo read:packages
+#
+# BACKUP NA HORA (testar o B2): Portainer → Containers → manutencao_manutencao-backup
+#   → Console (sh) → /ops/backup.sh agora
+# -----------------------------------------------------------------------------

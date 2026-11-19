@@ -93,6 +93,15 @@ nano .env
 Cole as chaves do arquivo que você recebeu e ajuste `DOMINIO`,
 `TRAEFIK_DOMINIO` e `ACME_EMAIL`. Mantenha as **aspas simples** nos valores.
 
+Defina também o **superadmin** (`SUPERADMIN_EMAIL` e `SUPERADMIN_SENHA`, com 8
+ou mais caracteres): é o login que administra todas as empresas e usuários pelo
+menu **Administração**. O migrador cria e mantém esse login a cada deploy.
+
+> **Portainer com um Traefik que já existe na VM?** Use
+> [`infra/portainer.yml`](infra/portainer.yml): troque os valores `TROQUE-...`,
+> cole em *Stacks → Add stack* e faça o Deploy. Para atualizar, troque a tag das
+> 4 linhas `image:` pela release nova e clique em *Update the stack*.
+
 ## 6. Subir
 
 ```bash
@@ -108,12 +117,12 @@ docker service logs -f manutencao_migrador
 docker service logs -f manutencao_app
 ```
 
-Em 1–2 minutos: `https://SEU_DOMINIO` → **Criar conta grátis**. O primeiro
-cadastro cria a sua empresa.
+Em 1–2 minutos: `https://SEU_DOMINIO` → entre com o `SUPERADMIN_EMAIL` e a
+`SUPERADMIN_SENHA`. No menu **Administração** você cria empresas e usuários.
 
-> Quer que só você crie contas? Depois do seu cadastro, ponha
-> `CADASTRO_ABERTO='false'` no `.env` e rode `./deploy.sh` de novo. Novos
-> usuários passam a ser criados em Configurações → Equipe.
+> Quer que só você crie contas? Ponha `CADASTRO_ABERTO='false'` no `.env` e
+> rode `./deploy.sh` de novo. Novos usuários passam a ser criados pelo
+> superadmin (Administração) ou pelo gestor (Configurações → Equipe).
 
 ---
 
@@ -188,12 +197,74 @@ sudo ls -lh /var/lib/docker/volumes/manutencao_backups/_data/
 ```
 
 **Copie para fora da VM** — um backup no mesmo disco não salva de um disco
-perdido. Exemplo diário com `rclone` para o Object Storage da Oracle (ou
-qualquer S3/Google Drive), no crontab da VM:
+perdido. O serviço de backup já manda tudo para o **Backblaze B2** quando as
+variáveis `B2_*` estão preenchidas.
 
+#### Backblaze B2 (cópia fora do servidor)
+
+O B2 é um armazenamento de arquivos barato (cerca de US$ 6 por TB/mês, os
+primeiros 10 GB grátis) e compatível com o `rclone`, que já vem na imagem `ops`.
+
+1. Crie a conta em <https://www.backblaze.com/sign-up/cloud-storage>.
+2. **Buckets → Create a Bucket**: nome único (ex.: `suaempresa-manutencao-backup`),
+   *Files in Bucket*: **Private**. Ligar *Default Encryption* não custa nada.
+3. **Application Keys → Add a New Application Key**: *Allow access to Bucket(s)*:
+   só esse bucket; *Type of Access*: **Read and Write**. Copie o **keyID** e a
+   **applicationKey** (ela aparece uma vez só).
+4. Preencha no serviço de backup (`infra/.env` ou na stack do Portainer):
+
+   ```
+   B2_KEY_ID='keyID'
+   B2_APP_KEY='applicationKey'
+   B2_BUCKET='suaempresa-manutencao-backup'
+   B2_PASTA='manutencao'          # pasta dentro do bucket
+   B2_DIAS='30'                   # dias que os dumps do banco ficam no B2
+   B2_SENHA_CRIPTOGRAFIA=''       # opcional: criptografa antes de enviar
+   ```
+
+5. Atualize a stack. No log do backup deve aparecer
+   `Backblaze B2 conectado` (`docker service logs manutencao_backup`).
+
+O que vai para lá, todo dia depois do backup local das 3h30:
+
+| No bucket | O quê |
+|---|---|
+| `manutencao/banco/banco-AAAAMMDD-HHMM.dump` | Um dump do banco por dia, guardado por `B2_DIAS` dias |
+| `manutencao/arquivos/` | Espelho das fotos e anexos (só o que mudou sobe) |
+| `manutencao/arquivos-removidos/AAAAMMDD-HHMM/` | O que foi apagado no sistema, guardado por `B2_DIAS` dias |
+
+**Testar agora**, sem esperar a madrugada (Portainer → Containers → backup →
+Console, ou na VM):
+
+```bash
+docker exec -it $(docker ps -qf name=manutencao_backup) /ops/backup.sh agora
 ```
-45 4 * * * rclone copy /var/lib/docker/volumes/manutencao_backups/_data oci:backups-manutencao
+
+> Com `B2_SENHA_CRIPTOGRAFIA` os nomes e o conteúdo ficam ilegíveis no painel
+> do Backblaze. **Guarde essa senha fora do servidor**: sem ela o backup não
+> abre. Não troque depois de começar (os arquivos antigos continuariam na senha velha).
+
+**Baixar do B2 para restaurar** (traz para o volume de backups e depois segue
+os passos de restauração abaixo):
+
+```bash
+cd /opt/manutencao/infra && set -a && . ./.env && set +a
+docker run --rm -v manutencao_backups:/backups \
+  -e B2_KEY_ID -e B2_APP_KEY -e B2_BUCKET -e B2_PASTA -e B2_SENHA_CRIPTOGRAFIA \
+  --entrypoint sh ghcr.io/dhqdev/manutencao-ativos/ops:latest -c '
+    export RCLONE_CONFIG_B2_TYPE=b2 RCLONE_CONFIG_B2_ACCOUNT="$B2_KEY_ID" RCLONE_CONFIG_B2_KEY="$B2_APP_KEY"
+    R="b2:$B2_BUCKET/${B2_PASTA:-manutencao}"
+    if [ -n "$B2_SENHA_CRIPTOGRAFIA" ]; then
+      export RCLONE_CONFIG_C_TYPE=crypt RCLONE_CONFIG_C_REMOTE="$R"
+      export RCLONE_CONFIG_C_PASSWORD=$(rclone obscure "$B2_SENHA_CRIPTOGRAFIA"); R="c:"
+    fi
+    rclone lsf "$R/banco"                                    # lista os dumps
+    rclone copy "$R/banco/banco-AAAAMMDD-HHMM.dump" /backups # baixa um
+    rclone copy "$R/arquivos" /backups/arquivos-b2           # fotos e anexos'
 ```
+
+Os arquivos baixados em `arquivos-b2` voltam para o volume com
+`docker run --rm -v manutencao_arquivos:/dados/arquivos -v manutencao_backups:/backups alpine sh -c 'cp -a /backups/arquivos-b2/. /dados/arquivos/ && chown -R 1000:1000 /dados/arquivos'`.
 
 **Restaurar o banco** (apaga o conteúdo atual):
 
@@ -216,7 +287,9 @@ docker run --rm -v manutencao_arquivos:/dados/arquivos -v manutencao_backups:/ba
 
 ### Trocar a senha de alguém pelo servidor
 
-Para quando o próprio dono esquece a senha e não há SMTP configurado:
+O jeito fácil é o superadmin: **Administração → Usuários → chave** (define ou
+gera uma senha nova). Pelo terminal, para quando nem o superadmin entra
+(a senha do superadmin se acerta trocando `SUPERADMIN_SENHA` na stack):
 
 ```bash
 docker exec -it $(docker ps -qf name=manutencao_db) psql -U postgres -d manutencao -c \

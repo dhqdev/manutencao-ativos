@@ -8,6 +8,12 @@ const BASE = process.env.BASE_URL ?? "https://manutencao.localhost";
 const sufixo = Date.now();
 const GESTOR = { email: `gestor-${sufixo}@teste.com.br`, senha: "Senha-E2E-2026" };
 const TECNICO = { email: `tecnico-${sufixo}@teste.com.br`, senha: "Tecnico-E2E-2026" };
+const INTRUSO = { email: `intruso-${sufixo}@teste.com.br`, senha: "Intruso-2026" };
+// Mesmos valores de testes/gerar-env-teste.sh (o migrador cria esse login).
+const SUPERADMIN = {
+  email: process.env.SUPERADMIN_EMAIL ?? "superadmin@teste.com.br",
+  senha: process.env.SUPERADMIN_SENHA ?? "Superadmin-E2E-2026",
+};
 
 // PNG 1x1 e um PDF mínimo, gerados aqui (sem arquivos de apoio).
 const PNG = Buffer.from(
@@ -215,13 +221,44 @@ await passo("outra empresa não enxerga os dados da primeira", async () => {
   await page.goto("/cadastro");
   await page.fill("#nome", "Intruso");
   await page.fill("#empresa", "Empresa Intrusa");
-  await page.fill("#email", `intruso-${sufixo}@teste.com.br`);
-  await page.fill("#senha", "Intruso-2026");
-  await page.fill("#confirmacao", "Intruso-2026");
+  await page.fill("#email", INTRUSO.email);
+  await page.fill("#senha", INTRUSO.senha);
+  await page.fill("#confirmacao", INTRUSO.senha);
   await page.click('button[type="submit"]');
   await page.waitForURL("**/dashboard");
   await page.goto("/manutencoes");
   verdade((await page.getByText("Troca de óleo E2E").count()) === 0, "vazou manutenção de outra empresa!");
+});
+
+await passo("usuário comum não vê o painel do superadmin", async () => {
+  verdade((await page.locator('a[href="/admin"]').count()) === 0, "menu Administração apareceu para usuário comum");
+  const r = await page.goto("/admin");
+  verdade(r.status() === 404, `/admin para usuário comum: ${r.status()}`);
+});
+
+await passo("superadmin (da stack) entra e vê todas as empresas e usuários", async () => {
+  await page.goto("/auth/sair");
+  await entrar(SUPERADMIN);
+  await page.locator('a[href="/admin"]').first().click();
+  await page.waitForURL("**/admin");
+  await page.getByRole("heading", { name: "Administração do sistema" }).waitFor();
+  await page.getByText(GESTOR.email).first().waitFor();
+  await page.getByRole("button", { name: /^Empresas/ }).click();
+  await page.getByText("Oficina E2E").first().waitFor();
+  await page.getByText("Empresa Intrusa").first().waitFor();
+});
+
+await passo("superadmin bloqueia um usuário e ele não entra mais", async () => {
+  await page.getByRole("button", { name: /^Usuários/ }).click();
+  const linha = page.locator("li").filter({ hasText: INTRUSO.email });
+  await linha.getByRole("button", { name: "Bloquear acesso" }).click();
+  await linha.getByText("Bloqueado").waitFor();
+  await page.goto("/auth/sair");
+  await page.goto("/login");
+  await page.fill("#email", INTRUSO.email);
+  await page.fill("#senha", INTRUSO.senha);
+  await page.click('button[type="submit"]');
+  await page.getByText(/acesso foi bloqueado/).waitFor();
 });
 
 await passo("muitas tentativas de login bloqueiam", async () => {

@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
       const userId = await consumirTokenRecuperacao(token);
       const usuario = userId ? await usuarioPorId(userId) : null;
 
-      if (usuario) {
+      if (usuario && !usuario.bloqueado) {
         const resposta = NextResponse.redirect(new URL("/nova-senha", base));
         resposta.cookies.set(COOKIE_SESSAO, await criarSessao(usuario), opcoesCookieSessao());
         return resposta;

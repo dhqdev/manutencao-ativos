@@ -21,6 +21,9 @@ services:
       PGHOST: db
       PGPASSWORD: dev-postgres
       AUTHENTICATOR_PASSWORD: devauthenticator
+      # Superadmin local (menu Administração). Só para desenvolvimento!
+      SUPERADMIN_EMAIL: admin@local.test
+      SUPERADMIN_SENHA: admin-dev-123
     depends_on:
       db: { condition: service_healthy }
 

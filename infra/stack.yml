@@ -6,7 +6,7 @@
 #
 #   migrador  aplica o SQL a cada deploy e termina
 #   cron      chama a rotina do WhatsApp de hora em hora
-#   backup    copia banco e arquivos todo dia
+#   backup    copia banco e arquivos todo dia (e manda para o Backblaze B2)
 #
 # Variáveis: infra/.env (modelo em infra/.env.exemplo). Subir: infra/deploy.sh
 
@@ -62,6 +62,9 @@ services:
     environment:
       <<: *banco
       AUTHENTICATOR_PASSWORD: ${AUTHENTICATOR_PASSWORD}
+      # Login do superadmin (painel /admin). Criado/atualizado a cada deploy.
+      SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-}
+      SUPERADMIN_SENHA: ${SUPERADMIN_SENHA:-}
     networks: [interna]
     logging: *log
     deploy:
@@ -172,6 +175,13 @@ services:
       BACKUP_DIAS: ${BACKUP_DIAS:-14}
       BACKUP_HORA: ${BACKUP_HORA:-3}
       ARQUIVOS_DIR: /dados/arquivos
+      # Cópia fora do servidor no Backblaze B2 (opcional; vazio = só local).
+      B2_KEY_ID: ${B2_KEY_ID:-}
+      B2_APP_KEY: ${B2_APP_KEY:-}
+      B2_BUCKET: ${B2_BUCKET:-}
+      B2_PASTA: ${B2_PASTA:-manutencao}
+      B2_DIAS: ${B2_DIAS:-30}
+      B2_SENHA_CRIPTOGRAFIA: ${B2_SENHA_CRIPTOGRAFIA:-}
     volumes:
       - backups:/backups
       - arquivos:/dados/arquivos:ro

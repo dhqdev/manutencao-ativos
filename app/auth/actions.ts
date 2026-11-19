@@ -59,6 +59,8 @@ export async function entrar(_prev: EstadoForm, formData: FormData): Promise<Est
     await registrarTentativa(chaves, certa);
 
     if (!usuario || !certa) return { erro: "E-mail ou senha incorretos." };
+    // Só depois da senha certa: não revela a quem não sabe a senha que a conta existe.
+    if (usuario.bloqueado) return { erro: "Seu acesso foi bloqueado. Fale com o administrador do sistema." };
 
     await iniciarSessao({ id: usuario.id, email: usuario.email });
   } catch (e) {

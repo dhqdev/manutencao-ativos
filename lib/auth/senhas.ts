@@ -1,4 +1,5 @@
 import "server-only";
+import { randomInt } from "node:crypto";
 import bcrypt from "bcryptjs";
 
 /**
@@ -34,4 +35,12 @@ export async function conferirSenha(senha: string, hash: string | null | undefin
 
 export function senhaValida(senha: string) {
   return senha.length >= 6 && senha.length <= 72; // bcrypt ignora além de 72 bytes
+}
+
+/** Senha legível para ditar ou mandar no WhatsApp: sem 0/O, 1/l/I. */
+export function gerarSenhaLegivel(tamanho = 10) {
+  const letras = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let senha = "";
+  for (let i = 0; i < tamanho; i++) senha += letras[randomInt(letras.length)];
+  return senha;
 }

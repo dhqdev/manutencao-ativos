@@ -1,11 +1,10 @@
 "use server";
 
-import { randomInt } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { getContexto } from "@/lib/session";
 import { createClient } from "@/lib/db/server";
 import { createAdminClient } from "@/lib/db/admin";
-import { senhaValida } from "@/lib/auth/senhas";
+import { gerarSenhaLegivel as gerarSenha, senhaValida } from "@/lib/auth/senhas";
 import { criarUsuario as criarLogin, definirSenha, excluirUsuario, usuarioPorId } from "@/lib/auth/usuarios";
 import { erroBanco, mensagemErro, texto, textoObrigatorio, type Resultado } from "@/lib/form";
 import type { PapelMembro } from "@/lib/types";
@@ -15,14 +14,6 @@ const PAPEIS_CONVIDAVEIS: PapelMembro[] = ["gestor", "tecnico", "leitor"];
 export type Credenciais =
   | { ok: true; nome: string; email: string; senha: string | null; aviso?: string }
   | { ok: false; erro: string };
-
-/** Senha legível para ditar ou mandar no WhatsApp: sem 0/O, 1/l/I. */
-function gerarSenha(tamanho = 10) {
-  const letras = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let senha = "";
-  for (let i = 0; i < tamanho; i++) senha += letras[randomInt(letras.length)];
-  return senha;
-}
 
 function papelValido(valor: string | null): PapelMembro {
   return PAPEIS_CONVIDAVEIS.includes(valor as PapelMembro) ? (valor as PapelMembro) : "tecnico";

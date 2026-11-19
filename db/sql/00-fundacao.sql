@@ -98,6 +98,12 @@ create table if not exists auth.users (
 
 create unique index if not exists users_email_unico on auth.users (lower(email));
 
+-- superadmin: administra o sistema inteiro (todas as empresas e usuários).
+--             Só o migrador liga, a partir de SUPERADMIN_EMAIL (30-superadmin.sql).
+-- bloqueado:  não entra e perde as sessões abertas (o superadmin decide).
+alter table auth.users add column if not exists superadmin boolean not null default false;
+alter table auth.users add column if not exists bloqueado  boolean not null default false;
+
 create table if not exists auth.sessoes (
   id         uuid primary key default gen_random_uuid(),
   user_id    uuid not null references auth.users (id) on delete cascade,

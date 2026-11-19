@@ -226,7 +226,10 @@ Fotos e anexos ficam no volume `manutencao_arquivos`. Nada é público:
 
 ## O que continua sendo responsabilidade sua
 
-- **Backups fora da VM** (INSTALACAO.md → Backups).
+- **Backups fora da VM**: preencha as variáveis `B2_*` (Backblaze B2, INSTALACAO.md → Backups).
+- **Senha forte para o superadmin** (`SUPERADMIN_SENHA`): ele enxerga e altera
+  todas as empresas. As funções `admin_*` do banco só rodam com a chave de
+  servidor, e o app confere o posto na sessão (no banco) a cada ação.
 - **Atualizar o sistema operacional** da VM e manter o SSH só com chave.
 - **Ativar SMTP** se quiser recuperação de senha por e-mail.
 - Desligar o cadastro público (`CADASTRO_ABERTO='false'`) se o sistema for só
