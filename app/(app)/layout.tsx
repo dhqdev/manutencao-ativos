@@ -11,7 +11,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       emailUsuario={ctx.email}
       nomeEmpresa={ctx.organizacao.nome}
       alertas={ctx.alertas}
-      superadmin={ctx.superadmin}
     >
       {children}
     </Navegacao>

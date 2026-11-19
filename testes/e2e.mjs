@@ -74,12 +74,12 @@ async function abrirHistorico() {
   await page.getByRole("button", { name: /Histórico realizado/ }).first().click();
 }
 
-async function entrar(conta) {
+async function entrar(conta, destino = "**/dashboard") {
   await page.goto("/login");
   await page.fill("#email", conta.email);
   await page.fill("#senha", conta.senha);
   await page.click('button[type="submit"]');
-  await page.waitForURL("**/dashboard");
+  await page.waitForURL(destino);
 }
 
 await passo("cadastro de uma empresa nova cai no painel", async () => {
@@ -230,34 +230,46 @@ await passo("outra empresa não enxerga os dados da primeira", async () => {
   verdade((await page.getByText("Troca de óleo E2E").count()) === 0, "vazou manutenção de outra empresa!");
 });
 
-await passo("usuário comum não vê o painel do superadmin", async () => {
-  verdade((await page.locator('a[href="/admin"]').count()) === 0, "menu Administração apareceu para usuário comum");
-  // A tela interna é transmitida aos poucos (loading.tsx): o status HTTP já saiu
-  // 200 quando a página chama notFound(). Confere o conteúdo, não o status.
-  await page.goto("/admin");
+await passo("usuário comum não vê o console do superadmin", async () => {
+  verdade((await page.locator('a[href^="/admin"]').count()) === 0, "link do console apareceu para usuário comum");
+  // A tela é transmitida aos poucos (loading.tsx): o status HTTP já saiu 200
+  // quando a página chama notFound(). Confere o conteúdo, não o status.
+  await page.goto("/admin/usuarios");
   await page.getByText("Página não encontrada").first().waitFor();
-  verdade(
-    (await page.getByText("Administração do sistema").count()) === 0,
-    "usuário comum abriu o painel do superadmin!",
-  );
+  verdade((await page.getByText("Console do superadmin").count()) === 0, "usuário comum abriu o console!");
+  verdade((await page.getByText(GESTOR.email).count()) === 0, "console vazou a lista de usuários!");
 });
 
-await passo("superadmin (da stack) entra e vê todas as empresas e usuários", async () => {
+await passo("superadmin (da stack) entra direto no console, sem acesso ao sistema das empresas", async () => {
   await page.goto("/auth/sair");
-  await entrar(SUPERADMIN);
-  await page.locator('a[href="/admin"]').first().click();
+  await entrar(SUPERADMIN, "**/admin");
+  await page.getByRole("heading", { name: "Visão geral" }).waitFor();
+  // O sistema das empresas devolve o superadmin ao console.
+  await page.goto("/dashboard");
   await page.waitForURL("**/admin");
-  await page.getByRole("heading", { name: "Administração do sistema" }).waitFor();
-  await page.getByText(GESTOR.email).first().waitFor();
-  await page.getByRole("button", { name: /^Empresas/ }).click();
-  // exact: os selos "Empresa · Papel" da aba Usuários (escondida) não contam.
+  verdade((await page.locator('a[href="/dashboard"]').count()) === 0, "console mostrou o menu do sistema");
+});
+
+await passo("console: usuários e empresas de todo o sistema", async () => {
+  await page.goto("/admin/usuarios");
+  await page.locator(`li[data-usuario="${GESTOR.email}"]`).waitFor();
+  await page.goto("/admin/empresas");
   await page.getByText("Oficina E2E", { exact: true }).first().waitFor();
   await page.getByText("Empresa Intrusa", { exact: true }).first().waitFor();
+  await page.getByRole("link", { name: /Oficina E2E/ }).click();
+  await page.getByRole("heading", { name: "Oficina E2E" }).waitFor();
+  await page.locator(`li[data-membro="${GESTOR.email}"]`).waitFor();
+});
+
+await passo("console: superadmin não entra na equipe de uma empresa", async () => {
+  await page.fill('input[name="email"]', SUPERADMIN.email);
+  await page.getByRole("button", { name: "Adicionar" }).click();
+  await page.getByText(/não entra na equipe/).waitFor();
 });
 
 await passo("superadmin bloqueia um usuário e ele não entra mais", async () => {
-  await page.getByRole("button", { name: /^Usuários/ }).click();
-  const linha = page.locator("li").filter({ hasText: INTRUSO.email });
+  await page.goto("/admin/usuarios");
+  const linha = page.locator(`li[data-usuario="${INTRUSO.email}"]`);
   await linha.getByRole("button", { name: "Bloquear acesso" }).click();
   await linha.getByText("Bloqueado").waitFor();
   await page.goto("/auth/sair");

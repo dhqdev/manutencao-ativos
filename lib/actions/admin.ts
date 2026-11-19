@@ -1,6 +1,5 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { obterSessao } from "@/lib/auth/sessao";
 import { gerarSenhaLegivel, senhaValida } from "@/lib/auth/senhas";
@@ -18,13 +17,14 @@ import { mensagemErro, texto, textoObrigatorio, type Resultado } from "@/lib/for
 import type { PapelMembro } from "@/lib/types";
 
 /**
- * Ações do painel do superadmin (/admin). Mexem em QUALQUER empresa e usuário,
+ * Ações do console do superadmin (/admin). Mexem em QUALQUER empresa e usuário,
  * por isso cada uma confere primeiro, na sessão validada no banco, se quem
  * pediu é o superadmin — só então a chave de serviço entra em cena.
  */
 
 const PAPEIS: PapelMembro[] = ["proprietario", "gestor", "tecnico", "leitor"];
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const SUPERADMIN_FORA = "O superadmin só administra o sistema; ele não entra na equipe das empresas.";
 
 export type CredenciaisAdmin =
   | { ok: true; nome: string; email: string; senha: string | null; aviso?: string }
@@ -48,7 +48,7 @@ function falha(e: unknown): { ok: false; erro: string } {
 }
 
 function pronto(): Resultado {
-  revalidatePath("/admin");
+  revalidatePath("/admin", "layout");
   return { ok: true };
 }
 
@@ -104,7 +104,7 @@ export async function adminCriarUsuario(fd: FormData): Promise<CredenciaisAdmin>
       }
     }
 
-    revalidatePath("/admin");
+    revalidatePath("/admin", "layout");
     return { ok: true, nome, email, senha };
   } catch (e) {
     return falha(e);
@@ -197,6 +197,7 @@ export async function adminCriarEmpresa(fd: FormData): Promise<Resultado> {
     if (emailDono) {
       const usuario = await usuarioPorEmail(emailDono);
       if (!usuario) return { ok: false, erro: "Nenhum usuário com este e-mail. Crie o usuário antes." };
+      if (usuario.superadmin) return { ok: false, erro: SUPERADMIN_FORA };
       dono = usuario.id;
     }
 
@@ -252,7 +253,8 @@ export async function adminAdicionarMembro(fd: FormData): Promise<Resultado> {
     const papel = papelValido(texto(fd, "papel") ?? "tecnico");
 
     const usuario = await usuarioPorEmail(email);
-    if (!usuario) return { ok: false, erro: "Nenhum usuário com este e-mail. Crie o usuário na aba Usuários." };
+    if (!usuario) return { ok: false, erro: "Nenhum usuário com este e-mail. Crie o usuário na tela Usuários." };
+    if (usuario.superadmin) return { ok: false, erro: SUPERADMIN_FORA };
 
     const { error } = await admin.rpc("admin_definir_membro", { p_org: orgId, p_user: usuario.id, p_papel: papel });
     if (error) return { ok: false, erro: error.message };
@@ -287,38 +289,4 @@ export async function adminRemoverMembro(orgId: string, userId: string): Promise
   } catch (e) {
     return falha(e);
   }
-}
-
-/**
- * Abre a empresa no sistema para o superadmin trabalhar nela. Se ele ainda não
- * participa, entra como gestor (e aparece na equipe dela — fica transparente).
- */
-export async function adminAcessarEmpresa(orgId: string): Promise<Resultado> {
-  try {
-    const { sessao, admin } = await exigirSuperadmin();
-
-    const { data: vinculo } = await admin
-      .from("org_membros")
-      .select("papel")
-      .eq("org_id", orgId)
-      .eq("user_id", sessao.userId)
-      .maybeSingle();
-
-    if (!vinculo) {
-      const { error } = await admin.rpc("admin_definir_membro", {
-        p_org: orgId,
-        p_user: sessao.userId,
-        p_papel: "gestor",
-      });
-      if (error) return { ok: false, erro: error.message };
-    }
-
-    const { error } = await admin.from("profiles").update({ org_atual: orgId }).eq("id", sessao.userId);
-    if (error) return { ok: false, erro: error.message };
-  } catch (e) {
-    return falha(e);
-  }
-
-  revalidatePath("/", "layout");
-  redirect("/dashboard");
 }

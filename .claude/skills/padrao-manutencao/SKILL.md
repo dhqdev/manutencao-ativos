@@ -36,7 +36,7 @@ migrador (aplica db/sql) · cron (rotina do WhatsApp) · backup (local + Backbla
   **RLS filtra por empresa**. É o padrão para tudo.
 - `createAdminClient()` (`lib/db/admin.ts`) ignora o RLS. Só para: autenticação,
   rotina do cron, ou **depois** de conferir a permissão de quem pediu (equipe,
-  painel do superadmin). Nunca para buscar dados de tela comuns.
+  console do superadmin). Nunca para buscar dados de tela comuns.
 - Multiempresa: toda tabela de dados tem `org_id`. A empresa é sempre a aberta
   na tela (`getContexto().orgId`), nunca "adivinhada".
 
@@ -72,9 +72,17 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
 - Permissões por papel ficam em `lib/permissoes.ts` e **espelham** o RLS.
   Papéis: proprietário / gestor (tudo) · técnico (registra manutenções, anexos,
   movimenta pneus) · leitor (só consulta).
-- Superadmin (painel `/admin`): toda ação começa com `exigirSuperadmin()`
-  (`lib/actions/admin.ts`), que confere `obterSessao().superadmin` — o posto vem
-  do banco a cada requisição, nunca do cookie.
+- Superadmin = **console de gerência** (`app/admin/`, fora do grupo `(app)`,
+  casca própria em `components/admin/console.tsx`). Ele **não** entra no
+  sistema das empresas: `getContexto()` o redireciona para `/admin` e ele não
+  pode ser membro de equipe (`admin_definir_membro` recusa). Seção nova do
+  console: item em `SECOES` + `app/admin/<seção>/page.tsx`.
+  - Toda página do console começa com `exigirSuperadminTela()`
+    (`lib/admin-console.ts`) — layout e página rodam em paralelo, não confie
+    só no layout. Dados pelos `carregar*()` do mesmo arquivo.
+  - Toda ação começa com `exigirSuperadmin()` (`lib/actions/admin.ts`), que
+    confere `obterSessao().superadmin` — o posto vem do banco a cada
+    requisição, nunca do cookie.
 - Arquivos: o navegador sobe direto para `/api/arquivos` com token de envio
   (`criarUploadAssinado`); o caminho começa sempre por `{org_id}/`. Ao apagar
   linhas com anexos/fotos, chame `removerArquivos()` depois.
@@ -120,8 +128,11 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   viram folha de baixo para cima. Item novo de menu vai em `MENU` de
   `components/shell/navegacao.tsx`.
 - Formulário cliente: `useTransition` + chamar a action + mostrar `erro` +
-  `router.refresh()` no sucesso (veja `FormModal` em `components/admin/painel-admin.tsx`).
+  `router.refresh()` no sucesso (veja `FormModal` em `components/admin/comum.tsx`).
 - Tela restrita: confira no servidor e chame `notFound()` (não só esconder o botão).
+- Datas com hora: use `dataHoraBR` (fuso fixo de Brasília). `toLocaleString`
+  sem `timeZone` em componente cliente gera erro de hidratação (#418) quando o
+  fuso do navegador difere do servidor.
 
 ## 5. Infra, stack e variáveis
 

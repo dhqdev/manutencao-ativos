@@ -29,9 +29,18 @@ export function dataBR(iso: string | null | undefined) {
   return d ? d.toLocaleDateString("pt-BR") : "—";
 }
 
+/**
+ * Data e hora sempre no fuso de Brasília. Sem o fuso fixo, o servidor e o
+ * navegador formatavam horários diferentes quando os fusos não batiam, e o
+ * React acusava erro de hidratação (#418) na tela.
+ */
 export function dataHoraBR(iso: string | null | undefined) {
   if (!iso) return "—";
-  return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+  return new Date(iso).toLocaleString("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+    timeZone: "America/Sao_Paulo",
+  });
 }
 
 /**

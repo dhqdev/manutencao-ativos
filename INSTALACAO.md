@@ -95,7 +95,7 @@ Cole as chaves do arquivo que você recebeu e ajuste `DOMINIO`,
 
 Defina também o **superadmin** (`SUPERADMIN_EMAIL` e `SUPERADMIN_SENHA`, com 8
 ou mais caracteres): é o login que administra todas as empresas e usuários pelo
-menu **Administração**. O migrador cria e mantém esse login a cada deploy.
+**console do superadmin** (ele só gerencia; não usa o sistema das empresas). O migrador cria e mantém esse login a cada deploy.
 
 > **Portainer com um Traefik que já existe na VM?** Use
 > [`infra/portainer.yml`](infra/portainer.yml): troque os valores `TROQUE-...`,
@@ -118,11 +118,11 @@ docker service logs -f manutencao_app
 ```
 
 Em 1–2 minutos: `https://SEU_DOMINIO` → entre com o `SUPERADMIN_EMAIL` e a
-`SUPERADMIN_SENHA`. No menu **Administração** você cria empresas e usuários.
+`SUPERADMIN_SENHA`. Você cai no **console do superadmin**, onde cria empresas e usuários.
 
 > Quer que só você crie contas? Ponha `CADASTRO_ABERTO='false'` no `.env` e
 > rode `./deploy.sh` de novo. Novos usuários passam a ser criados pelo
-> superadmin (Administração) ou pelo gestor (Configurações → Equipe).
+> superadmin (console → Usuários) ou pelo gestor (Configurações → Equipe).
 
 ---
 
@@ -287,7 +287,7 @@ docker run --rm -v manutencao_arquivos:/dados/arquivos -v manutencao_backups:/ba
 
 ### Trocar a senha de alguém pelo servidor
 
-O jeito fácil é o superadmin: **Administração → Usuários → chave** (define ou
+O jeito fácil é o superadmin: **console → Usuários → chave** (define ou
 gera uma senha nova). Pelo terminal, para quando nem o superadmin entra
 (a senha do superadmin se acerta trocando `SUPERADMIN_SENHA` na stack):
 

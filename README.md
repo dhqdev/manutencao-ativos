@@ -166,24 +166,36 @@ O superadmin é um login definido **na stack**, no serviço `migrador`:
 A cada deploy o migrador cria esse login (se ainda não existir), garante que
 ele é o superadmin e acerta a senha para a da stack. Trocar a senha na stack e
 dar *Update* derruba as sessões abertas dele. Trocar o e-mail passa o posto
-para o e-mail novo; deixar as duas vazias tira o posto de todo mundo. O login
-ganha também uma empresa própria, "Administração", para usar o sistema normal.
+para o e-mail novo; deixar as duas vazias tira o posto de todo mundo.
 
-Entrando com ele aparece o menu **Administração** (`/admin`), com:
+O superadmin **só gerencia**: ao entrar ele cai direto no **console do
+superadmin** (`/admin`), com menu próprio, e não tem acesso ao sistema das
+empresas (dashboard, ativos, manutenções…). Qualquer tela do sistema o devolve
+ao console, e ele não pode fazer parte da equipe de nenhuma empresa. O console
+tem:
 
-- **Números do sistema**: usuários, empresas, ativos, manutenções, sessões abertas e WhatsApps conectados.
-- **Usuários** (todos, de todas as empresas): criar login (numa empresa nova ou
-  numa existente, com qualquer papel), editar nome e e-mail, definir/gerar senha,
-  encerrar sessões, **bloquear/desbloquear** e excluir.
-- **Empresas**: criar, editar dados, excluir (com fotos, anexos e WhatsApp),
-  ver e mexer na equipe (adicionar pessoa, trocar papel, trocar o proprietário,
-  remover) e **Abrir no sistema** para trabalhar dentro dela (o superadmin entra
-  na equipe como gestor).
+- **Visão geral**: números do sistema (usuários, empresas, ativos, manutenções,
+  sessões abertas, WhatsApps conectados), o que pede atenção (bloqueados,
+  usuários sem empresa, empresas sem proprietário), últimos acessos e empresas
+  mais novas.
+- **Usuários** (todos, de todas as empresas), com filtros (entraram em 7 dias,
+  nunca entraram, sem empresa, bloqueados): criar login (numa empresa nova ou
+  numa existente, com qualquer papel), editar nome e e-mail, definir/gerar
+  senha, encerrar sessões, **bloquear/desbloquear** e excluir.
+- **Empresas**: lista com busca e uma tela por empresa com números, dados
+  (editar), equipe (adicionar pessoa, trocar papel, trocar o proprietário,
+  remover) e excluir (com fotos, anexos e WhatsApp).
+- **Sistema**: saúde do banco, sessões e WhatsApp, e como o superadmin é definido.
 
-Quem não é superadmin não vê o menu e recebe 404 em `/admin`. Cada ação confere
-no banco, pela sessão, se quem pediu é o superadmin; as funções `admin_*` só são
-executáveis pela chave de servidor. Usuário bloqueado não entra e perde as
-sessões na hora.
+A cada deploy o migrador tira o superadmin das empresas: a empresa vazia que o
+cadastro monta para ele é apagada; nas empresas com mais gente ele só sai (se
+era o proprietário, a próxima pessoa assume). Empresa com dados em que ele é a
+única pessoa fica, e aparece no console para você decidir.
+
+Quem não é superadmin não vê o console e recebe 404 em `/admin`. Cada tela e
+cada ação conferem no banco, pela sessão, se quem pediu é o superadmin; as
+funções `admin_*` só são executáveis pela chave de servidor. Usuário bloqueado
+não entra e perde as sessões na hora.
 
 ### Limpar histórico
 
@@ -198,7 +210,7 @@ quantos registros vão sair e pede para digitar APAGAR.
 ```
 app/
   (app)/            telas internas (dashboard, ativos, manutenções, calendário, relatórios, configurações)
-  (app)/admin/      painel do superadmin (todas as empresas e usuários)
+  admin/            console do superadmin (só gerência: usuários, empresas, sistema)
   api/arquivos/     envio e leitura de fotos/anexos (links assinados)
   api/notificacoes/ rotina diária do WhatsApp (chamada pelo serviço cron)
   auth/             login, cadastro, recuperação de senha e logout

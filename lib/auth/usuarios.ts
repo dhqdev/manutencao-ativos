@@ -45,7 +45,7 @@ export async function criarUsuario(entrada: {
 
 export async function usuarioPorEmail(email: string) {
   const { data } = await createAdminClient().rpc("auth_usuario_por_email", { p_email: email });
-  return (data as { id: string; email: string; hash: string | null; bloqueado?: boolean } | null) ?? null;
+  return (data as { id: string; email: string; hash: string | null; bloqueado?: boolean; superadmin?: boolean } | null) ?? null;
 }
 
 export async function usuarioPorId(id: string) {

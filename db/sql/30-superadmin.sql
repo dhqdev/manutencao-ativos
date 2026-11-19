@@ -251,6 +251,10 @@ begin
   if not exists (select 1 from auth.users where id = p_user) then
     raise exception 'Usuário não encontrado.';
   end if;
+  -- O superadmin só administra pelo console (/admin); não entra no sistema das empresas.
+  if exists (select 1 from auth.users where id = p_user and superadmin) then
+    raise exception 'O superadmin só administra o sistema; ele não entra na equipe das empresas.';
+  end if;
 
   if p_papel = 'proprietario' then
     update public.org_membros set papel = 'gestor'
@@ -410,6 +414,37 @@ begin
   return json_build_object('arquivos', to_json(v_arquivos), 'instancias', to_json(v_instancias));
 end;
 $$;
+
+-- ---------------------------------------------------------------------------
+-- 3. Superadmin fora do sistema das empresas
+-- ---------------------------------------------------------------------------
+-- O superadmin usa só o console (/admin). Vínculos dele com empresas (a empresa
+-- "Administração" que o cadastro monta, ou o "Abrir no sistema" das versões
+-- antigas) não servem mais. Roda a cada deploy e não perde dado:
+--   empresa vazia em que ele é a única pessoa -> apagada;
+--   empresa com mais gente                    -> ele sai (se era o dono, o próximo assume);
+--   empresa com dados em que só ele está      -> fica (aparece no console para decidir).
+do $$
+declare
+  v record;
+begin
+  for v in
+    select m.org_id, m.user_id
+      from public.org_membros m
+      join auth.users u on u.id = m.user_id
+     where u.superadmin
+  loop
+    if exists (select 1 from public.org_membros where org_id = v.org_id and user_id <> v.user_id) then
+      perform public.admin_remover_membro(v.org_id, v.user_id);
+    elsif not exists (select 1 from public.ativos where org_id = v.org_id)
+      and not exists (select 1 from public.manutencoes where org_id = v.org_id)
+      and not exists (select 1 from public.pneus where org_id = v.org_id) then
+      delete from public.organizacoes where id = v.org_id;
+    else
+      raise notice 'Superadmin continua na empresa % (tem dados e ninguém mais).', v.org_id;
+    end if;
+  end loop;
+end $$;
 
 -- Permissões: só o servidor ------------------------------------------------
 do $$

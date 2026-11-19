@@ -42,6 +42,10 @@ export const getContexto = cache(async (): Promise<Contexto> => {
   const sessao = await obterSessao();
   if (!sessao) redirect("/auth/sair");
 
+  // O superadmin só administra pelo console (/admin): não entra no sistema das
+  // empresas. Toda tela e ação que usa o contexto o devolve para lá.
+  if (sessao.superadmin) redirect("/admin");
+
   const { userId, email } = sessao;
   const db = await createClient();
 

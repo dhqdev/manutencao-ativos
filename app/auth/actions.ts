@@ -46,7 +46,7 @@ export async function entrar(_prev: EstadoForm, formData: FormData): Promise<Est
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const senha = String(formData.get("senha") ?? "");
   // Saneado de novo aqui: a página também filtra, mas o FormData vem do cliente.
-  const destino = caminhoInterno(String(formData.get("redirect") ?? ""));
+  let destino = caminhoInterno(String(formData.get("redirect") ?? ""));
 
   if (!email || !senha) return { erro: "Informe e-mail e senha." };
 
@@ -63,6 +63,8 @@ export async function entrar(_prev: EstadoForm, formData: FormData): Promise<Est
     if (usuario.bloqueado) return { erro: "Seu acesso foi bloqueado. Fale com o administrador do sistema." };
 
     await iniciarSessao({ id: usuario.id, email: usuario.email });
+    // O superadmin só usa o console de gerência; o sistema das empresas não é dele.
+    if (usuario.superadmin && !destino.startsWith("/admin")) destino = "/admin";
   } catch (e) {
     return falhaInesperada(e);
   }

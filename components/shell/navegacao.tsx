@@ -14,7 +14,6 @@ import {
   type LucideIcon,
   Package,
   Settings,
-  ShieldCheck,
   LayoutGrid,
   X,
 } from "lucide-react";
@@ -35,9 +34,6 @@ const MENU: Item[] = [
   { href: "/configuracoes", rotulo: "Configurações", Icone: Settings },
 ];
 
-/** Só para o superadmin (o painel confere de novo no servidor). */
-const ITEM_ADMIN: Item = { href: "/admin", rotulo: "Administração", Icone: ShieldCheck };
-
 /** Na barra inferior cabem 4 com conforto; o resto vai para o menu suspenso. */
 const NA_BARRA = MENU.slice(0, 4);
 
@@ -46,18 +42,16 @@ export function Navegacao({
   emailUsuario,
   nomeEmpresa,
   alertas,
-  superadmin = false,
   children,
 }: {
   nomeUsuario: string;
   emailUsuario: string;
   nomeEmpresa: string;
   alertas: number;
-  superadmin?: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const menu = superadmin ? [...MENU, ITEM_ADMIN] : MENU;
+  const menu = MENU;
   const NO_MENU = menu.slice(4);
   const [menuAberto, setMenuAberto] = useState(false);
 

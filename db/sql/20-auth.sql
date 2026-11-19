@@ -40,7 +40,8 @@ stable
 security definer
 set search_path = public, auth
 as $$
-  select json_build_object('id', u.id, 'email', u.email, 'hash', u.encrypted_password, 'bloqueado', u.bloqueado)
+  select json_build_object('id', u.id, 'email', u.email, 'hash', u.encrypted_password, 'bloqueado', u.bloqueado,
+                           'superadmin', u.superadmin)
     from auth.users u
    where lower(u.email) = lower(trim(p_email))
    limit 1
