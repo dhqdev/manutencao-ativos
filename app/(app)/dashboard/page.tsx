@@ -8,13 +8,12 @@ import {
   ClipboardList,
   Gift,
   Package,
-  Snowflake,
-  TreePine,
   TrendingUp,
   TriangleAlert,
   Wallet,
 } from "lucide-react";
 import { Contador } from "@/components/efeitos/contador";
+import { Enfeites } from "@/components/natal/decoracao";
 import { BarrasCategoria, type GastoCategoria } from "@/components/dashboard/barras-categoria";
 import { type PontoMensal } from "@/components/dashboard/grafico-mensal";
 import { GraficoMensalLazy } from "@/components/dashboard/grafico-mensal-lazy";
@@ -380,15 +379,11 @@ function FaixaNatal({ dias }: { dias: number | null }) {
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-600 text-white shadow-sm">
         <Gift className="h-[18px] w-[18px]" />
       </span>
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 sm:pr-20">
         <p className="text-sm font-semibold text-slate-900">Boas festas!</p>
         <p className="text-xs text-slate-600 sm:text-[13px]">{contagem}</p>
       </div>
-      <div className="hidden items-center gap-2 text-emerald-600 sm:flex" aria-hidden>
-        <Snowflake className="h-4 w-4 text-sky-400" />
-        <TreePine className="h-6 w-6" />
-        <Snowflake className="h-3 w-3 text-sky-300" />
-      </div>
+      <Enfeites className="absolute -top-px right-4 hidden h-12 w-16 sm:block" />
     </div>
   );
 }

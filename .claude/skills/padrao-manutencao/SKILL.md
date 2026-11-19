@@ -169,7 +169,10 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   com `prefers-reduced-motion`.
 - Natal: `lib/natal.ts` decide a época (15/11 a 6/1, fuso de Brasília) e o
   cookie `natal` deixa cada aparelho desligar. Decoração em
-  `components/natal/decoracao.tsx` (luzes, neve no menu, gorro, trenó).
+  `components/natal/decoracao.tsx` (luzes, neve no menu, gorro, bolinhas
+  `Enfeites`, trenó com renas desenhadas em SVG com degradê e patas em
+  galope). Animação nova de enfeite entra também no bloco
+  `prefers-reduced-motion` do `globals.css`.
 - Tem que funcionar no celular (é PWA): barra inferior + menu "Mais"; modais
   viram folha que desce do topo (`Modal`, animação `folha-topo`); só o menu
   "Mais" sobe da barra inferior. Item novo de menu vai em `MENU` de
