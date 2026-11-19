@@ -40,6 +40,8 @@ confere 403 "arquivo sem assinatura recusado" "$BASE/api/arquivos/11111111-2222-
 confere 403 "envio sem token recusado" "$BASE/api/arquivos/11111111-2222-3333-4444-555555555555/x/a.pdf" -X PUT --data-binary "x"
 
 echo "— painel do Traefik"
+# O painel só aparece quando o health check do próprio Traefik passa.
+for _ in $(seq 1 30); do [ "$(codigo "https://$TRAEFIK_DOMINIO/dashboard/")" != "404" ] && break; sleep 2; done
 confere 401 "painel exige senha" "https://$TRAEFIK_DOMINIO/dashboard/"
 confere 200 "painel abre com a senha" "https://$TRAEFIK_DOMINIO/dashboard/" -u "admin:senha-de-teste"
 

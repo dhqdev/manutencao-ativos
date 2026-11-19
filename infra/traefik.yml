@@ -47,10 +47,13 @@ services:
       - certificados:/certificados
     networks:
       - rede_publica
+    # O Traefik só roteia para serviços saudáveis — inclusive o próprio painel.
+    # Intervalo curto para o painel aparecer logo depois de subir.
     healthcheck:
       test: ["CMD", "traefik", "healthcheck", "--ping"]
-      interval: 30s
+      interval: 10s
       timeout: 5s
+      start_period: 10s
       retries: 3
     logging:
       driver: json-file
