@@ -22,3 +22,6 @@ testes/resultados
 
 # Arquivos enviados em desenvolvimento
 .arquivos
+
+# O serviço de WhatsApp não versiona lock (o Dockerfile usa npm install)
+whatsapp/package-lock.json
