@@ -75,6 +75,9 @@ test("mensagemErro traduz falha de rede", () => {
 test("erroBanco traduz os códigos do Postgres para português", () => {
   assert.match(erroBanco({ code: "42501", message: "x" }).erro, /papel/);
   assert.match(erroBanco({ code: "23505" }).erro, /Já existe/);
+  // App mais novo que o banco (migrador não rodou): aviso claro, não o texto do PostgREST.
+  assert.match(erroBanco({ code: "PGRST202", message: "Could not find the function" }).erro, /migrador/);
+  assert.match(erroBanco({ code: "PGRST205", message: "Could not find the table" }).erro, /migrador/);
   assert.match(erroBanco({ code: "22P02", message: 'invalid input syntax for type uuid: "x"' }).erro, /formato inválido/);
   assert.match(erroBanco({ code: "23514", message: "violates check constraint" }).erro, /não é aceito/);
   assert.match(

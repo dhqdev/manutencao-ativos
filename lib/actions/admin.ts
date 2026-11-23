@@ -22,7 +22,7 @@ import {
 import { createAdminClient } from "@/lib/db/admin";
 import { removerArquivos } from "@/lib/arquivos";
 import { desconectar } from "@/lib/whatsapp";
-import { exigirId, mensagemErro, texto, textoObrigatorio, type Resultado } from "@/lib/form";
+import { BANCO_DESATUALIZADO, esquemaDesatualizado, exigirId, mensagemErro, texto, textoObrigatorio, type Resultado } from "@/lib/form";
 import type { PapelMembro } from "@/lib/types";
 
 /**
@@ -224,6 +224,8 @@ export async function adminEntrarComo(userId: string): Promise<Resultado> {
       p_ip: ipDoCliente(h),
       p_agente: h.get("user-agent"),
     });
+    // As recusas da função (bloqueado, sem empresa...) já vêm em português.
+    if (esquemaDesatualizado(error)) return { ok: false, erro: BANCO_DESATUALIZADO };
     if (error || !sid) return { ok: false, erro: error?.message ?? "Não foi possível entrar na conta." };
 
     const validade = MINUTOS_ENTRAR_COMO * 60;

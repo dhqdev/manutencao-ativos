@@ -142,9 +142,23 @@ export function mensagemErro(e: unknown): string {
  * não achando a linha porque o RLS a escondeu — ambos são falta de permissão.
  * Os demais códigos do Postgres viram português em vez do texto cru em inglês.
  */
+/**
+ * App mais novo que o banco: o PostgREST não acha a função (PGRST202) ou a
+ * tabela (PGRST205) desta versão. Acontece quando a stack sobe a imagem nova
+ * sem o migrador rodar de novo.
+ */
+export const BANCO_DESATUALIZADO =
+  "O banco ainda não recebeu a atualização desta versão. No Portainer, abra o serviço " +
+  "manutencao_migrador e clique em Update the service (com Re-pull image); depois tente de novo.";
+
+export function esquemaDesatualizado(erro: { code?: string } | null | undefined) {
+  return erro?.code === "PGRST202" || erro?.code === "PGRST205";
+}
+
 export function erroBanco(erro: { code?: string; message?: string }): { ok: false; erro: string } {
   const m = erro.message ?? "";
   const c = erro.code ?? "";
+  if (esquemaDesatualizado(erro)) return { ok: false, erro: BANCO_DESATUALIZADO };
   if (/row-level security/i.test(m) || c === "42501" || c === "PGRST116") {
     return { ok: false, erro: "Seu papel nesta empresa não permite esta ação. Fale com o gestor." };
   }
