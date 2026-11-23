@@ -274,7 +274,9 @@ Variável nova de ambiente ⇒ atualize **todos** estes lugares no mesmo commit:
   em `sistema_atualizacoes`; o serviço `atualizador` (`db/scripts/atualizador.sh`,
   socket do Docker, sem porta) aplica: migrador primeiro, depois os outros,
   ele por último. Versão atual = `APP_VERSAO` (build-arg do CI); última =
-  maior tag `vAAAA.MM.DD-N` do ghcr.io (`lib/atualizacao.ts`). Serviço novo que
+  maior tag `vAAAA.MM.DD-N` do ghcr.io (`lib/atualizacao.ts`). No fim ele
+  força o restart do PostgREST da stack (`servicos_postgrest`): o canal de
+  `notify pgrst` pode morrer e o cache velho dá PGRST202 em função nova. Serviço novo que
   usa imagem nossa entra sozinho na atualização (é achado pela base da imagem).
 
 ## 6. Testes e CI

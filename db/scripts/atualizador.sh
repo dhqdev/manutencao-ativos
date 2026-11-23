@@ -10,9 +10,10 @@
 #   4. por último troca a própria imagem
 #
 # Precisa do socket do Docker (/var/run/docker.sock) e roda num manager.
-# Só mexe nos serviços da PRÓPRIA stack cujas imagens vêm da mesma base que a
-# dele (ex.: ghcr.io/dhqdev/manutencao-ativos/*): banco, PostgREST e Traefik
-# ficam como estão. Mudanças no arquivo da stack (variável nova, serviço
+# Só troca a imagem dos serviços da PRÓPRIA stack cujas imagens vêm da mesma
+# base que a dele (ex.: ghcr.io/dhqdev/manutencao-ativos/*): banco, PostgREST e
+# Traefik ficam na versão que estão; o PostgREST só é reiniciado no fim, para
+# reler o esquema. Mudanças no arquivo da stack (variável nova, serviço
 # novo) continuam pedindo um deploy pela stack (deploy.sh ou Portainer).
 set -u
 . /ops/comum.sh
@@ -94,6 +95,17 @@ nossos_servicos() {
     done
 }
 
+# PostgREST da stack (imagem postgrest/...): não é nosso, mas guarda o esquema
+# em cache e precisa reler depois do SQL novo.
+servicos_postgrest() {
+  docker service ls --filter "label=com.docker.stack.namespace=$STACK" --format '{{.Name}}' |
+    while read -r s; do
+      case "$(repo_de "$(imagem_do_servico "$s")")" in
+        postgrest/*|*/postgrest/*) echo "$s" ;;
+      esac
+    done
+}
+
 e_migrador() {
   docker service inspect --format '{{json .Spec.TaskTemplate.ContainerSpec.Args}}' "$1" | grep -q '"migrar"'
 }
@@ -168,6 +180,14 @@ atualizar() { # id versão
   # tabela nova responde "not in the schema cache". Avisar de novo no fim é
   # de graça e resolve.
   echo "notify pgrst, 'reload schema'" | sql >/dev/null 2>&1 || true
+
+  # E se o canal de avisos do PostgREST morreu (aconteceu em produção: o
+  # container de dias atrás não ouvia mais nada), só reiniciando. Ele usa
+  # start-first: o novo sobe antes do velho sair, sem derrubar o site.
+  for s in $(servicos_postgrest); do
+    andamento "$id" "Recarregando a API do banco ($s)..."
+    docker service update --quiet --detach --force "$s" >/dev/null 2>&1 || log "não consegui reiniciar $s"
+  done
 
   terminar "$id" concluida "Sistema atualizado para $versao."
   log "pedido $id: concluído"
