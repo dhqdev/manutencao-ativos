@@ -81,6 +81,9 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   Em catch próprio que não usa `mensagemErro`, chame `unstable_rethrow(e)`.
 - `erroBanco()` traduz os códigos do Postgres (23503, 23514, 22P02...); as
   mensagens de `raise exception` das nossas funções passam como vieram.
+  PGRST202/PGRST205 (função/tabela que o banco ainda não tem: imagem nova sem
+  o migrador ter rodado) viram `BANCO_DESATUALIZADO`; ação que repassa
+  `error.message` cru confere `esquemaDesatualizado(error)` antes.
 - Permissões por papel ficam em `lib/permissoes.ts` e **espelham** o RLS.
   Papéis: proprietário / gestor (tudo) · técnico (registra manutenções, anexos,
   movimenta pneus) · leitor (só consulta).
