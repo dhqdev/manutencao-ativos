@@ -260,6 +260,15 @@ Fotos e anexos ficam no volume `manutencao_arquivos`. Nada é público:
   servidor, e o app confere o posto na sessão (no banco) em cada tela e ação
   do console. O superadmin não entra no sistema das empresas: ele só gerencia
   pelo console (`/admin`) e não pode fazer parte de nenhuma equipe.
+- **"Entrar como"** (console → detalhe do usuário): o superadmin abre a conta
+  de alguém sem senha. O banco (`auth_entrar_como`, só `service_role`) confere
+  o posto de novo, recusa usuário bloqueado, sem empresa ou superadmin, e cria
+  uma sessão de 1 hora marcada com quem a abriu (`auth.sessoes.aberta_por`):
+  ela não se renova e cai na hora se o superadmin perder o posto ou for
+  bloqueado. O cookie do superadmin fica guardado à parte (`sessao_admin`,
+  httpOnly) e só volta a valer se o banco ainda o reconhecer como superadmin.
+  Toda entrada vai para `sistema_entradas_como` (sem policy: só o servidor lê).
+  Para consultar: `select * from sistema_entradas_como order by inicio desc;`.
 - **Atualizar o sistema operacional** da VM e manter o SSH só com chave.
 - **Ativar SMTP** se quiser recuperação de senha por e-mail.
 - Desligar o cadastro público (`CADASTRO_ABERTO='false'`) se o sistema for só

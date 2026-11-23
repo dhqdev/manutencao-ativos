@@ -17,6 +17,8 @@ export type Contexto = {
   alertas: number;
   /** Administra o sistema inteiro (painel /admin). Vem da stack: SUPERADMIN_EMAIL. */
   superadmin: boolean;
+  /** Superadmin dentro desta conta pelo "Entrar como" (aviso no topo). */
+  entradaComo: { expiraEm: string } | null;
 };
 
 type RespostaContexto = {
@@ -60,19 +62,19 @@ export const getContexto = cache(async (): Promise<Contexto> => {
 
     const { data: segundaTentativa } = await db.rpc("contexto_usuario");
     if (!segundaTentativa) redirect("/erro-configuracao");
-    return montar(segundaTentativa as RespostaContexto, userId, email, sessao.superadmin);
+    return montar(segundaTentativa as RespostaContexto, userId, email, sessao.superadmin, sessao.entradaComo);
   }
 
   // Banco ainda sem a função (migração de desempenho não rodada): usa o caminho
   // antigo, mais lento, em vez de derrubar o app.
   if (error) {
-    if (funcaoAusente(error)) return caminhoAntigo(userId, email, sessao.superadmin);
+    if (funcaoAusente(error)) return caminhoAntigo(userId, email, sessao.superadmin, sessao.entradaComo);
     redirect("/erro-configuracao");
   }
 
   if (!data) redirect("/erro-configuracao");
 
-  return montar(data as RespostaContexto, userId, email, sessao.superadmin);
+  return montar(data as RespostaContexto, userId, email, sessao.superadmin, sessao.entradaComo);
 });
 
 function funcaoAusente(erro: { code?: string; message?: string }) {
@@ -84,7 +86,12 @@ function funcaoAusente(erro: { code?: string; message?: string }) {
 }
 
 /** Caminho antigo (5 consultas). Só roda se `contexto_usuario()` não existir. */
-async function caminhoAntigo(userId: string, email: string, superadmin: boolean): Promise<Contexto> {
+async function caminhoAntigo(
+  userId: string,
+  email: string,
+  superadmin: boolean,
+  entradaComo: Contexto["entradaComo"],
+): Promise<Contexto> {
   console.warn(
     "[gestao-manutencao] Função contexto_usuario() ausente no banco. " +
       "Rode o migrador (db/sql) para acelerar a navegação.",
@@ -130,10 +137,17 @@ async function caminhoAntigo(userId: string, email: string, superadmin: boolean)
     userId,
     email,
     superadmin,
+    entradaComo,
   );
 }
 
-function montar(dados: RespostaContexto, userId: string, email: string, superadmin: boolean): Contexto {
+function montar(
+  dados: RespostaContexto,
+  userId: string,
+  email: string,
+  superadmin: boolean,
+  entradaComo: Contexto["entradaComo"],
+): Contexto {
   return {
     userId,
     email: dados.perfil?.email ?? email,
@@ -154,5 +168,6 @@ function montar(dados: RespostaContexto, userId: string, email: string, superadm
     empresas: dados.empresas ?? [],
     alertas: Number(dados.alertas ?? 0),
     superadmin,
+    entradaComo,
   };
 }

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
   COOKIE_SESSAO,
+  COOKIE_SESSAO_ADMIN,
   DURACAO_COOKIE_SEGUNDOS,
   assinarCookieSessao,
   lerCookieSessao,
@@ -93,6 +94,15 @@ export async function proxySessao(request: NextRequest) {
   const sessao = lerCookieSessao(bruto);
   const ehPublica = ROTAS_PUBLICAS.some((r) => pathname === r || pathname.startsWith(r + "/"));
 
+  // Acabou o tempo do "Entrar como" (o cookie curto venceu): devolve o
+  // superadmin ao console em vez de mandá-lo para o login.
+  if (!sessao && !ehPublica && request.cookies.has(COOKIE_SESSAO_ADMIN)) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/auth/voltar";
+    url.search = "";
+    return aplicarCabecalhos(NextResponse.redirect(url), csp);
+  }
+
   if (!sessao && !ehPublica) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
@@ -112,7 +122,8 @@ export async function proxySessao(request: NextRequest) {
 
   // Sessão ativa perto de expirar o cookie: renova (o banco renova a dele
   // a cada uso, em auth_validar_sessao).
-  if (sessao && sessao.exp - Math.floor(Date.now() / 1000) < RENOVAR_COM_SEGUNDOS) {
+  // A do "Entrar como" não: ela é curta de propósito.
+  if (sessao && !sessao.como && sessao.exp - Math.floor(Date.now() / 1000) < RENOVAR_COM_SEGUNDOS) {
     response.cookies.set(
       COOKIE_SESSAO,
       assinarCookieSessao({ sid: sessao.sid, sub: sessao.sub, email: sessao.email }),

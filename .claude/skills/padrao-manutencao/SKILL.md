@@ -86,8 +86,19 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   movimenta pneus) · leitor (só consulta).
 - Superadmin = **console de gerência** (`app/admin/`, fora do grupo `(app)`,
   casca própria em `components/admin/console.tsx`). Ele **não** entra no
-  sistema das empresas: `getContexto()` o redireciona para `/admin` e ele não
-  pode ser membro de equipe (`admin_definir_membro` recusa). O dono quer
+  sistema das empresas com a conta dele: `getContexto()` o redireciona para
+  `/admin` e ele não pode ser membro de equipe (`admin_definir_membro` recusa).
+  A única porta é o **"Entrar como"** (pedido do dono em 23/11/2026), no
+  detalhe do usuário: `adminEntrarComo()` → `auth_entrar_como()`
+  (`db/sql/72-entrar-como.sql`) cria uma sessão de 1 h (`MINUTOS_ENTRAR_COMO`,
+  `lib/auth/entrar-como.ts`) **da pessoa**, marcada em
+  `auth.sessoes.aberta_por`, sem renovar e sem contar como acesso dela, e
+  registra em `sistema_entradas_como`. O cookie do superadmin fica em
+  `sessao_admin`; `voltarAoConsole()` (rotas `/auth/voltar` e `/auth/sair`, e
+  o proxy quando o cookie curto vence) fecha a sessão emprestada e o devolve.
+  Faixa `AvisoEntrarComo` no topo do `(app)` via `getContexto().entradaComo`.
+  Contagem de sessões/acessos (`admin_usuarios`, `equipe_acessos`,
+  `admin_resumo`) ignora `aberta_por`. O dono quer
   **uma tela só** (`app/admin/page.tsx`: abas Usuários, Clientes e uso e
   Integrações + bloco da versão);
   não crie telas novas no console sem ele pedir.
@@ -138,6 +149,9 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
     último; arquivo novo vem antes dele)
   - `71-backup.sql` `sistema_backups` (rodadas e pedidos de "backup agora")
     e `sistema_backup_servico` (sinal de vida do serviço backup)
+  - `72-entrar-como.sql` `auth_entrar_como` / `auth_sair_entrada_como` e o
+    registro `sistema_entradas_como` (coluna `auth.sessoes.aberta_por` mora
+    no `00-fundacao.sql`, porque `20-auth.sql` já a usa)
   - Coisa nova grande: crie `40-<assunto>.sql` em vez de inchar os outros.
 - Tabela nova: `org_id ... references organizacoes on delete cascade`, índice
   em `org_id`, `enable row level security` e policies separadas por comando

@@ -4,6 +4,7 @@ import { cache } from "react";
 import { createAdminClient } from "@/lib/db/admin";
 import {
   COOKIE_SESSAO,
+  COOKIE_SESSAO_ADMIN,
   assinarCookieSessao,
   lerCookieSessao,
   opcoesCookieSessao,
@@ -11,6 +12,7 @@ import {
 
 export {
   COOKIE_SESSAO,
+  COOKIE_SESSAO_ADMIN,
   DURACAO_COOKIE_SEGUNDOS,
   assinarCookieSessao,
   lerCookieSessao,
@@ -30,7 +32,14 @@ export type { DadosCookie } from "./sessao-cookie";
  * redirecionamentos; toda tela e ação confere a sessão no banco aqui.
  */
 
-export type Sessao = { sessaoId: string; userId: string; email: string; superadmin: boolean };
+export type Sessao = {
+  sessaoId: string;
+  userId: string;
+  email: string;
+  superadmin: boolean;
+  /** Sessão aberta pelo superadmin com "Entrar como": até quando vale. */
+  entradaComo: { expiraEm: string } | null;
+};
 
 /** Sessão válida da requisição atual (uma consulta ao banco por requisição). */
 export const obterSessao = cache(async (): Promise<Sessao | null> => {
@@ -40,12 +49,19 @@ export const obterSessao = cache(async (): Promise<Sessao | null> => {
   const { data, error } = await createAdminClient().rpc("auth_validar_sessao", { p_sessao: dados.sid });
   if (error || !data) return null;
 
-  const sessao = data as { user_id: string; email: string; superadmin?: boolean };
+  const sessao = data as {
+    user_id: string;
+    email: string;
+    superadmin?: boolean;
+    aberta_por?: string | null;
+    expira_em?: string | null;
+  };
   return {
     sessaoId: dados.sid,
     userId: sessao.user_id,
     email: sessao.email,
     superadmin: sessao.superadmin === true,
+    entradaComo: sessao.aberta_por ? { expiraEm: String(sessao.expira_em) } : null,
   };
 });
 
@@ -71,15 +87,19 @@ export async function criarSessao(usuario: { id: string; email: string }) {
 /** Para server actions: cria a sessão e grava o cookie. */
 export async function iniciarSessao(usuario: { id: string; email: string }) {
   const valor = await criarSessao(usuario);
-  (await cookies()).set(COOKIE_SESSAO, valor, opcoesCookieSessao());
+  const jar = await cookies();
+  jar.set(COOKIE_SESSAO, valor, opcoesCookieSessao());
+  // Login novo encerra qualquer "Entrar como" que tenha ficado para trás.
+  jar.delete(COOKIE_SESSAO_ADMIN);
 }
 
-/** Apaga a sessão do banco (se houver) e o cookie. */
+/** Apaga a sessão do banco (se houver) e o cookie. Com "Entrar como" aberto, sai das duas. */
 export async function encerrarSessaoAtual() {
   const jar = await cookies();
-  const dados = lerCookieSessao(jar.get(COOKIE_SESSAO)?.value);
-  if (dados) {
-    await createAdminClient().rpc("auth_encerrar_sessao", { p_sessao: dados.sid });
+  const admin = createAdminClient();
+  for (const nome of [COOKIE_SESSAO, COOKIE_SESSAO_ADMIN]) {
+    const dados = lerCookieSessao(jar.get(nome)?.value);
+    if (dados) await admin.rpc(dados.como ? "auth_sair_entrada_como" : "auth_encerrar_sessao", { p_sessao: dados.sid });
+    jar.delete(nome);
   }
-  jar.delete(COOKIE_SESSAO);
 }

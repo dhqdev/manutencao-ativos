@@ -119,9 +119,11 @@ begin
 end;
 $$;
 
--- Devolve { user_id, email, superadmin } se a sessão vale, ou null (usuário
--- bloqueado também dá null). Renova a validade
+-- Devolve { user_id, email, superadmin, aberta_por, expira_em } se a sessão
+-- vale, ou null (usuário bloqueado também dá null). Renova a validade
 -- (no máximo uma gravação por hora por sessão, para não escrever a cada clique).
+-- Sessão do "Entrar como" (aberta_por preenchido) não se renova e cai junto se
+-- quem a abriu perder o posto de superadmin ou for bloqueado.
 create or replace function public.auth_validar_sessao(p_sessao uuid)
 returns json
 language plpgsql
@@ -131,23 +133,35 @@ as $$
 declare
   v record;
 begin
-  select s.id, s.user_id, s.expira_em, s.ultimo_uso, u.email, u.superadmin, u.bloqueado
+  select s.id, s.user_id, s.expira_em, s.ultimo_uso, s.aberta_por, u.email, u.superadmin, u.bloqueado,
+         a.superadmin as admin_ok, a.bloqueado as admin_bloqueado
     into v
     from auth.sessoes s
     join auth.users u on u.id = s.user_id
+    left join auth.users a on a.id = s.aberta_por
    where s.id = p_sessao;
 
   if not found or v.expira_em < now() or v.bloqueado then
     return null;
   end if;
 
-  if v.ultimo_uso < now() - interval '1 hour' then
+  if v.aberta_por is not null and (v.admin_ok is not true or v.admin_bloqueado) then
+    return null;
+  end if;
+
+  if v.aberta_por is null and v.ultimo_uso < now() - interval '1 hour' then
     update auth.sessoes
        set ultimo_uso = now(), expira_em = now() + interval '30 days'
      where id = p_sessao;
   end if;
 
-  return json_build_object('user_id', v.user_id, 'email', v.email, 'superadmin', v.superadmin);
+  return json_build_object(
+    'user_id', v.user_id,
+    'email', v.email,
+    'superadmin', v.superadmin,
+    'aberta_por', v.aberta_por,
+    'expira_em', v.expira_em
+  );
 end;
 $$;
 

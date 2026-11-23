@@ -1,7 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { obterSessao } from "@/lib/auth/sessao";
+import { cookies, headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { MINUTOS_ENTRAR_COMO } from "@/lib/auth/entrar-como";
+import {
+  COOKIE_SESSAO,
+  COOKIE_SESSAO_ADMIN,
+  assinarCookieSessao,
+  ipDoCliente,
+  obterSessao,
+  opcoesCookieSessao,
+} from "@/lib/auth/sessao";
 import { gerarSenhaLegivel, senhaValida } from "@/lib/auth/senhas";
 import {
   criarUsuario as criarLogin,
@@ -12,7 +22,7 @@ import {
 import { createAdminClient } from "@/lib/db/admin";
 import { removerArquivos } from "@/lib/arquivos";
 import { desconectar } from "@/lib/whatsapp";
-import { mensagemErro, texto, textoObrigatorio, type Resultado } from "@/lib/form";
+import { exigirId, mensagemErro, texto, textoObrigatorio, type Resultado } from "@/lib/form";
 import type { PapelMembro } from "@/lib/types";
 
 /**
@@ -181,6 +191,52 @@ export async function adminExcluirUsuario(userId: string): Promise<Resultado> {
   } catch (e) {
     return falha(e);
   }
+}
+
+/**
+ * "Entrar como": abre o sistema na conta da pessoa, sem a senha dela. O banco
+ * (auth_entrar_como) confere as regras de novo, cria uma sessão curta marcada
+ * com quem a abriu e grava o registro. O cookie do superadmin fica guardado
+ * para "Voltar ao console" (lib/auth/entrar-como.ts).
+ *
+ * Termina com redirect (fora do try): trocar o cookie numa action faz o Next
+ * redesenhar a tela atual, e o /admin com o cookie da pessoa daria 404.
+ */
+export async function adminEntrarComo(userId: string): Promise<Resultado> {
+  try {
+    const { sessao, admin } = await exigirSuperadmin();
+    exigirId(userId, "o usuário");
+    if (sessao.entradaComo) return { ok: false, erro: "Volte ao console antes de entrar em outra conta." };
+    if (userId === sessao.userId) return { ok: false, erro: "Esta já é a sua conta." };
+
+    const alvo = await usuarioPorId(userId);
+    if (!alvo) return { ok: false, erro: "Usuário não encontrado." };
+
+    const jar = await cookies();
+    const meuCookie = jar.get(COOKIE_SESSAO)?.value;
+    if (!meuCookie) return { ok: false, erro: "Sua sessão expirou. Entre de novo." };
+
+    const h = await headers();
+    const { data: sid, error } = await admin.rpc("auth_entrar_como", {
+      p_admin: sessao.userId,
+      p_user: userId,
+      p_minutos: MINUTOS_ENTRAR_COMO,
+      p_ip: ipDoCliente(h),
+      p_agente: h.get("user-agent"),
+    });
+    if (error || !sid) return { ok: false, erro: error?.message ?? "Não foi possível entrar na conta." };
+
+    const validade = MINUTOS_ENTRAR_COMO * 60;
+    jar.set(COOKIE_SESSAO_ADMIN, meuCookie, opcoesCookieSessao());
+    jar.set(
+      COOKIE_SESSAO,
+      assinarCookieSessao({ sid: String(sid), sub: userId, email: alvo.email, como: true }, validade),
+      opcoesCookieSessao(validade),
+    );
+  } catch (e) {
+    return falha(e);
+  }
+  redirect("/dashboard");
 }
 
 // --- Empresas de um usuário (gaveta de detalhes) ----------------------------------

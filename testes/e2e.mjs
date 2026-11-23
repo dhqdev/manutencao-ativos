@@ -299,6 +299,23 @@ await passo("console: detalhe do usuário troca o papel na empresa", async () =>
   await page.keyboard.press("Escape");
 });
 
+await passo("console: \"Entrar como\" abre a conta do usuário sem senha e volta ao console", async () => {
+  await page.goto("/admin");
+  await page.locator(`li[data-usuario="${GESTOR.email}"] button`).click();
+  await page.locator(`[data-detalhe="${GESTOR.email}"]`).getByRole("button", { name: "Entrar como", exact: true }).click();
+  await page.waitForURL("**/dashboard");
+  await page.locator(`[data-entrar-como="${GESTOR.email}"]`).waitFor();
+  // Dados da empresa dele aparecem (a sessão é a do usuário, com o RLS dele).
+  await page.goto("/manutencoes");
+  await page.getByText("Troca de óleo E2E").first().waitFor();
+  await page.getByRole("button", { name: "Voltar ao console" }).click();
+  await page.waitForURL("**/admin");
+  await page.getByRole("heading", { name: "Gerência", exact: true }).waitFor();
+  // Depois de voltar, o sistema das empresas o devolve ao console de novo.
+  await page.goto("/dashboard");
+  await page.waitForURL("**/admin");
+});
+
 await passo("console: uso de cada cliente (arquivos e banco) e WhatsApp", async () => {
   await page.goto("/admin?aba=clientes");
   const linha = page.locator('li[data-cliente="Oficina E2E"]');

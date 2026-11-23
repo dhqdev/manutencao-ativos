@@ -125,7 +125,7 @@ as $$
     'ativos',            (select count(*) from public.ativos),
     'manutencoes',       (select count(*) from public.manutencoes),
     'pneus',             (select count(*) from public.pneus),
-    'sessoes_ativas',    (select count(*) from auth.sessoes where expira_em > now()),
+    'sessoes_ativas',    (select count(*) from auth.sessoes where expira_em > now() and aberta_por is null),
     'logins_7_dias',     (select count(*) from auth.users where last_sign_in_at > now() - interval '7 days'),
     'whatsapp_conectados', (select count(*) from public.whatsapp_conexoes where status = 'conectado'),
     'gasto_total',       (select coalesce(sum(valor), 0) from public.manutencoes)
@@ -144,7 +144,9 @@ as $$
     from (
       select u.id, u.email, p.nome, p.telefone, u.superadmin, u.bloqueado,
              u.created_at, u.last_sign_in_at,
-             (select count(*) from auth.sessoes s where s.user_id = u.id and s.expira_em > now()) as sessoes,
+             -- A sessão do "Entrar como" é do superadmin, não da pessoa: fica fora da conta.
+             (select count(*) from auth.sessoes s
+               where s.user_id = u.id and s.expira_em > now() and s.aberta_por is null) as sessoes,
              coalesce((
                select json_agg(json_build_object('id', o.id, 'nome', o.nome, 'papel', m.papel) order by o.nome)
                  from public.org_membros m

@@ -18,7 +18,8 @@ as $$
   select m.user_id,
          u.last_sign_in_at,
          (select count(*)::int from auth.sessoes s
-           where s.user_id = m.user_id and s.expira_em > now())
+           where s.user_id = m.user_id and s.expira_em > now()
+             and s.aberta_por is null)  -- "Entrar como" do superadmin não conta
     from public.org_membros m
     join auth.users u on u.id = m.user_id
    where m.org_id = p_org

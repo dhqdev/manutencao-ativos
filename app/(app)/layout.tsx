@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { AvisoEntrarComo } from "@/components/shell/aviso-entrar-como";
 import { Navegacao } from "@/components/shell/navegacao";
 import { getContexto } from "@/lib/session";
 import { COOKIE_MENU, menuRecolhido } from "@/lib/menu-lateral";
@@ -21,6 +22,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         dias: diasParaONatal(),
       }}
     >
+      {ctx.entradaComo && (
+        <AvisoEntrarComo
+          nome={ctx.profile.nome ?? ctx.email}
+          email={ctx.email}
+          empresa={ctx.organizacao.nome}
+          expiraEm={ctx.entradaComo.expiraEm}
+        />
+      )}
       {children}
     </Navegacao>
   );

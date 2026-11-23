@@ -9,10 +9,19 @@ import { assinarJwt, verificarJwt } from "./jwt";
 export const COOKIE_SESSAO = "sessao";
 export const DURACAO_COOKIE_SEGUNDOS = 60 * 24 * 60 * 60; // 60 dias (o banco expira em 30 sem uso)
 
-export type DadosCookie = { sid: string; sub: string; email: string };
+/**
+ * "Entrar como" (console do superadmin): enquanto ele está na conta de outra
+ * pessoa, o cookie de sessão dele fica guardado aqui, intacto, para o botão
+ * "Voltar ao console" devolvê-lo. Só vale se o banco ainda o reconhecer como
+ * superadmin (lib/auth/entrar-como.ts).
+ */
+export const COOKIE_SESSAO_ADMIN = "sessao_admin";
 
-export function assinarCookieSessao(dados: DadosCookie) {
-  return assinarJwt(dados, segredoSessao(), DURACAO_COOKIE_SEGUNDOS);
+/** `como`: sessão aberta pelo superadmin; curta, o proxy não a renova. */
+export type DadosCookie = { sid: string; sub: string; email: string; como?: true };
+
+export function assinarCookieSessao(dados: DadosCookie, validadeSegundos = DURACAO_COOKIE_SEGUNDOS) {
+  return assinarJwt(dados, segredoSessao(), validadeSegundos);
 }
 
 export function lerCookieSessao(token: string | undefined | null) {
@@ -20,12 +29,12 @@ export function lerCookieSessao(token: string | undefined | null) {
   return dados?.sid && dados.sub ? dados : null;
 }
 
-export function opcoesCookieSessao() {
+export function opcoesCookieSessao(maxAge = DURACAO_COOKIE_SEGUNDOS) {
   return {
     httpOnly: true,
     secure: siteEmHttps(),
     sameSite: "lax" as const,
     path: "/",
-    maxAge: DURACAO_COOKIE_SEGUNDOS,
+    maxAge,
   };
 }

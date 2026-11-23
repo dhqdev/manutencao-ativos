@@ -116,6 +116,10 @@ create table if not exists auth.sessoes (
 
 create index if not exists sessoes_usuario on auth.sessoes (user_id);
 
+-- Sessão aberta pelo superadmin com "Entrar como" (72-entrar-como.sql): quem
+-- abriu. Vazio = login normal da própria pessoa. Dura pouco e não se renova.
+alter table auth.sessoes add column if not exists aberta_por uuid references auth.users (id) on delete cascade;
+
 -- Links de recuperação de senha. Guardamos só o hash: quem ler o banco não
 -- consegue usar um link que ainda esteja valendo.
 create table if not exists auth.tokens (

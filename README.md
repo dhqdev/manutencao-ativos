@@ -51,6 +51,7 @@ Todo o SQL fica em [`db/sql/`](db/sql/) e é aplicado pelo migrador:
 | `30-superadmin.sql` | Login do superadmin (vindo da stack) e funções `admin_*` do painel de administração |
 | `70-integracoes.sql` | `sistema_credenciais`: chaves de serviços externos (Groq...) salvas pelo console |
 | `71-backup.sql` | Rodadas do backup (histórico e "backup agora") e sinal de vida do serviço backup |
+| `72-entrar-como.sql` | "Entrar como" do superadmin: sessão curta na conta da pessoa e registro de cada entrada |
 
 Cadastro automático: ao criar conta, o usuário ganha empresa, perfil e as 6
 categorias padrão.
@@ -203,6 +204,14 @@ O superadmin **só gerencia**: ao entrar ele cai direto no **console do
 superadmin** (`/admin`), com menu próprio, e não tem acesso ao sistema das
 empresas (dashboard, ativos, manutenções…). Qualquer tela do sistema o devolve
 ao console, e ele não pode fazer parte da equipe de nenhuma empresa.
+
+A exceção é o botão **Entrar como**, no detalhe de um usuário: abre o sistema
+na conta da pessoa, sem a senha dela, para ver o que ela vê. A sessão dura
+1 hora, não se renova, não conta como acesso da pessoa e cai se o superadmin
+perder o posto. Uma faixa no topo mostra de quem é a conta e o botão **Voltar
+ao console** (sair pelo menu também volta). Cada entrada fica registrada em
+`sistema_entradas_como` (quem, na conta de quem, quando, IP e quando saiu).
+Não vale para usuário bloqueado, sem empresa ou outro superadmin.
 
 O console tem **uma tela só, a gerência dos usuários** (todos, de todas as
 empresas):

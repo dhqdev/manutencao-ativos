@@ -45,6 +45,12 @@ export function dataHoraBR(iso: string | null | undefined) {
 
 const FUSO = "America/Sao_Paulo";
 
+/** Só a hora (HH:MM) em Brasília. */
+export function horaBR(iso: string | null | undefined) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: FUSO });
+}
+
 /**
  * Data de hoje em Brasília (AAAA-MM-DD). `toISOString` usa UTC — depois das 21h
  * já seria amanhã — e o container roda em UTC; o fuso fixo resolve os dois.

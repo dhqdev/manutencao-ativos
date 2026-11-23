@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, useTransition, type ReactNode } from "react";
 import {
   Ban,
   Building2,
@@ -10,6 +10,7 @@ import {
   Download,
   KeyRound,
   LoaderCircle,
+  LogIn,
   LogOut,
   Pencil,
   Plus,
@@ -30,11 +31,13 @@ import {
   adminCriarUsuario,
   adminEditarUsuario,
   adminEncerrarSessoes,
+  adminEntrarComo,
   adminExcluirUsuario,
   adminRedefinirSenha,
   adminRemoverMembro,
   adminVincularEmpresa,
 } from "@/lib/actions/admin";
+import { chamarAcao } from "@/lib/acao-cliente";
 import { dataBR, dataHoraBR, iniciais } from "@/lib/format";
 import type { PapelMembro } from "@/lib/types";
 import { Busca, Erro, FormModal, normalizar, useAcao, type Credenciais } from "./comum";
@@ -380,6 +383,18 @@ function DetalheUsuario({
   const voltar = () => setTela("detalhe");
   const protegido = u.superadmin || eu;
 
+  // "Entrar como": a action redireciona para o sistema; aqui só o erro.
+  const [erroEntrada, setErroEntrada] = useState<string | null>(null);
+  const [entrando, iniciarEntrada] = useTransition();
+  const podeEntrar = !protegido && !u.bloqueado && u.empresas.length > 0;
+  function entrarComo() {
+    setErroEntrada(null);
+    iniciarEntrada(async () => {
+      const r = await chamarAcao(() => adminEntrarComo(u.id));
+      if (r && !r.ok) setErroEntrada(r.erro);
+    });
+  }
+
   const dados: [string, ReactNode][] = [
     ["Criado em", dataBR(u.created_at)],
     [
@@ -411,10 +426,18 @@ function DetalheUsuario({
           {ocupado && <LoaderCircle className="h-5 w-5 animate-spin text-slate-400" />}
         </div>
 
-        {erro && <Erro>{erro}</Erro>}
+        {(erro || erroEntrada) && <Erro>{erro ?? erroEntrada}</Erro>}
 
         {/* Ações rápidas */}
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:auto-cols-fr sm:grid-flow-col sm:grid-cols-none">
+          {podeEntrar && (
+            <Acao
+              Icone={entrando ? LoaderCircle : LogIn}
+              rotulo="Entrar como"
+              onClick={entrarComo}
+              disabled={ocupado || entrando}
+            />
+          )}
           <Acao Icone={Pencil} rotulo="Editar" onClick={() => setTela("editar")} disabled={ocupado} />
           {!u.superadmin && <Acao Icone={KeyRound} rotulo="Nova senha" onClick={() => setTela("senha")} disabled={ocupado} />}
           {!eu && (
