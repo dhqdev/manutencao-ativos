@@ -307,7 +307,8 @@ await passo("console: \"Entrar como\" abre a conta do usuário sem senha e volta
   await page.locator(`[data-entrar-como="${GESTOR.email}"]`).waitFor();
   // Dados da empresa dele aparecem (a sessão é a do usuário, com o RLS dele).
   await page.goto("/manutencoes");
-  await page.getByText("Troca de óleo E2E").first().waitFor();
+  // A lista fica numa aba escondida (histórico): basta estar no DOM.
+  await page.getByText("Troca de óleo E2E").first().waitFor({ state: "attached" });
   await page.getByRole("button", { name: "Voltar ao console" }).click();
   await page.waitForURL("**/admin");
   await page.getByRole("heading", { name: "Gerência", exact: true }).waitFor();
