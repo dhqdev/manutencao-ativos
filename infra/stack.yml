@@ -135,17 +135,19 @@ services:
         - traefik.http.routers.manutencao.middlewares=manutencao-compressao
         - traefik.http.middlewares.manutencao-compressao.compress=true
         - traefik.http.services.manutencao.loadbalancer.server.port=3000
-        # Telas de login, cadastro e recuperação: no máximo ~1 pedido/s por IP
-        # (rajada de 40). O app ainda tem o limite por conta; isto segura
-        # robôs antes de chegarem a ele (cada senha conferida custa CPU).
-        - traefik.http.routers.manutencao-auth.rule=Host(`${DOMINIO}`) && (Path(`/login`) || Path(`/cadastro`) || Path(`/recuperar-senha`) || PathPrefix(`/auth/`))
+        # Envio dos formulários de login, cadastro e recuperação (só POST: abrir
+        # a tela não conta): no máximo ~2 por segundo por IP (rajada de 60). O
+        # app ainda tem o limite por conta; isto segura robôs antes de chegarem
+        # a ele (cada senha conferida custa CPU). Escritório atrás de um IP só
+        # cabe folgado.
+        - traefik.http.routers.manutencao-auth.rule=Host(`${DOMINIO}`) && (Path(`/login`) || Path(`/cadastro`) || Path(`/recuperar-senha`) || PathPrefix(`/auth/`)) && Method(`POST`)
         - traefik.http.routers.manutencao-auth.entrypoints=websecure
         - traefik.http.routers.manutencao-auth.tls.certresolver=letsencrypt
         - traefik.http.routers.manutencao-auth.service=manutencao
         - traefik.http.routers.manutencao-auth.middlewares=manutencao-auth-limite,manutencao-compressao
-        - traefik.http.middlewares.manutencao-auth-limite.ratelimit.average=60
+        - traefik.http.middlewares.manutencao-auth-limite.ratelimit.average=120
         - traefik.http.middlewares.manutencao-auth-limite.ratelimit.period=1m
-        - traefik.http.middlewares.manutencao-auth-limite.ratelimit.burst=40
+        - traefik.http.middlewares.manutencao-auth-limite.ratelimit.burst=60
 
   # WhatsApp (Baileys). UMA cópia só: duas com a mesma sessão se derrubam.
   whatsapp:

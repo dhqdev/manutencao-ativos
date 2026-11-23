@@ -21,6 +21,10 @@ confere 200 "tela de login" "$BASE/login"
 confere 307 "tela interna sem sessão manda para o login" "$BASE/dashboard"
 "${C[@]}" -I "$BASE/login" | grep -qi "content-security-policy" && ok "cabeçalho CSP presente" || erro "sem CSP"
 "${C[@]}" -I "$BASE/login" | grep -qi "strict-transport-security" && ok "HSTS presente" || erro "sem HSTS"
+# O limite do Traefik vale só para o envio dos formulários: abrir a tela de
+# login muitas vezes (escritório inteiro atrás de um IP) não pode dar 429.
+for _ in $(seq 1 80); do c=$(codigo "$BASE/login"); [ "$c" = "200" ] || break; done
+[ "$c" = "200" ] && ok "abrir o login 80 vezes seguidas não esbarra no limite" || erro "abrir o login esbarrou no limite: $c"
 
 echo "— app ↔ banco"
 "${C[@]}" "$BASE/api/saude?banco=1" | grep -q '"banco":"ok"' && ok "app → PostgREST → Postgres" || erro "saúde do banco: $("${C[@]}" "$BASE/api/saude?banco=1")"

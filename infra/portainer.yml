@@ -145,15 +145,15 @@ services:
         - "traefik.http.routers.manutencao.middlewares=manutencao-compressao"
         - "traefik.http.middlewares.manutencao-compressao.compress=true"
         - "traefik.http.services.manutencao-service.loadbalancer.server.port=3000"
-        # Login, cadastro e recuperação: ~1 pedido/s por IP (rajada de 40). Troque o domínio aqui também.
-        - "traefik.http.routers.manutencao-auth.rule=Host(`manutencao.seudominio.com.br`) && (Path(`/login`) || Path(`/cadastro`) || Path(`/recuperar-senha`) || PathPrefix(`/auth/`))"
+        # Envio (POST) de login, cadastro e recuperação: ~2/s por IP (rajada de 60); abrir a tela não conta. Troque o domínio aqui também.
+        - "traefik.http.routers.manutencao-auth.rule=Host(`manutencao.seudominio.com.br`) && (Path(`/login`) || Path(`/cadastro`) || Path(`/recuperar-senha`) || PathPrefix(`/auth/`)) && Method(`POST`)"
         - "traefik.http.routers.manutencao-auth.entrypoints=websecure"
         - "traefik.http.routers.manutencao-auth.service=manutencao-service"
         - "traefik.http.routers.manutencao-auth.tls.certresolver=letsencryptresolver"
         - "traefik.http.routers.manutencao-auth.middlewares=manutencao-auth-limite,manutencao-compressao"
-        - "traefik.http.middlewares.manutencao-auth-limite.ratelimit.average=60"
+        - "traefik.http.middlewares.manutencao-auth-limite.ratelimit.average=120"
         - "traefik.http.middlewares.manutencao-auth-limite.ratelimit.period=1m"
-        - "traefik.http.middlewares.manutencao-auth-limite.ratelimit.burst=40"
+        - "traefik.http.middlewares.manutencao-auth-limite.ratelimit.burst=60"
 
   # --- WhatsApp (Baileys). UMA réplica só: duas com a mesma sessão se derrubam. ----
   manutencao-whatsapp:

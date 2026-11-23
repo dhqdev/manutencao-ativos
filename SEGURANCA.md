@@ -290,8 +290,10 @@ em vez de vazar.
   o nome antigo é migrado pelo proxy sem perder a sessão.
 - `/auth/sair` e `/auth/voltar` ignoram pedido vindo de outro site
   (`Sec-Fetch-Site: cross-site`): um link ou `<img>` alheio não derruba a sessão.
-- O Traefik limita login, cadastro, recuperação e `/auth/*` a ~1 pedido por
-  segundo por IP (rajada de 40), antes de o app gastar CPU com bcrypt.
+- O Traefik limita o envio (POST) de login, cadastro, recuperação e `/auth/*`
+  a ~2 por segundo por IP (rajada de 60), antes de o app gastar CPU com
+  bcrypt. Abrir a tela não conta, para não travar um escritório inteiro atrás
+  do mesmo IP.
 - `/api/saude?banco=1` não devolve a mensagem de erro do banco (vai para o log).
 - Link de recuperação de senha: uso único, 30 minutos, só o hash fica no banco.
 - As funções `auth_*` só podem ser executadas pelo `service_role`.
