@@ -257,6 +257,17 @@ await passo("técnico entra e vê a manutenção da empresa", async () => {
   await page.getByText("Troca de óleo E2E").first().waitFor();
 });
 
+await passo("trocar a senha pede a atual; /nova-senha sem o link do e-mail não abre", async () => {
+  await page.goto("/nova-senha");
+  await page.waitForURL("**/configuracoes");
+  const form = page.locator("form").filter({ has: page.locator('input[name="senha_atual"]') });
+  await form.locator('input[name="senha_atual"]').fill("nao-e-a-senha");
+  await form.locator('input[name="senha"]').fill("Outra-Senha-2026");
+  await form.locator('input[name="confirmacao"]').fill("Outra-Senha-2026");
+  await form.getByRole("button", { name: "Alterar senha" }).click();
+  await page.getByText("A senha atual não confere.").waitFor();
+});
+
 await passo("outra empresa não enxerga os dados da primeira", async () => {
   await page.goto("/auth/sair");
   await page.goto("/cadastro");
@@ -279,6 +290,30 @@ await passo("usuário comum não vê o console do superadmin", async () => {
   await page.getByText("Página não encontrada").first().waitFor();
   verdade((await page.getByText("Console do superadmin").count()) === 0, "usuário comum abriu o console!");
   verdade((await page.getByText(GESTOR.email).count()) === 0, "console vazou a lista de usuários!");
+});
+
+await passo("conta que já existe vira convite; sem e-mail confirmado não entra na equipe", async () => {
+  await page.goto("/auth/sair");
+  await entrar(GESTOR);
+  await page.goto("/equipe");
+  await page.getByRole("button", { name: "Nova pessoa" }).click();
+  const form = page.locator("form").filter({ has: page.locator('input[placeholder="Nome da pessoa"]') });
+  await form.locator('input[name="nome"]').fill("Intruso");
+  await form.locator('input[name="email"]').fill(INTRUSO.email);
+  await form.getByRole("button", { name: "Criar acesso" }).click();
+  await page.getByText("mandamos um convite").waitFor();
+  await page.goto("/equipe");
+  await page.locator(`[data-convite-pendente="${INTRUSO.email}"]`).waitFor();
+  // O intruso (e-mail nunca confirmado) vê o convite, mas não consegue aceitar.
+  await page.goto("/auth/sair");
+  await entrar(INTRUSO);
+  const convite = page.locator('[data-convite="Oficina E2E"]');
+  await convite.getByText("confirme antes o seu e-mail").waitFor();
+  verdade((await convite.getByRole("button", { name: "Aceitar" }).count()) === 0, "aceitar apareceu sem e-mail confirmado");
+  await convite.getByRole("button", { name: "Recusar" }).click();
+  await convite.waitFor({ state: "detached" });
+  await page.goto("/manutencoes");
+  verdade((await page.getByText("Troca de óleo E2E").count()) === 0, "o intruso entrou na empresa pelo convite!");
 });
 
 await passo("superadmin (da stack) entra direto na gerência de usuários, sem acesso ao sistema", async () => {
@@ -325,6 +360,14 @@ await passo("console: \"Entrar como\" abre a conta do usuário sem senha e volta
   await page.goto("/manutencoes");
   // A lista fica numa aba escondida (histórico): basta estar no DOM.
   await page.getByText("Troca de óleo E2E").first().waitFor({ state: "attached" });
+  // A senha é da pessoa: dentro da conta dela o superadmin não troca.
+  await page.goto("/configuracoes");
+  const senha = page.locator("form").filter({ has: page.locator('input[name="senha_atual"]') });
+  await senha.locator('input[name="senha_atual"]').fill(GESTOR.senha);
+  await senha.locator('input[name="senha"]').fill("Tomada-Pelo-Admin-2026");
+  await senha.locator('input[name="confirmacao"]').fill("Tomada-Pelo-Admin-2026");
+  await senha.getByRole("button", { name: "Alterar senha" }).click();
+  await page.getByText(/não dá para trocar senhas/).first().waitFor();
   await page.getByRole("button", { name: "Voltar ao console" }).click();
   await page.waitForURL("**/admin");
   await page.getByRole("heading", { name: "Gerência", exact: true }).waitFor();

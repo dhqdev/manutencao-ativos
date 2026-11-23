@@ -1,41 +1,34 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { cadastroAberto, urlSite } from "@/lib/auth/config";
-import { conferirSenha, senhaValida } from "@/lib/auth/senhas";
-import { encerrarSessaoAtual, iniciarSessao, ipDoCliente, obterSessao } from "@/lib/auth/sessao";
+import { cadastroAberto } from "@/lib/auth/config";
+import { enviarLinkConfirmacao, enviarLinkRecuperacao } from "@/lib/auth/links-email";
+import { conferirSenha, problemaNaSenha } from "@/lib/auth/senhas";
+import {
+  COOKIE_RECUPERACAO,
+  encerrarSessaoAtual,
+  iniciarSessao,
+  ipDoCliente,
+  lerCookieRecuperacao,
+  obterSessao,
+} from "@/lib/auth/sessao";
 import {
   bloqueadoPorTentativas,
   chavesTentativa,
-  criarTokenRecuperacao,
   criarUsuario,
   definirSenha,
   registrarTentativa,
   usuarioPorEmail,
 } from "@/lib/auth/usuarios";
-import { emailConfigurado, enviarEmail } from "@/lib/email";
+import { emailConfigurado } from "@/lib/email";
 import { caminhoInterno } from "@/lib/url-segura";
 
 export type EstadoForm = { erro?: string; sucesso?: string } | null;
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MUITAS_TENTATIVAS = "Muitas tentativas. Aguarde 15 minutos e tente novamente.";
-
-/**
- * Endereço público do app — usado no link de recuperação de senha. Em
- * produção vem de SITE_URL; sem ela, cai nos cabeçalhos da requisição.
- */
-async function origem() {
-  const configurado = urlSite();
-  if (configurado) return configurado;
-
-  const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3001";
-  const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
-  return `${proto}://${host}`;
-}
 
 function falhaInesperada(e: unknown): EstadoForm {
   console.error("[auth]", e);
@@ -87,7 +80,8 @@ export async function cadastrar(_prev: EstadoForm, formData: FormData): Promise<
 
   if (!nome || !email || !senha) return { erro: "Preencha nome, e-mail e senha." };
   if (!EMAIL.test(email)) return { erro: "E-mail inválido." };
-  if (!senhaValida(senha)) return { erro: "A senha deve ter entre 6 e 72 caracteres." };
+  const fraca = problemaNaSenha(senha, email);
+  if (fraca) return { erro: fraca };
   if (senha !== confirmacao) return { erro: "As senhas não conferem." };
 
   try {
@@ -96,6 +90,13 @@ export async function cadastrar(_prev: EstadoForm, formData: FormData): Promise<
       return { erro: criado.jaExiste ? "Este e-mail já está cadastrado. Faça login." : criado.erro };
     }
     await iniciarSessao({ id: criado.id, email });
+    // Confirmação do e-mail: não impede de usar a própria empresa, mas é ela
+    // que permite aceitar convite de outra (db/sql/73-convites.sql).
+    if (emailConfigurado()) {
+      await enviarLinkConfirmacao({ id: criado.id, email }).catch((e) =>
+        console.error("[auth] e-mail de confirmação", e),
+      );
+    }
   } catch (e) {
     return falhaInesperada(e);
   }
@@ -119,7 +120,11 @@ export async function recuperarSenha(_prev: EstadoForm, formData: FormData): Pro
   try {
     // Limita pedidos por IP: evita usar o formulário para disparar e-mails.
     const ip = ipDoCliente(await headers());
-    const chave = { email: `recuperacao:${email}`, ip: ip ? `recuperacao-ip:${ip}` : null };
+    // 5 por e-mail: ninguém usa o formulário para encher a caixa de outra pessoa.
+    const chave = [
+      { chave: `recuperacao:${email}`, limite: 5 },
+      ...(ip ? [{ chave: `recuperacao-ip:${ip}`, limite: 30 }] : []),
+    ];
     if (await bloqueadoPorTentativas(chave)) return { erro: MUITAS_TENTATIVAS };
     await registrarTentativa(chave, false);
 
@@ -127,16 +132,7 @@ export async function recuperarSenha(_prev: EstadoForm, formData: FormData): Pro
     // A senha do superadmin é a da stack: um link de recuperação não serviria
     // para nada além de abrir uma sessão dele sem senha.
     if (usuario && !usuario.superadmin) {
-      const token = await criarTokenRecuperacao(usuario.id);
-      const link = `${await origem()}/auth/confirmar?tipo=recuperacao&token=${token}`;
-      await enviarEmail({
-        para: usuario.email,
-        assunto: "Redefinir sua senha — Gestão de Manutenção",
-        texto:
-          `Recebemos um pedido para redefinir a sua senha.\n\n` +
-          `Abra o link abaixo em até 30 minutos para criar uma senha nova:\n${link}\n\n` +
-          `Se não foi você, ignore este e-mail — sua senha continua a mesma.`,
-      });
+      await enviarLinkRecuperacao(usuario);
     }
   } catch (e) {
     console.error("[auth] recuperação de senha", e);
@@ -151,14 +147,20 @@ export async function definirNovaSenha(_prev: EstadoForm, formData: FormData): P
   const senha = String(formData.get("senha") ?? "");
   const confirmacao = String(formData.get("confirmacao") ?? "");
 
-  if (!senhaValida(senha)) return { erro: "A senha deve ter entre 6 e 72 caracteres." };
   if (senha !== confirmacao) return { erro: "As senhas não conferem." };
 
   try {
     const sessao = await obterSessao();
-    if (!sessao) return { erro: "Sua sessão expirou. Peça um novo link de recuperação." };
+    const jar = await cookies();
+    // Sem senha atual só com o link do e-mail: a sessão tem de ser a que ele abriu.
+    if (!sessao || lerCookieRecuperacao(jar.get(COOKIE_RECUPERACAO)?.value) !== sessao.sessaoId) {
+      return { erro: "Este link de recuperação expirou ou já foi usado. Peça um novo." };
+    }
+    const fraca = problemaNaSenha(senha, sessao.email);
+    if (fraca) return { erro: fraca };
     // Derruba as outras sessões (quem estava com a senha antiga sai).
     await definirSenha(sessao.userId, senha, sessao.sessaoId);
+    jar.delete(COOKIE_RECUPERACAO);
   } catch (e) {
     return falhaInesperada(e);
   }

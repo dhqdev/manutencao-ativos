@@ -136,15 +136,18 @@ export default async function ConfiguracoesPage() {
             mensagemSucesso="Senha alterada."
             limparAoSalvar
           >
-            <Campo label="Nova senha" obrigatorio hint="Mínimo 6 caracteres.">
-              <input name="senha" type="password" required minLength={6} autoComplete="new-password" placeholder="••••••••" className="campo" />
+            <Campo label="Senha atual" obrigatorio>
+              <input name="senha_atual" type="password" required autoComplete="current-password" placeholder="••••••••" className="campo" />
+            </Campo>
+            <Campo label="Nova senha" obrigatorio hint="Mínimo 8 caracteres.">
+              <input name="senha" type="password" required minLength={8} maxLength={72} autoComplete="new-password" placeholder="••••••••" className="campo" />
             </Campo>
             <Campo label="Confirmar nova senha" obrigatorio>
-              <input name="confirmacao" type="password" required minLength={6} autoComplete="new-password" placeholder="••••••••" className="campo" />
+              <input name="confirmacao" type="password" required minLength={8} maxLength={72} autoComplete="new-password" placeholder="••••••••" className="campo" />
             </Campo>
             <div className="flex items-start gap-2 rounded-lg bg-slate-50 px-3.5 py-3 text-xs text-slate-600">
               <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-              Sua sessão continua ativa após a troca. Use uma senha que você não usa em outros sistemas.
+              Esta sessão continua ativa; os outros aparelhos saem. Use uma senha que você não usa em outros sistemas.
             </div>
           </FormularioSalvar>
         </Secao>

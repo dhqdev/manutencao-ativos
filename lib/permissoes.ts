@@ -17,3 +17,10 @@ export function podeRegistrar(papel: PapelMembro) {
 }
 
 export const SEM_PERMISSAO = "Seu papel nesta empresa não permite esta ação. Fale com o gestor.";
+
+/**
+ * No "Entrar como" o superadmin vê e corrige dados, mas o que é da pessoa fica
+ * com ela: senha (dela ou da equipe) e excluir a conta.
+ */
+export const ENTRAR_COMO_SEM_SENHA =
+  "No \"Entrar como\" não dá para trocar senhas nem excluir a conta: isso fica com a própria pessoa.";

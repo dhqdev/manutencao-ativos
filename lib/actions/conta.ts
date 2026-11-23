@@ -9,6 +9,7 @@ import { encerrarSessaoAtual } from "@/lib/auth/sessao";
 import { excluirUsuario } from "@/lib/auth/usuarios";
 import { desconectar } from "@/lib/whatsapp";
 import { erroBanco, mensagemErro, texto, type Resultado } from "@/lib/form";
+import { ENTRAR_COMO_SEM_SENHA } from "@/lib/permissoes";
 
 type RetornoExclusao = {
   orgs_apagadas: string[];
@@ -27,7 +28,8 @@ export async function excluirConta(fd: FormData): Promise<Resultado> {
   let concluido = false;
 
   try {
-    const { userId, email } = await getContexto();
+    const { userId, email, entradaComo } = await getContexto();
+    if (entradaComo) return { ok: false, erro: ENTRAR_COMO_SEM_SENHA };
 
     // Confirmação explícita: digitar o próprio e-mail.
     const confirmacao = (texto(fd, "confirmacao") ?? "").toLowerCase();

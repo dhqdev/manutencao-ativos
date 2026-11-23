@@ -127,6 +127,30 @@ nome/cargo/telefone e para desconectar alguém da equipe. O último acesso e as
 sessões abertas da tela Equipe vêm de `equipe_acessos()` (`db/sql/60-equipe.sql`),
 que só responde para membros da empresa pedida e devolve só esses dois dados.
 
+### 12. Conta pré-cadastrada entrava na equipe no lugar do funcionário (grave)
+
+O cadastro público não prova que o e-mail é de quem cadastrou. Um estranho
+cadastrava `joao@empresa.com.br` antes do João; quando o gestor ia "Criar
+usuário" para ele, o sistema via que o e-mail já tinha conta e só a punha na
+equipe — a conta do estranho, com a senha do estranho.
+
+Agora todo login nasce com o e-mail **não confirmado** (`auth_criar_usuario`)
+e só o link de um e-mail nosso confirma (confirmação no cadastro ou "Esqueci
+minha senha"). Pôr na equipe quem já tem conta vira **convite**
+(`db/sql/73-convites.sql`): a pessoa aceita no topo da tela, e só aceita com o
+e-mail confirmado. Login criado pelo gestor com e-mail novo continua entrando
+direto, mas é só daquela empresa. Contas que já existiam antes desta mudança
+ficaram como confirmadas.
+
+### 13. Trocar a senha não pedia a atual
+
+Qualquer sessão aberta (celular esquecido, "Entrar como") trocava a senha e
+derrubava o dono. Agora Configurações pede a senha atual (5 erros em 15 min
+bloqueiam), e `/nova-senha`, que não pede, só abre com o cookie curto
+`recuperacao` amarrado à sessão que o link do e-mail abriu. No "Entrar como"
+o superadmin não troca senha (da pessoa nem da equipe) nem exclui a conta
+(`ENTRAR_COMO_SEM_SENHA` em `lib/permissoes.ts`).
+
 ### 10. Entrada do navegador ia crua para o banco
 
 Ids, tipos (enums) e números chegavam ao Postgres sem conferência: um id
@@ -226,11 +250,18 @@ em vez de vazar.
 
 ## Autenticação própria
 
-- Senhas em **bcrypt** (custo 10). Senha errada e e-mail inexistente levam o
-  mesmo tempo para responder (não dá para descobrir quem tem conta).
-- **Limite de tentativas**: 8 falhas por e-mail ou 30 por IP em 15 minutos
-  bloqueiam novas tentativas. O IP vem do Traefik, que descarta o
-  `X-Forwarded-For` enviado pelo cliente.
+- Senhas em **bcrypt** (custo 12; as antigas, de custo 10, seguem valendo).
+  Senha errada e e-mail inexistente levam o mesmo tempo para responder (não
+  dá para descobrir quem tem conta).
+- **Senha mínima de 8 caracteres**, recusando as mais tentadas ("Senha123",
+  "12345678", nome de time…) e a que contém o próprio e-mail
+  (`lib/auth/regras-senha.ts`). Sem exigir símbolo: isso só gera "Senha@123".
+- **Limite de tentativas** em 15 minutos: 8 falhas por e-mail **no mesmo IP**,
+  30 por IP e 50 por e-mail de qualquer lugar. Errar a senha dos outros só
+  tranca o IP de quem errou, não a conta da vítima. O IP vem do Traefik, que
+  descarta o `X-Forwarded-For` enviado pelo cliente.
+- Links dos e-mails usam só `SITE_URL` (nunca o cabeçalho Host, que quem pede
+  escolhe). Confirmação vale 3 dias; recuperação, 30 minutos.
 - **Sessões no banco** (`auth.sessoes`): sair, trocar a senha, receber senha
   nova do gestor ou ser excluído derruba a sessão na hora. Duram 30 dias e se
   renovam com o uso.
@@ -276,7 +307,9 @@ Fotos e anexos ficam no volume `manutencao_arquivos`. Nada é público:
   Toda entrada vai para `sistema_entradas_como` (sem policy: só o servidor lê).
   Para consultar: `select * from sistema_entradas_como order by inicio desc;`.
 - **Atualizar o sistema operacional** da VM e manter o SSH só com chave.
-- **Ativar SMTP** se quiser recuperação de senha por e-mail.
+- **Ativar SMTP** para a recuperação de senha e a confirmação de e-mail (sem ela,
+  quem criou a própria conta não consegue aceitar convite de outra empresa;
+  o superadmin inclui a pessoa pelo console).
 - Desligar o cadastro público (`CADASTRO_ABERTO='false'`) se o sistema for só
   para a sua empresa.
 

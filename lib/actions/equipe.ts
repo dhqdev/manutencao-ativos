@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getContexto } from "@/lib/session";
 import { createClient } from "@/lib/db/server";
 import { createAdminClient } from "@/lib/db/admin";
-import { gerarSenhaLegivel as gerarSenha, senhaValida } from "@/lib/auth/senhas";
+import { gerarSenhaLegivel as gerarSenha, problemaNaSenha } from "@/lib/auth/senhas";
 import {
   criarUsuario as criarLogin,
   definirSenha,
@@ -21,6 +21,7 @@ import {
   textoObrigatorio,
   type Resultado,
 } from "@/lib/form";
+import { ENTRAR_COMO_SEM_SENHA } from "@/lib/permissoes";
 import type { PapelMembro } from "@/lib/types";
 
 const PAPEIS_CONVIDAVEIS: PapelMembro[] = ["gestor", "tecnico", "leitor"];
@@ -66,7 +67,9 @@ async function exigirGestor() {
  * A senha volta para a tela (para copiar ou mandar no WhatsApp) e não fica
  * guardada em lugar nenhum além do hash (bcrypt) no banco.
  *
- * Se o e-mail já tem conta, apenas adiciona a pessoa à equipe.
+ * Se o e-mail já tem conta, NÃO põe a conta na equipe: manda um convite, que a
+ * pessoa aceita ao entrar (com o e-mail confirmado). Senão, quem cadastrasse
+ * antes o e-mail de um funcionário entraria na empresa no lugar dele.
  */
 export async function criarUsuario(fd: FormData): Promise<Credenciais> {
   try {
@@ -78,7 +81,8 @@ export async function criarUsuario(fd: FormData): Promise<Credenciais> {
     const senha = texto(fd, "senha") ?? gerarSenha();
 
     if (!emailValido(email)) return { ok: false, erro: "E-mail inválido." };
-    if (!senhaValida(senha)) return { ok: false, erro: "A senha deve ter entre 6 e 72 caracteres." };
+    const fraca = problemaNaSenha(senha, email);
+    if (fraca) return { ok: false, erro: fraca };
 
     const admin = createAdminClient();
     const criado = await criarLogin({
@@ -93,7 +97,7 @@ export async function criarUsuario(fd: FormData): Promise<Credenciais> {
     if (!criado.ok) {
       if (!criado.jaExiste) return { ok: false, erro: criado.erro || "Não foi possível criar o usuário." };
 
-      // Conta existente: entra na equipe com a senha que já tem.
+      // Conta existente: vira convite (db/sql/73-convites.sql).
       const { error: erroMembro } = await db.rpc("adicionar_membro", {
         p_org: orgId,
         p_email: email,
@@ -107,7 +111,8 @@ export async function criarUsuario(fd: FormData): Promise<Credenciais> {
         nome,
         email,
         senha: null,
-        aviso: "Este e-mail já tinha conta. A pessoa foi adicionada à equipe e entra com a senha que já usa.",
+        aviso:
+          "Este e-mail já tem conta, então mandamos um convite: a pessoa entra com a senha que já usa e aceita o convite no topo da tela. Até lá, ela aparece em Convites pendentes.",
       };
     }
 
@@ -123,30 +128,6 @@ export async function criarUsuario(fd: FormData): Promise<Credenciais> {
 
     revalidarEquipe();
     return { ok: true, nome, email, senha };
-  } catch (e) {
-    return { ok: false, erro: mensagemErro(e) };
-  }
-}
-
-/** Adiciona alguém que já tem conta, pelo e-mail. */
-export async function adicionarMembro(fd: FormData): Promise<Resultado> {
-  try {
-    const { orgId } = await getContexto();
-    const db = await createClient();
-
-    const email = textoObrigatorio(fd, "email", "o e-mail da pessoa").toLowerCase();
-    if (!emailValido(email)) return { ok: false, erro: "E-mail inválido." };
-
-    const { error } = await db.rpc("adicionar_membro", {
-      p_org: orgId,
-      p_email: email,
-      p_papel: papelValido(texto(fd, "papel")),
-    });
-
-    if (error) return erroBanco(error);
-
-    revalidarEquipe();
-    return { ok: true };
   } catch (e) {
     return { ok: false, erro: mensagemErro(e) };
   }
@@ -218,6 +199,7 @@ async function alvoDaEquipe(
 /** Gera uma senha nova para alguém da equipe (derruba as sessões abertas). */
 export async function redefinirSenha(userId: string): Promise<Credenciais> {
   try {
+    if ((await getContexto()).entradaComo) return { ok: false, erro: ENTRAR_COMO_SEM_SENHA };
     const alvoOk = await alvoDaEquipe(userId, "trocar a senha");
     if (!alvoOk.ok) return alvoOk;
 

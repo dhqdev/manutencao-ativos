@@ -198,6 +198,19 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   `superadmin` no banco.
 - `org_membros` não tem policy de escrita: entrar/sair/trocar papel só por
   função `security definer` que confere as regras.
+- Quem JÁ tem conta não entra direto em equipe: vira convite
+  (`db/sql/73-convites.sql`), aceito pela pessoa na faixa do topo
+  (`components/shell/convites-pendentes.tsx`) e só com e-mail confirmado.
+  Login nasce com e-mail não confirmado; só link de e-mail confirma
+  (`lib/auth/links-email.ts`, que monta o link só com `SITE_URL`).
+- Senha: valide com `problemaNaSenha(senha, email)` (`lib/auth/regras-senha.ts`,
+  mínimo 8, recusa as comuns). Trocar a própria pede a atual; `/nova-senha`
+  só com o cookie `recuperacao`. Ação que mexe em senha ou exclui conta recusa
+  `entradaComo` com `ENTRAR_COMO_SEM_SENHA`.
+- Limite de tentativas: lista de `{ chave, limite }` em
+  `bloqueadoPorTentativas`/`registrarTentativa` (`lib/auth/usuarios.ts`).
+  Nunca uma chave só por e-mail com limite baixo: vira jeito de trancar a
+  conta dos outros.
 - Nada de efeito em todo clique (as faíscas foram tiradas a pedido do dono).
   Enfeite é discreto, `aria-hidden`, `pointer-events-none`, `no-print` e some
   com `prefers-reduced-motion`.

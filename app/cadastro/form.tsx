@@ -105,9 +105,9 @@ export function FormCadastro() {
           id="senha"
           name="senha"
           required
-          minLength={6}
+          minLength={8}
           autoComplete="new-password"
-          placeholder="Mínimo 6 caracteres"
+          placeholder="Mínimo 8 caracteres"
           value={senha}
           onChange={(e) => setSenha(e.target.value)}
         />
@@ -120,7 +120,7 @@ export function FormCadastro() {
           id="confirmacao"
           name="confirmacao"
           required
-          minLength={6}
+          minLength={8}
           autoComplete="new-password"
           placeholder="Repita a senha"
           value={confirmacao}

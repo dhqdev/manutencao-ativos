@@ -1,4 +1,4 @@
-import { PainelEquipe, type Membro } from "@/components/configuracoes/equipe";
+import { PainelEquipe, type ConviteEquipe, type Membro } from "@/components/configuracoes/equipe";
 import { Cabecalho } from "@/components/ui";
 import { urlSite } from "@/lib/auth/config";
 import { createClient } from "@/lib/db/server";
@@ -25,11 +25,14 @@ export default async function EquipePage() {
   // org_membros aponta para auth.users (fora da API), não para profiles: o
   // PostgREST não consegue embutir o perfil. Por isso os perfis vêm à parte
   // (o RLS de profiles já limita a quem divide empresa com o usuário).
-  const [{ data: membros }, { data: perfis }, { data: acessos }] = await Promise.all([
+  const gestor = podeGerenciar(papel);
+  const [{ data: membros }, { data: perfis }, { data: acessos }, { data: convites }] = await Promise.all([
     db.from("org_membros").select("user_id, papel, created_at").eq("org_id", orgId).order("created_at"),
     db.from("profiles").select("id, nome, email, cargo, telefone"),
     // Último acesso e sessões abertas moram no schema auth (db/sql/60-equipe.sql).
     db.rpc("equipe_acessos", { p_org: orgId }),
+    // Quem já tinha conta e ainda não aceitou (db/sql/73-convites.sql).
+    gestor ? db.rpc("convites_da_empresa", { p_org: orgId }) : Promise.resolve({ data: [] }),
   ]);
 
   const porUsuario = new Map(((acessos ?? []) as Acesso[]).map((a) => [a.user_id, a]));
@@ -57,7 +60,8 @@ export default async function EquipePage() {
       <PainelEquipe
         membros={equipe}
         userId={userId}
-        podeGerenciar={podeGerenciar(papel)}
+        convites={(convites as ConviteEquipe[] | null) ?? []}
+        podeGerenciar={gestor}
         urlSistema={urlSite()}
         agora={Date.now()}
       />

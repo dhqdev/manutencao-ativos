@@ -12,11 +12,19 @@
 -- Cria o login. O trigger on_auth_user_created (10-schema.sql) cria empresa,
 -- perfil e categorias — ou, se houver convite em p_app_meta, põe a pessoa
 -- direto na empresa que convidou. E-mail repetido → erro 23505.
+--
+-- O e-mail nasce NÃO confirmado: digitar um endereço não prova que ele é seu.
+-- Só o link do e-mail (confirmação ou "Esqueci minha senha") confirma, e só
+-- conta confirmada aceita convite para outra empresa (73-convites.sql). Sem
+-- isso, quem cadastrasse antes o e-mail de um funcionário entraria na equipe
+-- quando o gestor fosse criar o acesso dele.
+drop function if exists public.auth_criar_usuario(text, text, jsonb, jsonb);
 create or replace function public.auth_criar_usuario(
-  p_email    text,
-  p_hash     text,
-  p_meta     jsonb default '{}',
-  p_app_meta jsonb default '{}'
+  p_email      text,
+  p_hash       text,
+  p_meta       jsonb default '{}',
+  p_app_meta   jsonb default '{}',
+  p_confirmado boolean default false
 )
 returns uuid
 language plpgsql
@@ -27,7 +35,8 @@ declare
   v_id uuid;
 begin
   insert into auth.users (email, encrypted_password, raw_user_meta_data, raw_app_meta_data, email_confirmed_at)
-  values (lower(trim(p_email)), p_hash, coalesce(p_meta, '{}'), coalesce(p_app_meta, '{}'), now())
+  values (lower(trim(p_email)), p_hash, coalesce(p_meta, '{}'), coalesce(p_app_meta, '{}'),
+          case when p_confirmado then now() end)
   returning id into v_id;
   return v_id;
 end;
@@ -60,7 +69,8 @@ as $$
            'user_metadata', u.raw_user_meta_data,
            'app_metadata', u.raw_app_meta_data,
            'superadmin', u.superadmin,
-           'bloqueado', u.bloqueado
+           'bloqueado', u.bloqueado,
+           'email_confirmado', u.email_confirmed_at is not null
          )
     from auth.users u
    where u.id = p_id
@@ -239,6 +249,17 @@ begin
   insert into auth.tokens (hash, user_id, tipo, expira_em)
   values (p_hash, p_user, p_tipo, now() + make_interval(mins => p_minutos));
 end;
+$$;
+
+-- O link do e-mail chegou à pessoa: o endereço é dela.
+create or replace function public.auth_confirmar_email(p_user uuid)
+returns void
+language sql
+security definer
+set search_path = public, auth
+as $$
+  update auth.users set email_confirmed_at = now(), updated_at = now()
+   where id = p_user and email_confirmed_at is null;
 $$;
 
 -- Usa o link (uma vez só). Devolve o id do usuário, ou null.

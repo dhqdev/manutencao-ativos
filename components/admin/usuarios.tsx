@@ -770,7 +770,7 @@ function NovoUsuario({
         </Campo>
       </div>
       <Campo label="Senha" hint="Em branco: gera uma senha automática.">
-        <input name="senha" type="text" minLength={6} maxLength={72} autoComplete="new-password" className="campo" />
+        <input name="senha" type="text" minLength={8} maxLength={72} autoComplete="new-password" className="campo" />
       </Campo>
       <Campo label="Empresa">
         <select name="empresa" value={empresa} onChange={(e) => setEmpresa(e.target.value)} className="campo">
@@ -852,7 +852,7 @@ function NovaSenha({
       }}
     >
       <Campo label="Senha" hint="Em branco: gera uma senha automática.">
-        <input name="senha" type="text" minLength={6} maxLength={72} autoComplete="new-password" className="campo" />
+        <input name="senha" type="text" minLength={8} maxLength={72} autoComplete="new-password" className="campo" />
       </Campo>
     </FormModal>
   );

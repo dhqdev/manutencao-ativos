@@ -7,7 +7,9 @@ import bcrypt from "bcryptjs";
  * quem vier da base antiga continua entrando com a senha de sempre.
  */
 
-const CUSTO = 10;
+// 12: cada conferência leva ~0,25 s no servidor — imperceptível para quem
+// entra, e 4x mais caro para quem tenta adivinhar a partir de um dump.
+const CUSTO = 12;
 
 export function gerarHash(senha: string) {
   return bcrypt.hash(senha, CUSTO);
@@ -33,9 +35,7 @@ export async function conferirSenha(senha: string, hash: string | null | undefin
   }
 }
 
-export function senhaValida(senha: string) {
-  return senha.length >= 6 && senha.length <= 72; // bcrypt ignora além de 72 bytes
-}
+export { problemaNaSenha } from "./regras-senha";
 
 /** Senha legível para ditar ou mandar no WhatsApp: sem 0/O, 1/l/I. */
 export function gerarSenhaLegivel(tamanho = 10) {

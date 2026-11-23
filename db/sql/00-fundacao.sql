@@ -125,11 +125,14 @@ alter table auth.sessoes add column if not exists aberta_por uuid references aut
 create table if not exists auth.tokens (
   hash      text primary key,
   user_id   uuid not null references auth.users (id) on delete cascade,
-  tipo      text not null check (tipo in ('recuperacao')),
+  tipo      text not null check (tipo in ('recuperacao', 'confirmacao')),
   expira_em timestamptz not null,
   usado_em  timestamptz,
   criado_em timestamptz not null default now()
 );
+-- 'confirmacao': link que confirma o e-mail (bancos antigos só aceitavam 'recuperacao').
+alter table auth.tokens drop constraint if exists tokens_tipo_check;
+alter table auth.tokens add constraint tokens_tipo_check check (tipo in ('recuperacao', 'confirmacao'));
 
 -- Limite de tentativas de login (por e-mail e por IP).
 create table if not exists auth.tentativas (

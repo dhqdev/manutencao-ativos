@@ -3,6 +3,7 @@ import { cookies, headers } from "next/headers";
 import { cache } from "react";
 import { createAdminClient } from "@/lib/db/admin";
 import {
+  COOKIE_RECUPERACAO,
   COOKIE_SESSAO,
   COOKIE_SESSAO_ADMIN,
   assinarCookieSessao,
@@ -11,8 +12,12 @@ import {
 } from "./sessao-cookie";
 
 export {
+  COOKIE_RECUPERACAO,
   COOKIE_SESSAO,
   COOKIE_SESSAO_ADMIN,
+  DURACAO_RECUPERACAO_SEGUNDOS,
+  assinarCookieRecuperacao,
+  lerCookieRecuperacao,
   DURACAO_COOKIE_SEGUNDOS,
   assinarCookieSessao,
   lerCookieSessao,
@@ -89,8 +94,9 @@ export async function iniciarSessao(usuario: { id: string; email: string }) {
   const valor = await criarSessao(usuario);
   const jar = await cookies();
   jar.set(COOKIE_SESSAO, valor, opcoesCookieSessao());
-  // Login novo encerra qualquer "Entrar como" que tenha ficado para trás.
+  // Login novo encerra qualquer "Entrar como" (e link de recuperação) que tenha ficado para trás.
   jar.delete(COOKIE_SESSAO_ADMIN);
+  jar.delete(COOKIE_RECUPERACAO);
 }
 
 /** Apaga a sessão do banco (se houver) e o cookie. Com "Entrar como" aberto, sai das duas. */
@@ -102,4 +108,5 @@ export async function encerrarSessaoAtual() {
     if (dados) await admin.rpc(dados.como ? "auth_sair_entrada_como" : "auth_encerrar_sessao", { p_sessao: dados.sid });
     jar.delete(nome);
   }
+  jar.delete(COOKIE_RECUPERACAO);
 }

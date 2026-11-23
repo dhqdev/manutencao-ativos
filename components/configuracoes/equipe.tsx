@@ -29,6 +29,7 @@ import {
   removerMembro,
   type Credenciais,
 } from "@/lib/actions/equipe";
+import { cancelarConvite } from "@/lib/actions/convites";
 import { dataBR, dataHoraBR, iniciais } from "@/lib/format";
 import type { PapelMembro } from "@/lib/types";
 
@@ -91,6 +92,15 @@ export type Membro = {
   conta_da_empresa: boolean;
 };
 
+/** Convite para quem já tinha conta: só entra na equipe quando a pessoa aceita. */
+export type ConviteEquipe = {
+  id: string;
+  email: string;
+  nome: string | null;
+  papel: PapelMembro;
+  created_at: string;
+};
+
 type CredenciaisOk = Extract<Credenciais, { ok: true }>;
 
 const DIA = 86_400_000;
@@ -139,8 +149,10 @@ export function PainelEquipe({
   podeGerenciar,
   urlSistema,
   agora,
+  convites = [],
 }: {
   membros: Membro[];
+  convites?: ConviteEquipe[];
   userId: string;
   podeGerenciar: boolean;
   urlSistema: string;
@@ -288,6 +300,29 @@ export function PainelEquipe({
 
         <QuadroPermissoes />
       </div>
+
+      {podeGerenciar && convites.length > 0 && (
+        <Secao titulo="Convites pendentes">
+          <ul className="divide-y divide-slate-100">
+            {convites.map((c) => (
+              <li key={c.id} data-convite-pendente={c.email} className="flex items-center gap-3 px-4 py-3 sm:px-5">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-slate-900">{c.nome ?? c.email}</p>
+                  <p className="truncate text-xs text-slate-500">
+                    {c.email} · {PAPEIS[c.papel].label} · convidado(a) em {dataBR(c.created_at)} · aguardando a pessoa aceitar
+                  </p>
+                </div>
+                <BotaoExcluir
+                  compacto
+                  acao={cancelarConvite.bind(null, c.id)}
+                  titulo="Cancelar convite"
+                  mensagem={`O convite para ${c.email} deixa de valer.`}
+                />
+              </li>
+            ))}
+          </ul>
+        </Secao>
+      )}
 
       {podeGerenciar && (
         <NovoUsuario
@@ -649,7 +684,7 @@ function NovoUsuario({
             <input
               name="senha"
               type="text"
-              minLength={6}
+              minLength={8}
               autoComplete="new-password"
               placeholder="Gerar automaticamente"
               className="campo"

@@ -29,6 +29,24 @@ export function lerCookieSessao(token: string | undefined | null) {
   return dados?.sid && dados.sub ? dados : null;
 }
 
+/**
+ * Link de "Esqueci minha senha": além da sessão, o /auth/confirmar grava este
+ * cookie curto amarrado a ela. Só com ele a tela /nova-senha troca a senha sem
+ * pedir a atual — uma sessão qualquer (celular esquecido aberto) não basta.
+ */
+export const COOKIE_RECUPERACAO = "recuperacao";
+export const DURACAO_RECUPERACAO_SEGUNDOS = 30 * 60;
+
+export function assinarCookieRecuperacao(sid: string) {
+  return assinarJwt({ sid, rec: true }, segredoSessao(), DURACAO_RECUPERACAO_SEGUNDOS);
+}
+
+/** Id da sessão aberta pelo link de recuperação, ou null. */
+export function lerCookieRecuperacao(token: string | undefined | null) {
+  const dados = verificarJwt<{ sid?: string; rec?: boolean }>(token, segredoSessao());
+  return dados?.rec === true && dados.sid ? dados.sid : null;
+}
+
 export function opcoesCookieSessao(maxAge = DURACAO_COOKIE_SEGUNDOS) {
   return {
     httpOnly: true,

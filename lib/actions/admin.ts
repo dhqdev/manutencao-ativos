@@ -12,7 +12,7 @@ import {
   obterSessao,
   opcoesCookieSessao,
 } from "@/lib/auth/sessao";
-import { gerarSenhaLegivel, senhaValida } from "@/lib/auth/senhas";
+import { gerarSenhaLegivel, problemaNaSenha } from "@/lib/auth/senhas";
 import {
   criarUsuario as criarLogin,
   definirSenha,
@@ -86,7 +86,8 @@ export async function adminCriarUsuario(fd: FormData): Promise<CredenciaisAdmin>
     const empresa = texto(fd, "empresa") ?? "nova";
 
     if (!EMAIL.test(email)) return { ok: false, erro: "E-mail inválido." };
-    if (!senhaValida(senha)) return { ok: false, erro: "A senha deve ter entre 6 e 72 caracteres." };
+    const fraca = problemaNaSenha(senha, email);
+    if (fraca) return { ok: false, erro: fraca };
 
     if (empresa === "nova") {
       const empresaNome = texto(fd, "empresa_nome") ?? nome;
@@ -147,7 +148,8 @@ export async function adminRedefinirSenha(userId: string, senhaInformada?: strin
     }
 
     const senha = senhaInformada?.trim() || gerarSenhaLegivel();
-    if (!senhaValida(senha)) return { ok: false, erro: "A senha deve ter entre 6 e 72 caracteres." };
+    const fraca = problemaNaSenha(senha, alvo.email);
+    if (fraca) return { ok: false, erro: fraca };
 
     await definirSenha(userId, senha, userId === sessao.userId ? sessao.sessaoId : null);
     const { data: perfil } = await admin.from("profiles").select("nome").eq("id", userId).maybeSingle();
