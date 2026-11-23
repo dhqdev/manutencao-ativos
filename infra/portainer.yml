@@ -116,6 +116,8 @@ services:
       - SMTP_SENHA=
       - SMTP_REMETENTE=Gestão de Manutenção <nao-responda@seudominio.com.br>
       - ARQUIVOS_DIR=/dados/arquivos
+      # Espaço de fotos e anexos por empresa, em MB (0 = sem limite).
+      - ARQUIVOS_COTA_MB=5120
       - TZ=America/Sao_Paulo
     volumes:
       - manutencao_arquivos:/dados/arquivos
@@ -143,6 +145,15 @@ services:
         - "traefik.http.routers.manutencao.middlewares=manutencao-compressao"
         - "traefik.http.middlewares.manutencao-compressao.compress=true"
         - "traefik.http.services.manutencao-service.loadbalancer.server.port=3000"
+        # Login, cadastro e recuperação: ~1 pedido/s por IP (rajada de 40). Troque o domínio aqui também.
+        - "traefik.http.routers.manutencao-auth.rule=Host(`manutencao.seudominio.com.br`) && (Path(`/login`) || Path(`/cadastro`) || Path(`/recuperar-senha`) || PathPrefix(`/auth/`))"
+        - "traefik.http.routers.manutencao-auth.entrypoints=websecure"
+        - "traefik.http.routers.manutencao-auth.service=manutencao-service"
+        - "traefik.http.routers.manutencao-auth.tls.certresolver=letsencryptresolver"
+        - "traefik.http.routers.manutencao-auth.middlewares=manutencao-auth-limite,manutencao-compressao"
+        - "traefik.http.middlewares.manutencao-auth-limite.ratelimit.average=60"
+        - "traefik.http.middlewares.manutencao-auth-limite.ratelimit.period=1m"
+        - "traefik.http.middlewares.manutencao-auth-limite.ratelimit.burst=40"
 
   # --- WhatsApp (Baileys). UMA réplica só: duas com a mesma sessão se derrubam. ----
   manutencao-whatsapp:

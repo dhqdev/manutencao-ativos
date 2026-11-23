@@ -117,6 +117,9 @@ export async function salvarManutencao(fd: FormData): Promise<Resultado> {
     // para quem não quer sair da tela e cadastrar a preventiva à parte.
     let planoCriado: string | null = null;
     if (booleano(fd, "criar_plano")) {
+      // Plano é cadastro (RLS: só gestor). Antes o técnico via a opção e o
+      // banco recusava no meio, com uma mensagem crua.
+      if (!podeGerenciar(papel)) return { ok: false, erro: SEM_PERMISSAO };
       const periodicidade = inteiro(fd, "plano_periodicidade_valor", 0) ?? 0;
       const unidade = opcao(
         texto(fd, "plano_periodicidade_unidade"),

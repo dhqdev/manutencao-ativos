@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { urlSite } from "@/lib/auth/config";
-import { COOKIE_SESSAO, lerCookieSessao } from "@/lib/auth/sessao";
-import { voltarAoConsole } from "@/lib/auth/entrar-como";
+import { COOKIE_SESSAO, apagarCookie, lerCookieSessao } from "@/lib/auth/sessao";
+import { pedidoDeOutroSite, voltarAoConsole } from "@/lib/auth/entrar-como";
 import { createAdminClient } from "@/lib/db/admin";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +15,9 @@ export const dynamic = "force-dynamic";
  * tempo) fecha só a sessão emprestada e o devolve ao console.
  */
 async function encerrar(request: NextRequest) {
+  if (pedidoDeOutroSite(request)) {
+    return NextResponse.redirect(new URL("/dashboard", urlSite() || request.nextUrl.origin), { status: 303 });
+  }
   const deVolta = await voltarAoConsole(request);
   if (deVolta) return deVolta;
 
@@ -30,7 +33,7 @@ async function encerrar(request: NextRequest) {
   const resposta = NextResponse.redirect(new URL("/login", urlSite() || request.nextUrl.origin), {
     status: 303,
   });
-  resposta.cookies.delete(COOKIE_SESSAO);
+  resposta.cookies.delete(apagarCookie(COOKIE_SESSAO));
   return resposta;
 }
 

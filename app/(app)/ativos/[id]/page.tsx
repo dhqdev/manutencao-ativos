@@ -115,6 +115,7 @@ export default async function AtivoPage({ params }: { params: Promise<{ id: stri
                 ativos={opcoesAtivos}
                 ativoPadrao={item.id}
                 planos={opcoesPlanos}
+                podeCriarPeriodica={gestor}
               />
             )}
           </>
@@ -171,6 +172,7 @@ export default async function AtivoPage({ params }: { params: Promise<{ id: stri
                       ativos={opcoesAtivos}
                       ativoPadrao={item.id}
                       planos={opcoesPlanos}
+                      podeCriarPeriodica={gestor}
                     />
                     )
                   }

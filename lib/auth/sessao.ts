@@ -6,12 +6,14 @@ import {
   COOKIE_RECUPERACAO,
   COOKIE_SESSAO,
   COOKIE_SESSAO_ADMIN,
+  apagarCookie,
   assinarCookieSessao,
   lerCookieSessao,
   opcoesCookieSessao,
 } from "./sessao-cookie";
 
 export {
+  apagarCookie,
   COOKIE_RECUPERACAO,
   COOKIE_SESSAO,
   COOKIE_SESSAO_ADMIN,
@@ -95,8 +97,8 @@ export async function iniciarSessao(usuario: { id: string; email: string }) {
   const jar = await cookies();
   jar.set(COOKIE_SESSAO, valor, opcoesCookieSessao());
   // Login novo encerra qualquer "Entrar como" (e link de recuperação) que tenha ficado para trás.
-  jar.delete(COOKIE_SESSAO_ADMIN);
-  jar.delete(COOKIE_RECUPERACAO);
+  jar.delete(apagarCookie(COOKIE_SESSAO_ADMIN));
+  jar.delete(apagarCookie(COOKIE_RECUPERACAO));
 }
 
 /** Apaga a sessão do banco (se houver) e o cookie. Com "Entrar como" aberto, sai das duas. */
@@ -106,7 +108,7 @@ export async function encerrarSessaoAtual() {
   for (const nome of [COOKIE_SESSAO, COOKIE_SESSAO_ADMIN]) {
     const dados = lerCookieSessao(jar.get(nome)?.value);
     if (dados) await admin.rpc(dados.como ? "auth_sair_entrada_como" : "auth_encerrar_sessao", { p_sessao: dados.sid });
-    jar.delete(nome);
+    jar.delete(apagarCookie(nome));
   }
-  jar.delete(COOKIE_RECUPERACAO);
+  jar.delete(apagarCookie(COOKIE_RECUPERACAO));
 }

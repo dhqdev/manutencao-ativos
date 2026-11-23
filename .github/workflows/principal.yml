@@ -230,11 +230,14 @@ jobs:
           install -m 700 -d ~/.ssh
           printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy
           chmod 600 ~/.ssh/deploy
-          if [ -n "${{ secrets.DEPLOY_KNOWN_HOSTS }}" ]; then
-            printf '%s\n' "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
-          else
-            ssh-keyscan -H "${{ vars.DEPLOY_HOST }}" > ~/.ssh/known_hosts
+          # Sem a impressão digital conhecida, não conecta: o ssh-keyscan aceitava
+          # qualquer servidor que respondesse no endereço (e entregava a ele a
+          # versão nova e o acesso). Gere com: ssh-keyscan -H SEU_SERVIDOR
+          if [ -z "${{ secrets.DEPLOY_KNOWN_HOSTS }}" ]; then
+            echo "::error::Defina o secret DEPLOY_KNOWN_HOSTS (saída de ssh-keyscan -H do servidor)."
+            exit 1
           fi
+          printf '%s\n' "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
 
       - name: Atualizar o servidor
         env:

@@ -92,7 +92,7 @@ export default async function ManutencoesPage({
             {gestor && lista.length > 0 && <LimparHistorico ativos={opcoesAtivos} />}
             {gestor && <DialogoPlano ativos={opcoesAtivos} variante="secundario" />}
             {registra && (
-              <DialogoManutencao orgId={orgId} ativos={opcoesAtivos} planos={opcoesPlanos} />
+              <DialogoManutencao orgId={orgId} ativos={opcoesAtivos} planos={opcoesPlanos} podeCriarPeriodica={gestor} />
             )}
           </>
         }
@@ -155,7 +155,7 @@ export default async function ManutencoesPage({
                   descricao="Registre os serviços executados para acompanhar custos e histórico."
                   acao={
                     registra ? (
-                      <DialogoManutencao orgId={orgId} ativos={opcoesAtivos} planos={opcoesPlanos} />
+                      <DialogoManutencao orgId={orgId} ativos={opcoesAtivos} planos={opcoesPlanos} podeCriarPeriodica={gestor} />
                     ) : undefined
                   }
                 />

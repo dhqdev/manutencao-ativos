@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { urlSite } from "@/lib/auth/config";
-import { voltarAoConsole } from "@/lib/auth/entrar-como";
+import { pedidoDeOutroSite, voltarAoConsole } from "@/lib/auth/entrar-como";
 
 export const dynamic = "force-dynamic";
 
@@ -10,9 +10,10 @@ export const dynamic = "force-dynamic";
  * só leva para o início.
  */
 async function voltar(request: NextRequest) {
+  const inicio = () => NextResponse.redirect(new URL("/dashboard", urlSite() || request.nextUrl.origin), { status: 303 });
+  if (pedidoDeOutroSite(request)) return inicio();
   return (
-    (await voltarAoConsole(request)) ??
-    NextResponse.redirect(new URL("/dashboard", urlSite() || request.nextUrl.origin), { status: 303 })
+    (await voltarAoConsole(request)) ?? inicio()
   );
 }
 

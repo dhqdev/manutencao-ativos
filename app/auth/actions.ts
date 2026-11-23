@@ -8,6 +8,7 @@ import { enviarLinkConfirmacao, enviarLinkRecuperacao } from "@/lib/auth/links-e
 import { conferirSenha, problemaNaSenha } from "@/lib/auth/senhas";
 import {
   COOKIE_RECUPERACAO,
+  apagarCookie,
   encerrarSessaoAtual,
   iniciarSessao,
   ipDoCliente,
@@ -160,7 +161,7 @@ export async function definirNovaSenha(_prev: EstadoForm, formData: FormData): P
     if (fraca) return { erro: fraca };
     // Derruba as outras sessões (quem estava com a senha antiga sai).
     await definirSenha(sessao.userId, senha, sessao.sessaoId);
-    jar.delete(COOKIE_RECUPERACAO);
+    jar.delete(apagarCookie(COOKIE_RECUPERACAO));
   } catch (e) {
     return falhaInesperada(e);
   }

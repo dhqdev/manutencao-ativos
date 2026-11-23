@@ -94,10 +94,18 @@ await passo("cadastro de uma empresa nova cai no painel", async () => {
   await page.getByText("Oficina E2E").first().waitFor();
 });
 
-await passo("cookie de sessão é httpOnly e Secure", async () => {
-  const cookie = (await contexto.cookies()).find((c) => c.name === "sessao");
-  verdade(cookie, "sem cookie de sessão");
+await passo("cookie de sessão é httpOnly, Secure e __Host-", async () => {
+  // O prefixo __Host- impede subdomínio de plantar cookie de sessão por cima.
+  const cookie = (await contexto.cookies()).find((c) => c.name === "__Host-sessao");
+  verdade(cookie, `sem cookie __Host-sessao: ${(await contexto.cookies()).map((c) => c.name).join(", ")}`);
   verdade(cookie.httpOnly && cookie.secure, `cookie inseguro: ${JSON.stringify(cookie)}`);
+  // Quem ainda tem o cookie com o nome antigo continua logado (o proxy migra).
+  await contexto.clearCookies({ name: "__Host-sessao" });
+  await contexto.addCookies([{ name: "sessao", value: cookie.value, url: BASE, httpOnly: true, secure: true }]);
+  await page.goto("/dashboard");
+  await page.waitForURL("**/dashboard");
+  const nomes = (await contexto.cookies()).map((c) => c.name);
+  verdade(nomes.includes("__Host-sessao") && !nomes.includes("sessao"), `cookie antigo não migrou: ${nomes.join(", ")}`);
 });
 
 await passo("menu lateral recolhe, mostra a dica e lembra depois de recarregar", async () => {

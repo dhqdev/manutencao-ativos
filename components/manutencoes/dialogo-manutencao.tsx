@@ -31,6 +31,7 @@ export function DialogoManutencao({
   ativoPadrao,
   planos = [],
   planoPadrao,
+  podeCriarPeriodica = false,
   manutencao,
   rotulo = "Registrar manutenção",
   variante = "primario",
@@ -42,6 +43,8 @@ export function DialogoManutencao({
   planos?: Pick<PlanoManutencao, "id" | "tipo" | "ativo_id">[];
   /** Já vem escolhida ao abrir pelo "Dar baixa" de uma periódica. */
   planoPadrao?: string;
+  /** Opção "+ Criar nova periódica": só quem cadastra planos (gestor). */
+  podeCriarPeriodica?: boolean;
   manutencao?: Manutencao;
   rotulo?: string;
   variante?: "primario" | "secundario";
@@ -221,7 +224,7 @@ export function DialogoManutencao({
                       {p.tipo}
                     </option>
                   ))}
-                  <option value={NOVA_PERIODICA}>+ Criar nova periódica...</option>
+                  {podeCriarPeriodica && <option value={NOVA_PERIODICA}>+ Criar nova periódica...</option>}
                 </select>
               </Campo>
 

@@ -13,9 +13,15 @@ export async function GET(request: Request) {
 
   try {
     const { error } = await createAdminClient().from("organizacoes").select("id", { head: true, count: "exact" });
-    if (error) return NextResponse.json({ ok: false, banco: error.message }, { status: 503 });
+    // O detalhe vai para o log, não para a resposta: a rota é pública e a
+    // mensagem do banco contava nomes de serviço, papéis e tabelas.
+    if (error) {
+      console.error("[saude] banco", error.message);
+      return NextResponse.json({ ok: false, banco: "erro" }, { status: 503 });
+    }
     return NextResponse.json({ ok: true, banco: "ok" });
   } catch (e) {
-    return NextResponse.json({ ok: false, banco: e instanceof Error ? e.message : "erro" }, { status: 503 });
+    console.error("[saude] banco", e);
+    return NextResponse.json({ ok: false, banco: "erro" }, { status: 503 });
   }
 }

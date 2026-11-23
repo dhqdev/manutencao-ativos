@@ -1,12 +1,11 @@
 import "server-only";
-import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { cache } from "react";
 import { notFound, redirect } from "next/navigation";
 import { obterSessao } from "@/lib/auth/sessao";
 import { createAdminClient } from "@/lib/db/admin";
 import type { EmpresaAdmin, UsoEmpresa, UsuarioAdmin } from "@/components/admin/tipos";
-import { diretorioBase } from "@/lib/arquivos";
+import { diretorioBase, somarPasta } from "@/lib/arquivos";
 import type { SituacaoGroq } from "@/components/admin/integracoes";
 import { resumoGroq } from "@/lib/integracoes";
 
@@ -41,33 +40,6 @@ export const nomeDoSuperadmin = cache(async () => {
   const { data } = await createAdminClient().from("profiles").select("nome").eq("id", sessao.userId).maybeSingle();
   return { nome: data?.nome ?? "Superadmin", email: sessao.email, userId: sessao.userId };
 });
-
-/** Soma os arquivos de uma pasta (com subpastas). Pasta que não existe = zero. */
-async function somarPasta(pasta: string): Promise<{ arquivos: number; bytes: number }> {
-  let arquivos = 0;
-  let bytes = 0;
-  let itens;
-  try {
-    itens = await readdir(pasta, { withFileTypes: true });
-  } catch {
-    return { arquivos, bytes };
-  }
-  for (const item of itens) {
-    const caminho = path.join(pasta, item.name);
-    if (item.isDirectory()) {
-      const sub = await somarPasta(caminho);
-      arquivos += sub.arquivos;
-      bytes += sub.bytes;
-    } else if (item.isFile()) {
-      const info = await stat(caminho).catch(() => null);
-      if (info) {
-        arquivos++;
-        bytes += info.size;
-      }
-    }
-  }
-  return { arquivos, bytes };
-}
 
 /**
  * Uso de cada empresa: banco (admin_uso_empresas) + fotos e anexos no disco

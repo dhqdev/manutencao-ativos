@@ -215,6 +215,13 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   esse papel. Nunca dê a ele o `JWT_SECRET`. Lock versionado (`npm ci`).
 - Segredo novo lido pelo app: passe por `exigir()` de `lib/auth/config.ts`
   (recusa vazio e `TROQUE-...`) e inclua na lista do `infra/deploy.sh`.
+- Cookies: use as constantes de `lib/auth/sessao-cookie.ts` (`__Host-` com
+  HTTPS) e apague com `delete(apagarCookie(NOME))` — o `delete(nome)` simples
+  sai sem Secure e o navegador ignora para `__Host-`.
+- Rota que aceita GET e muda estado (sair, voltar): recuse `pedidoDeOutroSite`.
+- Upload: a rota `/api/arquivos` confere a cota (`cotaPorEmpresaBytes`).
+  Coluna nova que guarda caminho de arquivo: inclua em `caminhosDoBanco()` de
+  `lib/orfaos.ts`, senão a limpeza noturna move os arquivos dela.
 - Limite de tentativas: lista de `{ chave, limite }` em
   `bloqueadoPorTentativas`/`registrarTentativa` (`lib/auth/usuarios.ts`).
   Nunca uma chave só por e-mail com limite baixo: vira jeito de trancar a

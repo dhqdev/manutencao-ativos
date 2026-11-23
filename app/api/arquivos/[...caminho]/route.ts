@@ -9,6 +9,9 @@ import {
   caminhoValido,
   conferirEnvio,
   conferirLeitura,
+  cotaPorEmpresaBytes,
+  diretorioBase,
+  somarPasta,
   tipoDoArquivo,
 } from "@/lib/arquivos";
 
@@ -85,6 +88,14 @@ export async function PUT(request: NextRequest, contexto: Contexto) {
   if (declarado > LIMITE_BYTES) return json(413, { erro: "Arquivo maior que 25 MB." });
   if (!request.body) return json(400, { erro: "Arquivo vazio." });
 
+  // Cota da empresa (a pasta é o primeiro pedaço do caminho, já validado).
+  const cota = cotaPorEmpresaBytes();
+  const usado = Number.isFinite(cota) ? (await somarPasta(path.join(diretorioBase(), caminho.split("/")[0]))).bytes : 0;
+  const ESTOUROU = {
+    erro: `A empresa atingiu o limite de ${Math.round(cota / 1024 / 1024 / 1024 * 10) / 10} GB de fotos e anexos. Apague anexos antigos ou fale com o administrador do sistema.`,
+  };
+  if (usado + Math.max(declarado, 1) > cota) return json(413, ESTOUROU);
+
   const destino = caminhoNoDisco(caminho);
   const temporario = `${destino}.${process.pid}.${Date.now()}.parcial`;
   await mkdir(path.dirname(destino), { recursive: true });
@@ -113,6 +124,10 @@ export async function PUT(request: NextRequest, contexto: Contexto) {
   if (excedeu || total === 0) {
     await rm(temporario, { force: true });
     return json(excedeu ? 413 : 400, { erro: excedeu ? "Arquivo maior que 25 MB." : "Arquivo vazio." });
+  }
+  if (usado + total > cota) {
+    await rm(temporario, { force: true });
+    return json(413, ESTOUROU);
   }
 
   try {

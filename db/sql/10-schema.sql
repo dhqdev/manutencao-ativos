@@ -465,6 +465,17 @@ begin
     return new;
   end if;
 
+  -- Lançar hoje uma manutenção antiga (papelada atrasada) não pode puxar o
+  -- plano para trás: a próxima data voltaria ao passado e o plano apareceria
+  -- vencido mesmo com a manutenção em dia. Só avança com data mais nova
+  -- (ou mesma data com horímetro maior).
+  if p.ultima_data is not null
+     and (new.data_manutencao < p.ultima_data
+          or (new.data_manutencao = p.ultima_data
+              and coalesce(new.horimetro, 0) <= coalesce(p.ultimo_horimetro, 0))) then
+    return new;
+  end if;
+
   update public.planos_manutencao
      set ultima_data      = new.data_manutencao,
          ultimo_horimetro = coalesce(new.horimetro, p.ultimo_horimetro),
@@ -1586,6 +1597,26 @@ create table if not exists public.whatsapp_sessoes (
 alter table public.whatsapp_sessoes enable row level security;
 revoke all on public.whatsapp_sessoes from anon, authenticated;
 grant select, insert, update, delete on public.whatsapp_sessoes to service_role;
+
+-- Conexão apagada (empresa excluída, conta excluída) leva junto as chaves do
+-- número. Antes dependia do app avisar o serviço de WhatsApp; com ele fora do
+-- ar, as credenciais ficavam no banco (e nos backups) para sempre.
+create or replace function public.apagar_sessao_whatsapp()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  delete from public.whatsapp_sessoes where sessao = old.instancia;
+  return old;
+end;
+$$;
+revoke execute on function public.apagar_sessao_whatsapp() from public, anon, authenticated;
+drop trigger if exists trg_apagar_sessao_whatsapp on public.whatsapp_conexoes;
+create trigger trg_apagar_sessao_whatsapp
+  after delete on public.whatsapp_conexoes
+  for each row execute function public.apagar_sessao_whatsapp();
 
 -- Papel próprio do serviço de WhatsApp: só as duas tabelas dele. Antes ele
 -- recebia o JWT_SECRET e assinava tokens de service_role — se o contêiner

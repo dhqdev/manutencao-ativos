@@ -20,6 +20,7 @@ CRON_SECRET='$(aleatorio 32)'
 WHATSAPP_API_KEY='$(aleatorio 32)'
 TRAEFIK_PAINEL_USUARIOS='admin:$(openssl passwd -apr1 senha-de-teste)'
 CADASTRO_ABERTO='true'
+ARQUIVOS_COTA_MB='5120'
 SUPERADMIN_EMAIL='superadmin@teste.com.br'
 SUPERADMIN_SENHA='Superadmin-E2E-2026'
 ENV

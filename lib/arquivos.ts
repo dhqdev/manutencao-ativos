@@ -1,6 +1,6 @@
 import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { rm } from "node:fs/promises";
+import { readdir, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { segredoArquivos } from "@/lib/auth/config";
 
@@ -14,11 +14,22 @@ import { segredoArquivos } from "@/lib/auth/config";
  * Nada é público. O servidor só assina links para caminhos que vieram do
  * banco (já filtrados pelo RLS), com validade curta:
  *
- *   ler    GET /api/arquivos/<caminho>?exp=...&sig=...   (1 h)
+ *   ler    GET /api/arquivos/<caminho>?exp=...&sig=...   (30 min)
  *   enviar PUT /api/arquivos/<caminho>  x-token: exp.sig  (15 min)
  */
 
 export const LIMITE_BYTES = 25 * 1024 * 1024;
+
+/**
+ * Espaço de fotos e anexos por empresa (ARQUIVOS_COTA_MB, padrão 5 GB; 0 = sem
+ * limite). Sem cota, uma empresa (ou um técnico com o celular em loop) enchia
+ * o disco da VM e derrubava o sistema de todo mundo.
+ */
+export function cotaPorEmpresaBytes() {
+  const mb = Number(process.env.ARQUIVOS_COTA_MB?.trim() || 5120);
+  return Number.isFinite(mb) && mb > 0 ? mb * 1024 * 1024 : Infinity;
+}
+
 
 const TIPOS: Record<string, string> = {
   jpg: "image/jpeg",
@@ -75,16 +86,20 @@ export function rotaDoArquivo(caminho: string) {
   return `/api/arquivos/${caminho.split("/").map(encodeURIComponent).join("/")}`;
 }
 
-/** Link de leitura com validade (padrão: 1 hora). */
-export function urlAssinada(caminho: string, segundos = 3600) {
-  // Arredonda a validade para a hora cheia seguinte: o link fica igual por
-  // um tempo e o navegador reaproveita o cache da imagem.
-  const exp = Math.ceil((agora() + segundos) / 3600) * 3600;
+/**
+ * Link de leitura com validade (padrão: 30 min). Curto porque o link vale
+ * para qualquer um que o tenha (encaminhado, no histórico, num print):
+ * quem saiu da equipe não deve seguir abrindo anexos por horas.
+ */
+export function urlAssinada(caminho: string, segundos = 1800) {
+  // Arredonda para os 15 min seguintes: o link fica igual por um tempo e o
+  // navegador reaproveita o cache da imagem (vale de 30 a 45 min).
+  const exp = Math.ceil((agora() + segundos) / 900) * 900;
   return `${rotaDoArquivo(caminho)}?exp=${exp}&sig=${assinar("ler", caminho, String(exp))}`;
 }
 
 /** Mesma ordem da entrada; caminho vazio ou inválido vira null. */
-export function urlsAssinadas(caminhos: (string | null | undefined)[], segundos = 3600) {
+export function urlsAssinadas(caminhos: (string | null | undefined)[], segundos = 1800) {
   return caminhos.map((c) => (c && caminhoValido(c) ? urlAssinada(c, segundos) : null));
 }
 
@@ -117,4 +132,31 @@ export async function removerArquivos(caminhos: (string | null | undefined)[]) {
       rm(caminhoNoDisco(c), { force: true }).catch((e) => console.error("[arquivos] remover", c, e)),
     ),
   );
+}
+
+/** Soma os arquivos de uma pasta (com subpastas). Pasta que não existe = zero. */
+export async function somarPasta(pasta: string): Promise<{ arquivos: number; bytes: number }> {
+  let arquivos = 0;
+  let bytes = 0;
+  let itens;
+  try {
+    itens = await readdir(pasta, { withFileTypes: true });
+  } catch {
+    return { arquivos, bytes };
+  }
+  for (const item of itens) {
+    const caminho = path.join(pasta, item.name);
+    if (item.isDirectory()) {
+      const sub = await somarPasta(caminho);
+      arquivos += sub.arquivos;
+      bytes += sub.bytes;
+    } else if (item.isFile()) {
+      const info = await stat(caminho).catch(() => null);
+      if (info) {
+        arquivos++;
+        bytes += info.size;
+      }
+    }
+  }
+  return { arquivos, bytes };
 }

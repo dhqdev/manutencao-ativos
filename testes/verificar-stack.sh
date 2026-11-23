@@ -35,6 +35,10 @@ confere 401 "CRON_SECRET errado recusa" "$BASE/api/notificacoes/disparar" -H "Au
 r=$("${C[@]}" -H "Authorization: Bearer $CRON_SECRET" "$BASE/api/notificacoes/disparar")
 echo "$r" | grep -q '"verificadas"' && ok "com CRON_SECRET roda ($r)" || erro "rotina: $r"
 
+confere 401 "limpeza de órfãos sem CRON_SECRET recusa" "$BASE/api/rotinas/orfaos" -X POST
+r=$("${C[@]}" -X POST -H "Authorization: Bearer $CRON_SECRET" "$BASE/api/rotinas/orfaos")
+echo "$r" | grep -q '"ok":true' && ok "limpeza de órfãos roda ($r)" || erro "limpeza de órfãos: $r"
+
 echo "— arquivos"
 confere 403 "arquivo sem assinatura recusado" "$BASE/api/arquivos/11111111-2222-3333-4444-555555555555/x/a.pdf"
 confere 403 "envio sem token recusado" "$BASE/api/arquivos/11111111-2222-3333-4444-555555555555/x/a.pdf" -X PUT --data-binary "x"

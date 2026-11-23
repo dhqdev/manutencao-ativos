@@ -1,8 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
+  COOKIES_ANTIGOS,
   COOKIE_SESSAO,
   COOKIE_SESSAO_ADMIN,
   DURACAO_COOKIE_SEGUNDOS,
+  apagarCookie,
   assinarCookieSessao,
   lerCookieSessao,
   opcoesCookieSessao,
@@ -90,6 +92,27 @@ export async function proxySessao(request: NextRequest) {
     return aplicarCabecalhos(response, csp);
   }
 
+  // Cookie com o nome antigo (antes do prefixo __Host-): regrava com o nome
+  // novo e recarrega a mesma página, para ninguém ser deslogado na troca.
+  const migrar = (
+    [
+      [COOKIES_ANTIGOS.sessao, COOKIE_SESSAO],
+      [COOKIES_ANTIGOS.admin, COOKIE_SESSAO_ADMIN],
+    ] as const
+  ).filter(([antigo, novo]) => antigo !== novo && request.cookies.has(antigo) && !request.cookies.has(novo));
+  if (migrar.length && request.method === "GET") {
+    const recarregar = NextResponse.redirect(request.nextUrl.clone());
+    for (const [antigo, novo] of migrar) {
+      const dados = lerCookieSessao(request.cookies.get(antigo)?.value);
+      if (dados) {
+        const resta = Math.max(60, dados.exp - Math.floor(Date.now() / 1000));
+        recarregar.cookies.set(novo, request.cookies.get(antigo)!.value, opcoesCookieSessao(resta));
+      }
+      recarregar.cookies.delete(antigo);
+    }
+    return aplicarCabecalhos(recarregar, csp);
+  }
+
   const bruto = request.cookies.get(COOKIE_SESSAO)?.value;
   const sessao = lerCookieSessao(bruto);
   const ehPublica = ROTAS_PUBLICAS.some((r) => pathname === r || pathname.startsWith(r + "/"));
@@ -109,7 +132,7 @@ export async function proxySessao(request: NextRequest) {
     url.search = "";
     url.searchParams.set("redirect", pathname);
     const redirecionamento = NextResponse.redirect(url);
-    if (bruto) redirecionamento.cookies.delete(COOKIE_SESSAO);
+    if (bruto) redirecionamento.cookies.delete(apagarCookie(COOKIE_SESSAO));
     return aplicarCabecalhos(redirecionamento, csp);
   }
 

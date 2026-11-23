@@ -2,7 +2,7 @@ import "server-only";
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/db/admin";
 import { urlSite } from "./config";
-import { COOKIE_SESSAO, COOKIE_SESSAO_ADMIN, lerCookieSessao, opcoesCookieSessao } from "./sessao-cookie";
+import { COOKIE_SESSAO, COOKIE_SESSAO_ADMIN, apagarCookie, lerCookieSessao, opcoesCookieSessao } from "./sessao-cookie";
 
 /**
  * "Entrar como": o superadmin abre o sistema na conta de outra pessoa, sem a
@@ -16,6 +16,16 @@ import { COOKIE_SESSAO, COOKIE_SESSAO_ADMIN, lerCookieSessao, opcoesCookieSessao
  */
 
 export const MINUTOS_ENTRAR_COMO = 60;
+
+/**
+ * Pedido vindo de outro site (link ou <img> apontando para /auth/sair): o
+ * navegador manda o cookie junto num GET, e qualquer página derrubaria a
+ * sessão de quem a abrisse. Sec-Fetch-Site diz de onde veio; sem o
+ * cabeçalho (navegador antigo) segue como antes.
+ */
+export function pedidoDeOutroSite(request: NextRequest) {
+  return request.headers.get("sec-fetch-site") === "cross-site";
+}
 
 function ir(request: NextRequest, caminho: string) {
   return NextResponse.redirect(new URL(caminho, urlSite() || request.nextUrl.origin), { status: 303 });
@@ -49,8 +59,8 @@ export async function voltarAoConsole(request: NextRequest): Promise<NextRespons
   }
 
   const resposta = ir(request, superadmin ? "/admin" : "/login");
-  resposta.cookies.delete(COOKIE_SESSAO_ADMIN);
+  resposta.cookies.delete(apagarCookie(COOKIE_SESSAO_ADMIN));
   if (superadmin) resposta.cookies.set(COOKIE_SESSAO, guardado, opcoesCookieSessao());
-  else resposta.cookies.delete(COOKIE_SESSAO);
+  else resposta.cookies.delete(apagarCookie(COOKIE_SESSAO));
   return resposta;
 }

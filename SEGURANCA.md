@@ -285,7 +285,14 @@ em vez de vazar.
   nova do gestor ou ser excluído derruba a sessão na hora. Duram 30 dias e se
   renovam com o uso.
 - Cookie `httpOnly`, `Secure` (com HTTPS) e `SameSite=Lax`, assinado com
-  `SESSAO_SECRET` — diferente do `JWT_SECRET` do banco.
+  `SESSAO_SECRET` — diferente do `JWT_SECRET` do banco. Com HTTPS o nome leva
+  o prefixo `__Host-` (subdomínio não planta cookie por cima); quem chega com
+  o nome antigo é migrado pelo proxy sem perder a sessão.
+- `/auth/sair` e `/auth/voltar` ignoram pedido vindo de outro site
+  (`Sec-Fetch-Site: cross-site`): um link ou `<img>` alheio não derruba a sessão.
+- O Traefik limita login, cadastro, recuperação e `/auth/*` a ~1 pedido por
+  segundo por IP (rajada de 40), antes de o app gastar CPU com bcrypt.
+- `/api/saude?banco=1` não devolve a mensagem de erro do banco (vai para o log).
 - Link de recuperação de senha: uso único, 30 minutos, só o hash fica no banco.
 - As funções `auth_*` só podem ser executadas pelo `service_role`.
 
@@ -293,11 +300,15 @@ em vez de vazar.
 
 Fotos e anexos ficam no volume `manutencao_arquivos`. Nada é público:
 
-- **Leitura** só com link assinado (HMAC, `ARQUIVOS_SECRET`) de 1 hora, gerado
+- **Leitura** só com link assinado (HMAC, `ARQUIVOS_SECRET`) de 30 minutos, gerado
   para caminhos que vieram do banco já filtrados pelo RLS.
 - **Envio** só com autorização de 15 minutos para **um** caminho, que começa
   obrigatoriamente pela pasta da empresa; leitor não envia.
 - Só imagem (JPG, PNG, WEBP, HEIC) e PDF, até 25 MB, sem sobrescrever.
+- Cota por empresa (`ARQUIVOS_COTA_MB`, padrão 5 GB): uma empresa não enche o
+  disco de todas. Arquivo sem registro no banco vai de madrugada para
+  `.orfaos/` (fora do que a rota serve) e sai de vez em 30 dias; se "quase
+  tudo" parecer órfão, a limpeza não mexe em nada e avisa.
 - Caminhos com `..`, barras extras ou fora do formato são recusados.
 - A resposta vem com `Content-Security-Policy: sandbox` e `nosniff`: mesmo um
   arquivo malicioso não executa nada no navegador.

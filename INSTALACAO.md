@@ -128,6 +128,10 @@ Em 1–2 minutos: `https://SEU_DOMINIO` → entre com o `SUPERADMIN_EMAIL` e a
 > rode `./deploy.sh` de novo. Novos usuários passam a ser criados pelo
 > superadmin (console) ou pelo gestor (Configurações → Equipe).
 
+> Cada empresa tem até `ARQUIVOS_COTA_MB` (padrão 5120, ou seja 5 GB) de fotos
+> e anexos; `0` tira o limite. Arquivos que ficaram no disco sem registro no
+> banco vão toda madrugada para `ARQUIVOS_DIR/.orfaos/` e saem de vez em 30 dias.
+
 ---
 
 ## 7. Trazer os dados do Supabase antigo (opcional, uma vez)
@@ -169,7 +173,7 @@ na `main`:
    ```
 2. No GitHub: *Settings → Secrets and variables → Actions*
    - **Secrets**: `DEPLOY_SSH_KEY` = a chave **privada** de deploy.
-     Opcional: `DEPLOY_KNOWN_HOSTS` = saída de `ssh-keyscan IP_DA_VM` (mais seguro).
+     Obrigatório: `DEPLOY_KNOWN_HOSTS` = saída de `ssh-keyscan -H IP_DA_VM` (confira a impressão digital no servidor; sem ela o deploy não conecta).
    - **Variables**: `DEPLOY_HOST` = IP ou nome da VM.
      Opcionais: `DEPLOY_USUARIO` (padrão `ubuntu`), `DEPLOY_PASTA` (padrão `/opt/manutencao`).
 
