@@ -124,7 +124,9 @@ export async function recuperarSenha(_prev: EstadoForm, formData: FormData): Pro
     await registrarTentativa(chave, false);
 
     const usuario = await usuarioPorEmail(email);
-    if (usuario) {
+    // A senha do superadmin é a da stack: um link de recuperação não serviria
+    // para nada além de abrir uma sessão dele sem senha.
+    if (usuario && !usuario.superadmin) {
       const token = await criarTokenRecuperacao(usuario.id);
       const link = `${await origem()}/auth/confirmar?tipo=recuperacao&token=${token}`;
       await enviarEmail({

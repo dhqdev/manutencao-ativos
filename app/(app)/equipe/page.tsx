@@ -16,7 +16,7 @@ type Perfil = {
   telefone: string | null;
 };
 
-type Acesso = { user_id: string; ultimo_acesso: string | null; sessoes_ativas: number };
+type Acesso = { user_id: string; ultimo_acesso: string | null; sessoes_ativas: number; conta_da_empresa: boolean };
 
 export default async function EquipePage() {
   const { orgId, userId, papel, organizacao } = await getContexto();
@@ -45,6 +45,7 @@ export default async function EquipePage() {
     telefone: perfilDe.get(m.user_id)?.telefone ?? null,
     ultimo_acesso: porUsuario.get(m.user_id)?.ultimo_acesso ?? null,
     sessoes_ativas: porUsuario.get(m.user_id)?.sessoes_ativas ?? 0,
+    conta_da_empresa: porUsuario.get(m.user_id)?.conta_da_empresa ?? false,
   }));
 
   return (

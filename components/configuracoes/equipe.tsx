@@ -87,6 +87,8 @@ export type Membro = {
   telefone: string | null;
   ultimo_acesso: string | null;
   sessoes_ativas: number;
+  /** Login criado por esta empresa e só dela: o gestor pode trocar senha, desconectar e editar. */
+  conta_da_empresa: boolean;
 };
 
 type CredenciaisOk = Extract<Credenciais, { ok: true }>;
@@ -534,19 +536,22 @@ function LinhaMembro({
                 <LoaderCircle className="h-4 w-4 animate-spin" />
               </span>
             ) : (
-              <>
-                <BotaoIcone titulo="Editar dados" onClick={() => aoEditar(m)}>
-                  <Pencil className="h-4 w-4" />
-                </BotaoIcone>
-                <BotaoIcone titulo="Gerar nova senha" onClick={novaSenha}>
-                  <KeyRound className="h-4 w-4" />
-                </BotaoIcone>
-                {conectado && (
-                  <BotaoIcone titulo="Desconectar de todos os aparelhos" onClick={desconectar}>
-                    <LogOut className="h-4 w-4" />
+              m.conta_da_empresa && (
+                // Conta que a pessoa mesma criou é dela: senha e dados, só ela troca.
+                <>
+                  <BotaoIcone titulo="Editar dados" onClick={() => aoEditar(m)}>
+                    <Pencil className="h-4 w-4" />
                   </BotaoIcone>
-                )}
-              </>
+                  <BotaoIcone titulo="Gerar nova senha" onClick={novaSenha}>
+                    <KeyRound className="h-4 w-4" />
+                  </BotaoIcone>
+                  {conectado && (
+                    <BotaoIcone titulo="Desconectar de todos os aparelhos" onClick={desconectar}>
+                      <LogOut className="h-4 w-4" />
+                    </BotaoIcone>
+                  )}
+                </>
+              )
             )}
             <BotaoExcluir
               compacto

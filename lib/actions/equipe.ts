@@ -176,9 +176,10 @@ export async function alterarPapel(userId: string, papel: PapelMembro): Promise<
 /**
  * Confere se o gestor pode mexer na conta (senha, sessões, nome) desta pessoa.
  *
- * Só vale para quem participa APENAS desta empresa: sem essa trava, o gestor
- * de uma empresa poderia trocar a senha de alguém que é dono de outra — e
- * entrar nos dados dela.
+ * Só vale para o login que ESTA empresa criou ("Criar usuário") e que participa
+ * apenas dela. Sem isso, o gestor de uma empresa trocava a senha de quem é dono
+ * de outra — ou do superadmin, se o pusesse na equipe — e entrava no lugar dele.
+ * Quem criou a própria conta é dono dela: a senha se troca por "Esqueci minha senha".
  */
 async function alvoDaEquipe(
   userId: string,
@@ -194,7 +195,8 @@ async function alvoDaEquipe(
     .eq("user_id", userId);
 
   const aqui = vinculos?.find((v) => v.org_id === orgId);
-  if (!aqui) return { ok: false, erro: "Esta pessoa não faz parte da equipe." };
+  const conta = aqui ? await usuarioPorId(userId) : null;
+  if (!aqui || !conta || conta.superadmin) return { ok: false, erro: "Esta pessoa não faz parte da equipe." };
   if (aqui.papel === "proprietario") {
     return { ok: false, erro: `Não é possível ${oQue} do proprietário por aqui.` };
   }
@@ -202,6 +204,12 @@ async function alvoDaEquipe(
     return {
       ok: false,
       erro: `Esta pessoa também participa de outra empresa, então não dá para ${oQue} por aqui. Para a senha, ela pode usar "Esqueci minha senha" no login.`,
+    };
+  }
+  if (conta.app_metadata?.convite_org !== orgId) {
+    return {
+      ok: false,
+      erro: `Esta pessoa criou a própria conta, então não dá para ${oQue} por aqui. Para a senha, ela pode usar "Esqueci minha senha" no login.`,
     };
   }
   return { ok: true, orgId };

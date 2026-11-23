@@ -210,6 +210,22 @@ await passo("gestor cria acesso para um técnico", async () => {
   await page.getByText("Acesso pronto").waitFor();
 });
 
+await passo("gestor não consegue pôr o superadmin na equipe (nem trocar a senha dele)", async () => {
+  await page.goto("/equipe");
+  await page.getByRole("button", { name: "Nova pessoa" }).click();
+  const form = page.locator("form").filter({ has: page.locator('input[placeholder="Nome da pessoa"]') });
+  await form.locator('input[name="nome"]').fill("Superadmin intruso");
+  await form.locator('input[name="email"]').fill(SUPERADMIN.email);
+  await form.locator('input[name="senha"]').fill("Qualquer-2026");
+  await form.getByRole("button", { name: "Criar acesso" }).click();
+  await page.getByText("Nenhum usuário com este e-mail").first().waitFor();
+  await page.goto("/equipe");
+  await page.getByText("Técnico E2E").first().waitFor();
+  verdade((await page.getByText(SUPERADMIN.email).count()) === 0, "o superadmin entrou na equipe da empresa!");
+  // O login que a empresa criou continua administrável por ela.
+  await page.getByRole("button", { name: "Gerar nova senha" }).first().waitFor();
+});
+
 await passo("equipe mostra o técnico, o último acesso e filtra pela busca", async () => {
   await page.goto("/equipe");
   await page.getByText("Técnico E2E").first().waitFor();

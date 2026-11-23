@@ -369,7 +369,12 @@ begin
     raise exception 'Não é possível criar outro proprietário.';
   end if;
 
-  select id into v_alvo from auth.users where lower(email) = lower(trim(p_email)) limit 1;
+  -- O superadmin nunca entra em equipe: se entrasse, o gestor passaria a
+  -- "administrar" a conta dele (trocar a senha) e tomaria o console. Fica com
+  -- a mesma resposta de e-mail inexistente, para não revelar quem ele é.
+  select id into v_alvo from auth.users
+   where lower(email) = lower(trim(p_email)) and not superadmin
+   limit 1;
 
   if v_alvo is null then
     raise exception 'Nenhum usuário com este e-mail. Peça para a pessoa criar a conta primeiro.';
@@ -547,22 +552,15 @@ drop policy if exists membros_select on public.org_membros;
 create policy membros_select on public.org_membros for select to authenticated
   using (org_id in (select public.user_org_ids()));
 
--- Escrita separada por comando (nunca FOR ALL: isso também pegaria o SELECT
--- e criaria recursão com a policy de leitura acima).
+-- Sem escrita direta: entrar, sair e trocar de papel passa só pelas funções
+-- (adicionar_membro, alterar_papel_membro, remover_membro, admin_*), que
+-- conferem as regras — superadmin fora, um proprietário só, ninguém se
+-- promove. Uma policy de insert deixava o gestor pôr qualquer conta na equipe.
 drop policy if exists membros_write on public.org_membros;
-
 drop policy if exists membros_insert on public.org_membros;
-create policy membros_insert on public.org_membros for insert to authenticated
-  with check (org_id in (select public.user_admin_org_ids()));
-
 drop policy if exists membros_update on public.org_membros;
-create policy membros_update on public.org_membros for update to authenticated
-  using (org_id in (select public.user_admin_org_ids()))
-  with check (org_id in (select public.user_admin_org_ids()));
-
 drop policy if exists membros_delete on public.org_membros;
-create policy membros_delete on public.org_membros for delete to authenticated
-  using (org_id in (select public.user_admin_org_ids()));
+revoke insert, update, delete on public.org_membros from anon, authenticated;
 
 -- Policies das tabelas de dados (mesmo padrão para todas) ---------------------
 do $$
@@ -1136,7 +1134,12 @@ begin
     raise exception 'Não é possível criar outro proprietário.';
   end if;
 
-  select id into v_alvo from auth.users where lower(email) = lower(trim(p_email)) limit 1;
+  -- O superadmin nunca entra em equipe: se entrasse, o gestor passaria a
+  -- "administrar" a conta dele (trocar a senha) e tomaria o console. Fica com
+  -- a mesma resposta de e-mail inexistente, para não revelar quem ele é.
+  select id into v_alvo from auth.users
+   where lower(email) = lower(trim(p_email)) and not superadmin
+   limit 1;
 
   if v_alvo is null then
     raise exception 'Nenhum usuário com este e-mail. Use "Criar usuário" para cadastrar a pessoa.';

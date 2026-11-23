@@ -163,7 +163,7 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
 - Tabela nova: `org_id ... references organizacoes on delete cascade`, índice
   em `org_id`, `enable row level security` e policies separadas por comando
   (select para `user_org_ids()`, escrita para `user_admin_org_ids()` ou
-  `user_org_ids_escrita()`). Nunca `for all` em `org_membros` (recursão).
+  `user_org_ids_escrita()`). Nunca `for all` em `org_membros` (recursão); ela nem tem escrita direta.
   Se referencia outra tabela da empresa, inclua no trigger `garantir_mesma_empresa`.
 - Funções: `security definer` + `set search_path = public` (ou `public, auth`).
   No Postgres toda função nasce executável por PUBLIC: **revogue** de
@@ -189,8 +189,15 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   (o quadro "O que cada papel pode fazer" ali espelha `lib/permissoes.ts`).
 - Equipe tem tela própria (`/equipe`, no grupo Administração do menu). Ação que
   mexe na conta de outra pessoa (senha, dados, sessões) passa por
-  `alvoDaEquipe()` em `lib/actions/equipe.ts`: só quem participa **apenas**
-  desta empresa e não é proprietário.
+  `alvoDaEquipe()` em `lib/actions/equipe.ts`: só o login que **esta** empresa
+  criou (`app_metadata.convite_org`), que participa apenas dela, não é
+  proprietário nem superadmin. A tela esconde os botões pelo
+  `conta_da_empresa` de `equipe_acessos()`.
+- Superadmin nunca entra em equipe nem tem a senha trocada pelo app (só pela
+  stack). Função nova que põe alguém numa empresa ou troca senha: recuse
+  `superadmin` no banco.
+- `org_membros` não tem policy de escrita: entrar/sair/trocar papel só por
+  função `security definer` que confere as regras.
 - Nada de efeito em todo clique (as faíscas foram tiradas a pedido do dono).
   Enfeite é discreto, `aria-hidden`, `pointer-events-none`, `no-print` e some
   com `prefers-reduced-motion`.

@@ -114,9 +114,15 @@ Usuários criados pelo gestor entram direto na empresa pelo trigger
 `handle_new_user`, que lê o convite de `raw_app_meta_data` — campo que só a
 chave de serviço define. Ler de `raw_user_meta_data` (preenchido pelo
 formulário público de cadastro) deixaria qualquer pessoa se colocar dentro de
-outra empresa. A troca de senha pelo gestor só vale para quem participa
-apenas daquela empresa, para um gestor não tomar a conta do dono de outra.
-A mesma trava (`alvoDaEquipe` em `lib/actions/equipe.ts`) vale para editar
+outra empresa. A troca de senha pelo gestor só vale para o login que a
+própria empresa criou ("Criar usuário") e que participa apenas dela: um gestor
+não toma a conta do dono de outra empresa, nem de quem criou a própria conta.
+O superadmin nunca entra em equipe (`adicionar_membro` responde como se o
+e-mail não existisse) e a senha dele só muda pela stack: `auth_definir_senha`
+recusa, e "Esqueci minha senha" não manda link para ele. Sem essas travas, o
+gestor de qualquer empresa punha o e-mail do superadmin na equipe, gerava uma
+senha nova e entrava no console. `org_membros` não tem escrita direta: só as
+funções mexem nela. A mesma trava (`alvoDaEquipe` em `lib/actions/equipe.ts`) vale para editar
 nome/cargo/telefone e para desconectar alguém da equipe. O último acesso e as
 sessões abertas da tela Equipe vêm de `equipe_acessos()` (`db/sql/60-equipe.sql`),
 que só responde para membros da empresa pedida e devolve só esses dois dados.

@@ -74,6 +74,12 @@ security definer
 set search_path = public, auth
 as $$
 begin
+  -- A senha do superadmin é a da stack (o migrador acerta a cada deploy, por
+  -- auth.definir_superadmin). Nenhum caminho do app troca: nem gestor, nem
+  -- "Esqueci minha senha", nem o próprio console.
+  if exists (select 1 from auth.users where id = p_id and superadmin) then
+    raise exception 'A senha do superadmin é definida na stack (SUPERADMIN_SENHA).' using errcode = '42501';
+  end if;
   update auth.users set encrypted_password = p_hash, updated_at = now() where id = p_id;
   if not found then
     raise exception 'Usuário não encontrado.' using errcode = 'P0002';
