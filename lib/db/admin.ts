@@ -18,3 +18,16 @@ export function createAdminClient() {
     timeout: 30_000,
   });
 }
+
+/**
+ * Pede ao PostgREST para reler o esquema (sistema_recarregar_esquema, em
+ * 80-esquema.sql) e dá um instante para ele terminar. Para quando o banco já
+ * tem a função/tabela nova mas o PostgREST ainda responde PGRST202/PGRST205:
+ * o aviso do migrador se perdeu. Quem chama tenta a operação mais uma vez.
+ */
+export async function recarregarEsquema(esperaMs = 1500) {
+  const { error } = await createAdminClient().rpc("sistema_recarregar_esquema");
+  if (error) return false;
+  await new Promise((r) => setTimeout(r, esperaMs));
+  return true;
+}

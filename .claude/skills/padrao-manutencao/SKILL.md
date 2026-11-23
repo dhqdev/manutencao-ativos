@@ -83,7 +83,11 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   mensagens de `raise exception` das nossas funções passam como vieram.
   PGRST202/PGRST205 (função/tabela que o banco ainda não tem: imagem nova sem
   o migrador ter rodado) viram `BANCO_DESATUALIZADO`; ação que repassa
-  `error.message` cru confere `esquemaDesatualizado(error)` antes.
+  `error.message` cru confere `esquemaDesatualizado(error)` antes. Se o
+  migrador rodou e só o PostgREST ficou com o cache velho,
+  `recarregarEsquema()` (`lib/db/admin.ts` → `sistema_recarregar_esquema()`
+  em `80-esquema.sql`) pede para ele reler; tente a chamada mais uma vez
+  depois (como em `adminEntrarComo`).
 - Permissões por papel ficam em `lib/permissoes.ts` e **espelham** o RLS.
   Papéis: proprietário / gestor (tudo) · técnico (registra manutenções, anexos,
   movimenta pneus) · leitor (só consulta).

@@ -19,7 +19,7 @@ import {
   encerrarSessoesDoUsuario,
   usuarioPorId,
 } from "@/lib/auth/usuarios";
-import { createAdminClient } from "@/lib/db/admin";
+import { createAdminClient, recarregarEsquema } from "@/lib/db/admin";
 import { removerArquivos } from "@/lib/arquivos";
 import { desconectar } from "@/lib/whatsapp";
 import { BANCO_DESATUALIZADO, esquemaDesatualizado, exigirId, mensagemErro, texto, textoObrigatorio, type Resultado } from "@/lib/form";
@@ -217,13 +217,17 @@ export async function adminEntrarComo(userId: string): Promise<Resultado> {
     if (!meuCookie) return { ok: false, erro: "Sua sessão expirou. Entre de novo." };
 
     const h = await headers();
-    const { data: sid, error } = await admin.rpc("auth_entrar_como", {
-      p_admin: sessao.userId,
-      p_user: userId,
-      p_minutos: MINUTOS_ENTRAR_COMO,
-      p_ip: ipDoCliente(h),
-      p_agente: h.get("user-agent"),
-    });
+    const entrar = () =>
+      admin.rpc("auth_entrar_como", {
+        p_admin: sessao.userId,
+        p_user: userId,
+        p_minutos: MINUTOS_ENTRAR_COMO,
+        p_ip: ipDoCliente(h),
+        p_agente: h.get("user-agent"),
+      });
+    let { data: sid, error } = await entrar();
+    // Banco já atualizado, PostgREST com o cache velho: pede para reler e tenta de novo.
+    if (esquemaDesatualizado(error) && (await recarregarEsquema())) ({ data: sid, error } = await entrar());
     // As recusas da função (bloqueado, sem empresa...) já vêm em português.
     if (esquemaDesatualizado(error)) return { ok: false, erro: BANCO_DESATUALIZADO };
     if (error || !sid) return { ok: false, erro: error?.message ?? "Não foi possível entrar na conta." };

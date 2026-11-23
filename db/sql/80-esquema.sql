@@ -17,3 +17,20 @@ create table if not exists public.sistema_esquema (
 
 alter table public.sistema_esquema enable row level security;
 revoke all on public.sistema_esquema from public, anon, authenticated, service_role;
+
+-- O app pede ao PostgREST para reler o esquema quando bate numa função ou
+-- tabela que ele ainda não conhece (PGRST202/PGRST205): o aviso do migrador
+-- se perde se o PostgREST estava reconectando, e ele seguia com o cache
+-- antigo até alguém reiniciá-lo. Só o servidor chama (recarregarEsquema()
+-- em lib/db/admin.ts).
+create or replace function public.sistema_recarregar_esquema()
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  select pg_notify('pgrst', 'reload schema');
+$$;
+
+revoke execute on function public.sistema_recarregar_esquema() from public, anon, authenticated;
+grant execute on function public.sistema_recarregar_esquema() to service_role;
