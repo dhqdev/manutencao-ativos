@@ -78,7 +78,8 @@ begin
   end if;
 
   update auth.users set encrypted_password = crypt(p_senha, gen_salt('bf', 10)) where id = v_id;
-  delete from auth.sessoes where user_id = v_id;   -- senha nova: quem estava dentro sai
+  -- Senha nova: quem estava dentro sai — inclusive os "Entrar como" abertos por ele.
+  delete from auth.sessoes where user_id = v_id or aberta_por = v_id;
   return 'senha atualizada';
 end;
 $$;

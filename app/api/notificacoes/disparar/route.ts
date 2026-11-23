@@ -99,7 +99,8 @@ async function registrar(
 export async function GET(request: NextRequest) {
   const segredo = process.env.CRON_SECRET?.trim();
 
-  if (!segredo) {
+  // Valor de exemplo (TROQUE-...) é público: vale como não configurada.
+  if (!segredo || /^TROQUE/.test(segredo)) {
     return NextResponse.json(
       { erro: "CRON_SECRET não configurada. A rotina fica desligada até você definir a variável." },
       { status: 503 },

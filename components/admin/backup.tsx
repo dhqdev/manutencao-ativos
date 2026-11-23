@@ -153,11 +153,12 @@ export function CartaoBackup({ situacao }: { situacao: SituacaoBackup }) {
               <input name="dias" type="number" min={1} max={3650} className="campo" defaultValue={b2.dias} />
             </Campo>
             <Campo
-              label="Senha de criptografia (opcional)"
+              label="Senha de criptografia"
+              obrigatorio={!b2.criptografado}
               hint={
                 b2.criptografado
                   ? "Ligada. Em branco mantém a atual. Sem ela o backup não abre: guarde num lugar seguro."
-                  : "Criptografa tudo antes de sair do servidor. Guarde: sem ela o backup não abre."
+                  : "Obrigatória: criptografa tudo antes de sair do servidor. Guarde: sem ela o backup não abre."
               }
             >
               <input
@@ -166,15 +167,10 @@ export function CartaoBackup({ situacao }: { situacao: SituacaoBackup }) {
                 className="campo"
                 autoComplete="new-password"
                 placeholder={b2.criptografado ? "••••••••" : ""}
+                required={!b2.criptografado}
               />
             </Campo>
           </div>
-          {b2.criptografado && (
-            <label className="flex items-center gap-2 text-sm text-slate-700">
-              <input type="checkbox" name="sem_cripto" className="h-4 w-4 rounded border-slate-300" />
-              Desligar a criptografia (os backups novos saem sem senha)
-            </label>
-          )}
 
           <div className="flex items-start gap-2 rounded-lg bg-slate-50 px-3 py-2.5 text-xs text-slate-600">
             <FolderTree className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden />

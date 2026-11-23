@@ -1587,6 +1587,23 @@ alter table public.whatsapp_sessoes enable row level security;
 revoke all on public.whatsapp_sessoes from anon, authenticated;
 grant select, insert, update, delete on public.whatsapp_sessoes to service_role;
 
+-- Papel próprio do serviço de WhatsApp: só as duas tabelas dele. Antes ele
+-- recebia o JWT_SECRET e assinava tokens de service_role — se o contêiner
+-- (que roda uma biblioteca grande de terceiros) fosse invadido, o banco
+-- inteiro ia junto. Agora pede ao app um token curto deste papel
+-- (app/api/whatsapp/token) e nunca vê o segredo.
+do $$
+begin
+  if not exists (select 1 from pg_roles where rolname = 'whatsapp_servico') then
+    create role whatsapp_servico nologin noinherit bypassrls;
+  end if;
+end $$;
+grant whatsapp_servico to authenticator;
+grant usage on schema public to whatsapp_servico;
+revoke all on all tables in schema public from whatsapp_servico;
+grant select, insert, update, delete on public.whatsapp_sessoes to whatsapp_servico;
+grant select (instancia), update on public.whatsapp_conexoes to whatsapp_servico;
+
 -- 2. Destinatários do resumo --------------------------------------------------
 alter table public.whatsapp_conexoes
   add column if not exists destinatarios text[] not null default '{}';

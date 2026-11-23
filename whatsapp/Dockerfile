@@ -5,8 +5,10 @@ FROM node:22-slim
 ENV NODE_ENV=production
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm install --omit=dev --no-audit --no-fund && npm cache clean --force
+# Lock versionado + npm ci: a imagem leva exatamente as versões testadas no CI
+# (o Baileys é release candidate; um "^" a mais trazia código que ninguém viu).
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
 
 COPY src ./src
 

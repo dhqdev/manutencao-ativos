@@ -19,6 +19,9 @@ if [ -n "$SA_EMAIL" ]; then
   if ! printf '%s' "$SA_EMAIL" | grep -Eq '^[^@]+@[^@]+\.[^@]+$'; then
     echo "[migrador] AVISO: SUPERADMIN_EMAIL inválido ($SA_EMAIL). Superadmin não foi alterado." >&2
     SA_EMAIL=""
+  elif printf '%s' "$SA_SENHA" | grep -q '^TROQUE'; then
+    echo "[migrador] AVISO: SUPERADMIN_SENHA ainda com o valor de exemplo (TROQUE-...), que é público. Superadmin não foi alterado." >&2
+    SA_EMAIL=""
   elif [ "${#SA_SENHA}" -lt 8 ] || [ "${#SA_SENHA}" -gt 72 ]; then
     echo "[migrador] AVISO: SUPERADMIN_SENHA precisa ter de 8 a 72 caracteres. Superadmin não foi alterado." >&2
     SA_EMAIL=""

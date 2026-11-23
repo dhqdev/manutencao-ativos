@@ -25,7 +25,14 @@ export async function createClient(): Promise<Db> {
 
   if (sessao) {
     const token = assinarJwt(
-      { sub: sessao.userId, email: sessao.email, role: "authenticated" },
+      {
+        sub: sessao.userId,
+        email: sessao.email,
+        role: "authenticated",
+        // "Entrar como": o banco anota cada alteração feita nesta sessão
+        // (db/sql/79-entrar-como-auditoria.sql). Vem da sessão do banco, nunca do navegador.
+        ...(sessao.entradaComo ? { entrada_como: sessao.sessaoId } : {}),
+      },
       segredoBanco(),
       300,
     );

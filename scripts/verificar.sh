@@ -39,7 +39,10 @@ fi
 passo "Serviço de WhatsApp"
 (
   cd whatsapp
-  [ -d node_modules ] || npm install --no-audit --no-fund
+  # Lock versionado: a imagem instala exatamente o que foi testado (npm ci).
+  npm ci --dry-run --ignore-scripts --no-audit --no-fund >/dev/null 2>&1 \
+    || falha "whatsapp/package-lock.json fora de sincronia: rode \`npm install\` em whatsapp/ e commite o lock."
+  [ -d node_modules ] || npm ci --no-audit --no-fund
   node --check src/index.js
   npm test --silent
 )

@@ -11,7 +11,14 @@ function tokenDeServidorValido(cabecalho) {
   if (!h || !c || !a) return false;
   if (createHmac("sha256", JWT_SECRET).update(`${h}.${c}`).digest("base64url") !== a) return false;
   const dados = JSON.parse(Buffer.from(c, "base64url").toString());
-  return dados.role === "service_role" && dados.exp > Date.now() / 1000;
+  return dados.role === "whatsapp_servico" && dados.exp > Date.now() / 1000;
+}
+// Faz também o papel do app: emite o token do banco para quem tem a chave.
+function tokenDoApp() {
+  const b64 = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
+  const agora = Math.floor(Date.now() / 1000);
+  const c = `${b64({ alg: "HS256", typ: "JWT" })}.${b64({ role: "whatsapp_servico", iat: agora, exp: agora + 300 })}`;
+  return `${c}.${createHmac("sha256", JWT_SECRET).update(c).digest("base64url")}`;
 }
 const banco = new Map(); // "sessao|chave" -> valor
 const patches = [];
@@ -19,6 +26,10 @@ const listaIn = (s) => [...decodeURIComponent(s).slice(4, -1).matchAll(/"((?:[^"
 const db = http.createServer(async (req, res) => {
   const u = new URL(req.url, "http://x");
   let corpo = ""; for await (const p of req) corpo += p;
+  if (u.pathname === "/api/whatsapp/token") {
+    if (req.method !== "POST" || req.headers.authorization !== `Bearer ${CHAVE}`) { res.writeHead(401); return res.end("{}"); }
+    res.writeHead(200); return res.end(JSON.stringify({ token: tokenDoApp(), validade: 300 }));
+  }
   const auth = tokenDeServidorValido(req.headers.authorization);
   if (!auth) { res.writeHead(401); return res.end("{}"); }
   const p = Object.fromEntries(u.searchParams);
@@ -37,7 +48,7 @@ await new Promise((r) => db.listen(0, "127.0.0.1", r));
 const URL_DB = `http://127.0.0.1:${db.address().port}`;
 
 const CHAVE = "chave-de-teste-com-mais-de-24-caracteres";
-Object.assign(process.env, { PORT: "39111", WHATSAPP_API_KEY: CHAVE, POSTGREST_URL: URL_DB, JWT_SECRET, WHATSAPP_INTERVALO_ENVIO_MS: "10" });
+Object.assign(process.env, { PORT: "39111", WHATSAPP_API_KEY: CHAVE, POSTGREST_URL: URL_DB, APP_URL: URL_DB, WHATSAPP_INTERVALO_ENVIO_MS: "10" });
 await import("../src/index.js");
 await new Promise((r) => setTimeout(r, 200));
 

@@ -101,6 +101,15 @@ export type ConviteEquipe = {
   created_at: string;
 };
 
+/** Vez em que o superadmin entrou na conta de alguém daqui pelo "Entrar como". */
+export type AcessoSuporte = {
+  inicio: string;
+  fim: string;
+  usuario_email: string;
+  motivo: string | null;
+  alteracoes: number;
+};
+
 type CredenciaisOk = Extract<Credenciais, { ok: true }>;
 
 const DIA = 86_400_000;
@@ -150,9 +159,11 @@ export function PainelEquipe({
   urlSistema,
   agora,
   convites = [],
+  acessosSuporte = [],
 }: {
   membros: Membro[];
   convites?: ConviteEquipe[];
+  acessosSuporte?: AcessoSuporte[];
   userId: string;
   podeGerenciar: boolean;
   urlSistema: string;
@@ -300,6 +311,27 @@ export function PainelEquipe({
 
         <QuadroPermissoes />
       </div>
+
+      {podeGerenciar && acessosSuporte.length > 0 && (
+        <Secao titulo="Acessos do suporte">
+          <p className="border-b border-slate-200 px-4 py-2.5 text-xs text-slate-500 sm:px-5">
+            Vezes em que o administrador do sistema abriu a conta de alguém da equipe para dar suporte (últimos 6 meses).
+          </p>
+          <ul className="divide-y divide-slate-100" data-acessos-suporte>
+            {acessosSuporte.map((a) => (
+              <li key={`${a.inicio}-${a.usuario_email}`} className="px-4 py-3 text-sm sm:px-5">
+                <p className="text-slate-900">
+                  <span className="font-medium">{dataHoraBR(a.inicio)}</span> na conta de {a.usuario_email}
+                </p>
+                <p className="text-xs text-slate-500">
+                  {a.motivo ?? "Sem motivo informado"} · até {dataHoraBR(a.fim)} ·{" "}
+                  {a.alteracoes === 0 ? "nada alterado" : `${a.alteracoes} alteração(ões)`}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </Secao>
+      )}
 
       {podeGerenciar && convites.length > 0 && (
         <Secao titulo="Convites pendentes">

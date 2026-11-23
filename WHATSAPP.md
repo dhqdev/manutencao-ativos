@@ -79,7 +79,11 @@ veja [INSTALACAO.md](INSTALACAO.md)). Ele usa estas variáveis do `infra/.env`:
 | Variável | Para quê |
 |---|---|
 | `WHATSAPP_API_KEY` | Chave entre o app e o serviço (os dois leem do mesmo `.env`) |
-| `JWT_SECRET` | O serviço assina o próprio token de servidor para o PostgREST |
+| `APP_URL` | App na rede interna (`http://app:3000`). O serviço pede a ele um token de 5 min do papel `whatsapp_servico`, que só enxerga as tabelas do WhatsApp. Se faltar, deduz do `POSTGREST_URL` |
+
+O serviço **não** recebe mais o `JWT_SECRET`: se a sua stack antiga ainda passa
+essa variável para ele, tire (ela só serve de reserva se o app não responder,
+e mesmo assim com o papel restrito).
 
 Conferir: `docker service logs -f manutencao_whatsapp` deve mostrar
 "servidor de WhatsApp no ar" e "restaurando sessões salvas".

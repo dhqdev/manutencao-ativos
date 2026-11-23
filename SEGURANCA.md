@@ -151,6 +151,25 @@ bloqueiam), e `/nova-senha`, que não pede, só abre com o cookie curto
 o superadmin não troca senha (da pessoa nem da equipe) nem exclui a conta
 (`ENTRAR_COMO_SEM_SENHA` em `lib/permissoes.ts`).
 
+### 14. "Entrar como" sem rastro do que foi feito
+
+O registro guardava só que o superadmin entrou. Agora o motivo é obrigatório
+e, enquanto ele está na conta, o JWT que o app manda ao banco leva a claim
+`entrada_como`; um gatilho em toda tabela das empresas anota cada inclusão,
+alteração e exclusão (`db/sql/79-entrar-como-auditoria.sql`). O console mostra
+o histórico no detalhe do usuário, e o gestor vê em Equipe → "Acessos do
+suporte" quando, na conta de quem, por quê e quantas alterações. Trocar a
+`SUPERADMIN_SENHA` derruba também os "Entrar como" abertos por ele.
+
+### 15. Valores de exemplo e backup sem criptografia
+
+O `infra/portainer.yml` traz `TROQUE-...` nos segredos, e esse texto é
+público. O `deploy.sh` recusa, o app não sobe com `JWT_SECRET`,
+`SESSAO_SECRET` ou `ARQUIVOS_SECRET` de exemplo, o migrador não aceita a
+`SUPERADMIN_SENHA` de exemplo e o WhatsApp não aceita a chave de exemplo. A
+senha de criptografia do backup no B2 virou obrigatória no console; pelas
+variáveis da stack ela continua opcional, mas o log avisa a cada mudança.
+
 ### 10. Entrada do navegador ia crua para o banco
 
 Ids, tipos (enums) e números chegavam ao Postgres sem conferência: um id
@@ -352,9 +371,15 @@ ou pneu → ativo apontam para outra empresa. Linhas antigas não são tocadas.
 
 As chaves de criptografia de cada número conectado ficam na tabela
 `whatsapp_sessoes`, com RLS ligado e **nenhuma policy**: nem `anon` nem
-`authenticated` leem nada. Só o serviço de WhatsApp (como `service_role`)
-acessa. Quem tiver essas linhas consegue mandar mensagem como a empresa —
-trate o `JWT_SECRET` e os backups com o mesmo cuidado.
+`authenticated` leem nada. O serviço de WhatsApp acessa com o papel
+`whatsapp_servico`, que só tem permissão em `whatsapp_sessoes` e
+`whatsapp_conexoes`. Ele não guarda o `JWT_SECRET`: pede ao app (rede interna,
+com a `WHATSAPP_API_KEY`) um token de 5 minutos desse papel
+(`app/api/whatsapp/token`, que responde 404 pelo Traefik). Antes ele assinava
+tokens de `service_role` — invadir o contêiner do Baileys dava o banco inteiro.
+As dependências dele vão travadas no `whatsapp/package-lock.json` (`npm ci`).
+Quem tiver essas linhas consegue mandar mensagem como a empresa — trate os
+backups com o mesmo cuidado.
 
 ## Atualizador (botão Atualizar do console)
 

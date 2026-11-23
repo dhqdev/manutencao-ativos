@@ -27,6 +27,10 @@ create table if not exists public.sistema_entradas_como (
   agente           text
 );
 
+-- Por que entrou (obrigatório no console): fica no registro e aparece para a
+-- empresa na tela Equipe (79-entrar-como-auditoria.sql).
+alter table public.sistema_entradas_como add column if not exists motivo text;
+
 create index if not exists sistema_entradas_como_usuario on public.sistema_entradas_como (usuario_id, inicio desc);
 create index if not exists sistema_entradas_como_sessao on public.sistema_entradas_como (sessao_id);
 
@@ -38,12 +42,14 @@ grant select, insert, update on public.sistema_entradas_como to service_role;
 
 -- Abre a sessão do "Entrar como" e devolve o id dela. As regras ficam aqui
 -- (e não só no app) para nenhum outro caminho conseguir burlar.
+drop function if exists public.auth_entrar_como(uuid, uuid, int, text, text);
 create or replace function public.auth_entrar_como(
   p_admin   uuid,
   p_user    uuid,
   p_minutos int,
   p_ip      text default null,
-  p_agente  text default null
+  p_agente  text default null,
+  p_motivo  text default null
 )
 returns uuid
 language plpgsql
@@ -75,6 +81,10 @@ begin
     raise exception 'Este usuário não participa de nenhuma empresa: não há sistema para abrir.' using errcode = '42501';
   end if;
 
+  if length(trim(coalesce(p_motivo, ''))) < 5 then
+    raise exception 'Diga por que vai entrar na conta (ex.: "chamado 123: relatório não abre").' using errcode = '22023';
+  end if;
+
   v_expira := now() + make_interval(mins => greatest(5, least(coalesce(p_minutos, 60), 240)));
 
   delete from auth.sessoes where user_id = p_user and expira_em < now();
@@ -85,9 +95,10 @@ begin
   returning id into v_id;
 
   insert into public.sistema_entradas_como
-    (superadmin_id, superadmin_email, usuario_id, usuario_email, sessao_id, expira_em, ip, agente)
+    (superadmin_id, superadmin_email, usuario_id, usuario_email, sessao_id, expira_em, ip, agente, motivo)
   values
-    (p_admin, v_admin.email, p_user, v_alvo.email, v_id, v_expira, left(p_ip, 64), left(p_agente, 300));
+    (p_admin, v_admin.email, p_user, v_alvo.email, v_id, v_expira, left(p_ip, 64), left(p_agente, 300),
+     left(trim(p_motivo), 300));
 
   return v_id;
 end;
@@ -110,9 +121,9 @@ begin
 end;
 $$;
 
-revoke execute on function public.auth_entrar_como(uuid, uuid, int, text, text) from public, anon, authenticated;
+revoke execute on function public.auth_entrar_como(uuid, uuid, int, text, text, text) from public, anon, authenticated;
 revoke execute on function public.auth_sair_entrada_como(uuid) from public, anon, authenticated;
-grant execute on function public.auth_entrar_como(uuid, uuid, int, text, text) to service_role;
+grant execute on function public.auth_entrar_como(uuid, uuid, int, text, text, text) to service_role;
 grant execute on function public.auth_sair_entrada_como(uuid) to service_role;
 
 notify pgrst, 'reload schema';

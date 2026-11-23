@@ -207,6 +207,14 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   mínimo 8, recusa as comuns). Trocar a própria pede a atual; `/nova-senha`
   só com o cookie `recuperacao`. Ação que mexe em senha ou exclui conta recusa
   `entradaComo` com `ENTRAR_COMO_SEM_SENHA`.
+- "Entrar como": tabela nova com `org_id` ganha o gatilho de auditoria sozinha
+  (loop do `79-entrar-como-auditoria.sql`, que roda depois das tabelas). Arquivo
+  SQL com tabela de empresa deve vir antes do 79.
+- Serviço de WhatsApp fala com o banco como `whatsapp_servico` (token do app
+  em `/api/whatsapp/token`). Tabela nova que ele precise: `grant` explícito a
+  esse papel. Nunca dê a ele o `JWT_SECRET`. Lock versionado (`npm ci`).
+- Segredo novo lido pelo app: passe por `exigir()` de `lib/auth/config.ts`
+  (recusa vazio e `TROQUE-...`) e inclua na lista do `infra/deploy.sh`.
 - Limite de tentativas: lista de `{ chave, limite }` em
   `bloqueadoPorTentativas`/`registrarTentativa` (`lib/auth/usuarios.ts`).
   Nunca uma chave só por e-mail com limite baixo: vira jeito de trancar a

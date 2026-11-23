@@ -354,6 +354,9 @@ await passo("console: \"Entrar como\" abre a conta do usuário sem senha e volta
   await page.goto("/admin");
   await page.locator(`li[data-usuario="${GESTOR.email}"] button`).click();
   await page.locator(`[data-detalhe="${GESTOR.email}"]`).getByRole("button", { name: "Entrar como", exact: true }).click();
+  // Motivo obrigatório: fica no registro e a empresa vê na tela Equipe.
+  await page.locator('input[name="motivo"]').fill("Teste E2E: conferir relatório");
+  await page.getByRole("button", { name: "Entrar na conta" }).click();
   await page.waitForURL("**/dashboard");
   await page.locator(`[data-entrar-como="${GESTOR.email}"]`).waitFor();
   // Dados da empresa dele aparecem (a sessão é a do usuário, com o RLS dele).
@@ -368,6 +371,9 @@ await passo("console: \"Entrar como\" abre a conta do usuário sem senha e volta
   await senha.locator('input[name="confirmacao"]').fill("Tomada-Pelo-Admin-2026");
   await senha.getByRole("button", { name: "Alterar senha" }).click();
   await page.getByText(/não dá para trocar senhas/).first().waitFor();
+  // A empresa vê que o suporte entrou e por quê.
+  await page.goto("/equipe");
+  await page.locator("[data-acessos-suporte]").getByText("Teste E2E: conferir relatório").waitFor();
   await page.getByRole("button", { name: "Voltar ao console" }).click();
   await page.waitForURL("**/admin");
   await page.getByRole("heading", { name: "Gerência", exact: true }).waitFor();

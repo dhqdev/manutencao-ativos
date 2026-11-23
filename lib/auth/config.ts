@@ -12,6 +12,11 @@ function exigir(nome: string, tamanhoMinimo = 0) {
       `Variável de ambiente ${nome} não configurada. Confira o arquivo .env do servidor (veja infra/.env.exemplo).`,
     );
   }
+  // O valor de exemplo do infra/portainer.yml é público: com ele qualquer um
+  // assina sessões e tokens do banco. Melhor o app não subir.
+  if (/^TROQUE|TROQUE-/.test(valor)) {
+    throw new Error(`${nome} ainda está com o valor de exemplo (TROQUE-...). Gere um valor seu: openssl rand -hex 32.`);
+  }
   if (valor.length < tamanhoMinimo) {
     throw new Error(`${nome} precisa ter pelo menos ${tamanhoMinimo} caracteres.`);
   }

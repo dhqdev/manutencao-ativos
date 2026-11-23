@@ -10,8 +10,9 @@ import { logger } from "./logger.js";
  * cada deploy, e o número teria de ler o QR de novo toda vez. No banco, o
  * processo pode reiniciar à vontade que as sessões voltam sozinhas.
  *
- * Fala com o PostgREST da stack (rede interna) como service_role, com um JWT
- * assinado aqui mesmo. A tabela não tem nenhuma policy: só o servidor a enxerga.
+ * Fala com o PostgREST da stack (rede interna) com o papel whatsapp_servico,
+ * que só enxerga whatsapp_sessoes e whatsapp_conexoes. O token vem do app
+ * (POST /api/whatsapp/token com a WHATSAPP_API_KEY); o JWT_SECRET não fica aqui.
  */
 
 const TABELA = "whatsapp_sessoes";
@@ -27,18 +28,35 @@ function listaFiltro(valores) {
   return `(${itens.join(",")})`;
 }
 
-// --- Token de servidor (JWT HS256, 5 min) --------------------------------------
+// --- Token do banco (papel whatsapp_servico, 5 min, emitido pelo app) ------------
 let token = null;
 let tokenAte = 0;
 
-function tokenServidor() {
+async function tokenServidor() {
   const agora = Math.floor(Date.now() / 1000);
   if (token && tokenAte - agora > 60) return token;
-  const b64 = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
-  const conteudo = `${b64({ alg: "HS256", typ: "JWT" })}.${b64({ role: "service_role", iat: agora, exp: agora + 300 })}`;
-  token = `${conteudo}.${createHmac("sha256", config.jwtSecret).update(conteudo).digest("base64url")}`;
-  tokenAte = agora + 300;
-  return token;
+  try {
+    const resposta = await fetch(`${config.appUrl}/api/whatsapp/token`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${config.chaveApi}` },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!resposta.ok) {
+      throw new Error(`App recusou o token do banco (${resposta.status}): confira APP_URL e WHATSAPP_API_KEY.`);
+    }
+    const dados = await resposta.json();
+    token = dados.token;
+    tokenAte = agora + Number(dados.validade ?? 300);
+    return token;
+  } catch (err) {
+    if (!config.jwtSecretLegado) throw err;
+    logger.warn({ err }, "app não deu o token do banco; usando o JWT_SECRET legado (tire-o da stack)");
+    const b64 = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
+    const conteudo = `${b64({ alg: "HS256", typ: "JWT" })}.${b64({ role: "whatsapp_servico", iat: agora, exp: agora + 300 })}`;
+    token = `${conteudo}.${createHmac("sha256", config.jwtSecretLegado).update(conteudo).digest("base64url")}`;
+    tokenAte = agora + 300;
+    return token;
+  }
 }
 
 async function rest(caminho, { method = "GET", body, prefer } = {}) {
@@ -50,7 +68,7 @@ async function rest(caminho, { method = "GET", body, prefer } = {}) {
       const resposta = await fetch(url, {
         method,
         headers: {
-          Authorization: `Bearer ${tokenServidor()}`,
+          Authorization: `Bearer ${await tokenServidor()}`,
           "Content-Type": "application/json",
           ...(prefer ? { Prefer: prefer } : {}),
         },

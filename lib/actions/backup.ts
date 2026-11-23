@@ -13,7 +13,7 @@ import {
   validarSenhaCripto,
 } from "@/lib/backup-regras";
 import { createAdminClient } from "@/lib/db/admin";
-import { booleano, inteiro, mensagemErro, texto, textoObrigatorio, type Resultado } from "@/lib/form";
+import { inteiro, mensagemErro, texto, textoObrigatorio, type Resultado } from "@/lib/form";
 
 /**
  * Cartão "Backup no Backblaze B2" do console do superadmin. As credenciais
@@ -48,9 +48,12 @@ async function lerFormulario(fd: FormData) {
   const pasta = normalizarPasta(texto(fd, "pasta"));
   const dias = validarDias(inteiro(fd, "dias"));
 
-  // Senha de criptografia: em branco mantém; "sem_cripto" marcado tira.
+  // Senha de criptografia obrigatória: em branco mantém a salva. O dump leva
+  // senhas (hash), chaves de integração e os dados de todas as empresas; sem
+  // criptografia, quem obtivesse a chave do bucket lia tudo.
   const senhaNova = texto(fd, "senha_criptografia");
-  const senha = booleano(fd, "sem_cripto") ? null : senhaNova ? validarSenhaCripto(senhaNova) : (salvo.b2_senha_criptografia ?? null);
+  const senha = senhaNova ? validarSenhaCripto(senhaNova) : (salvo.b2_senha_criptografia ?? null);
+  if (!senha) throw new Error("Informe a senha de criptografia do backup (guarde-a: sem ela o backup não abre).");
   return { keyId, appKey, bucket, pasta, dias, senha };
 }
 
@@ -82,15 +85,11 @@ export async function adminSalvarBackblaze(fd: FormData): Promise<Resultado> {
       ["b2_bucket", f.bucket],
       ["b2_pasta", f.pasta],
       ["b2_dias", String(f.dias)],
-      ...(f.senha ? [["b2_senha_criptografia", f.senha]] : []),
+      ["b2_senha_criptografia", f.senha],
     ].map(([chave, valor]) => ({ chave, valor, atualizado_em: agora, atualizado_por: sessao.userId }));
 
     const { error } = await db.from("sistema_credenciais").upsert(linhas, { onConflict: "chave" });
     if (error) return { ok: false, erro: error.message };
-    if (!f.senha) {
-      const { error: e2 } = await db.from("sistema_credenciais").delete().eq("chave", "b2_senha_criptografia");
-      if (e2) return { ok: false, erro: e2.message };
-    }
     return pronto();
   } catch (e) {
     return { ok: false, erro: mensagemErro(e) };

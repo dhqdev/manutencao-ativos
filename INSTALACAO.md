@@ -250,7 +250,7 @@ primeiros 10 GB grátis) e compatível com o `rclone`, que já vem na imagem `op
    B2_BUCKET='suaempresa-manutencao-backup'
    B2_PASTA='manutencao'          # pasta dentro do bucket
    B2_DIAS='30'                   # dias que os dumps do banco ficam no B2
-   B2_SENHA_CRIPTOGRAFIA=''       # opcional: criptografa antes de enviar
+   B2_SENHA_CRIPTOGRAFIA=''       # recomendado: criptografa antes de enviar (sem ela o log avisa)
    ```
 
 5. No log do backup deve aparecer `Backblaze B2 conectado (console)` (ou

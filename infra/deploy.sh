@@ -23,7 +23,10 @@ RESOLVER="${RESOLVER_IMAGEM:-always}"
 obrigatorias=(DOMINIO TRAEFIK_DOMINIO ACME_EMAIL POSTGRES_PASSWORD AUTHENTICATOR_PASSWORD JWT_SECRET SESSAO_SECRET ARQUIVOS_SECRET CRON_SECRET WHATSAPP_API_KEY TRAEFIK_PAINEL_USUARIOS)
 for v in "${obrigatorias[@]}"; do
   if [ -z "${!v:-}" ]; then echo "Variável $v vazia em infra/.env" >&2; exit 1; fi
+  # Valor de exemplo é público (está no repositório): quem o lê forja sessões.
+  case "${!v}" in TROQUE*|*TROQUE-*) echo "Variável $v ainda com o valor de exemplo (TROQUE-...). Gere um valor seu." >&2; exit 1;; esac
 done
+case "${SUPERADMIN_SENHA:-}" in TROQUE*) echo "SUPERADMIN_SENHA ainda com o valor de exemplo. Escolha uma senha sua." >&2; exit 1;; esac
 
 if ! docker info --format '{{.Swarm.LocalNodeState}}' | grep -q active; then
   echo "Este servidor não está em modo Swarm. Rode: docker swarm init" >&2

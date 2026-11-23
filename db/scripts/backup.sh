@@ -102,6 +102,7 @@ configurar_b2() {
       # shellcheck disable=SC2086
       if $RC lsf "b2:$BUCKET" --max-depth 1 >/dev/null 2>&1; then
         log "Backblaze B2 conectado ($B2_ORIGEM): $BUCKET/$B2_PASTA_USO (banco por $B2_DIAS_USO dias)$([ "$B2_CRIPTO" = true ] && echo ', criptografado')"
+        [ "$B2_CRIPTO" = true ] || aviso "AVISO: o backup sai para o B2 SEM criptografia (senhas em hash, chaves e dados de todas as empresas). Defina a senha de criptografia no console ou em B2_SENHA_CRIPTOGRAFIA."
       else
         aviso "AVISO: não consegui acessar o bucket $BUCKET no Backblaze B2. Confira o keyID, a applicationKey e o nome do bucket ($B2_ORIGEM)."
       fi

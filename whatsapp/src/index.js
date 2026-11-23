@@ -159,7 +159,7 @@ function restaurarComInsistencia(tentativa = 1) {
       const espera = Math.min(60_000, 2000 * 2 ** Math.min(tentativa, 5));
       logger.warn(
         { err, tentativa },
-        `banco indisponível ao restaurar sessões; tentando de novo em ${espera / 1000}s (confira POSTGREST_URL, JWT_SECRET e o migrador)`,
+        `banco indisponível ao restaurar sessões; tentando de novo em ${espera / 1000}s (confira POSTGREST_URL, APP_URL, WHATSAPP_API_KEY e o migrador)`,
       );
       setTimeout(() => restaurarComInsistencia(tentativa + 1), espera);
     });

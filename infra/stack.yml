@@ -141,7 +141,8 @@ services:
     environment:
       WHATSAPP_API_KEY: ${WHATSAPP_API_KEY}
       POSTGREST_URL: http://rest:3000
-      JWT_SECRET: ${JWT_SECRET}
+      # Sem JWT_SECRET: o token do banco (papel whatsapp_servico) vem do app.
+      APP_URL: http://app:3000
       WHATSAPP_SEMPRE_ONLINE: ${WHATSAPP_SEMPRE_ONLINE:-true}
       WHATSAPP_DIGITANDO: ${WHATSAPP_DIGITANDO:-true}
       WHATSAPP_REJEITAR_CHAMADAS: ${WHATSAPP_REJEITAR_CHAMADAS:-false}

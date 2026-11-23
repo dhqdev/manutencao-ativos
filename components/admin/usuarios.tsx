@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
 import {
   Ban,
   Building2,
@@ -32,7 +32,9 @@ import {
   adminEditarUsuario,
   adminEncerrarSessoes,
   adminEntrarComo,
+  adminEntradasComo,
   adminExcluirUsuario,
+  type EntradaComoRegistro,
   adminRedefinirSenha,
   adminRemoverMembro,
   adminVincularEmpresa,
@@ -379,7 +381,7 @@ function DetalheUsuario({
   const { erro, ocupado, rodar } = useAcao();
   // Um diálogo de cada vez: o painel do Modal tem animação (transform), e um
   // diálogo aberto dentro dele ficaria preso na caixa do painel.
-  const [tela, setTela] = useState<"detalhe" | "editar" | "senha" | "excluir">("detalhe");
+  const [tela, setTela] = useState<"detalhe" | "editar" | "senha" | "excluir" | "entrar">("detalhe");
   const voltar = () => setTela("detalhe");
   const protegido = u.superadmin || eu;
 
@@ -387,13 +389,25 @@ function DetalheUsuario({
   const [erroEntrada, setErroEntrada] = useState<string | null>(null);
   const [entrando, iniciarEntrada] = useTransition();
   const podeEntrar = !protegido && !u.bloqueado && u.empresas.length > 0;
+  const [motivo, setMotivo] = useState("");
   function entrarComo() {
     setErroEntrada(null);
     iniciarEntrada(async () => {
-      const r = await chamarAcao(() => adminEntrarComo(u.id));
+      const r = await chamarAcao(() => adminEntrarComo(u.id, motivo));
       if (r && !r.ok) setErroEntrada(r.erro);
     });
   }
+
+  // Histórico do "Entrar como" nesta conta (quem, quando, por quê, quanto mudou).
+  const [entradas, setEntradas] = useState<EntradaComoRegistro[] | null>(null);
+  useEffect(() => {
+    if (protegido) return;
+    let vivo = true;
+    adminEntradasComo(u.id).then((r) => vivo && setEntradas(r.ok ? r.entradas : []));
+    return () => {
+      vivo = false;
+    };
+  }, [u.id, protegido]);
 
   const dados: [string, ReactNode][] = [
     ["Criado em", dataBR(u.created_at)],
@@ -434,7 +448,7 @@ function DetalheUsuario({
             <Acao
               Icone={entrando ? LoaderCircle : LogIn}
               rotulo="Entrar como"
-              onClick={entrarComo}
+              onClick={() => setTela("entrar")}
               disabled={ocupado || entrando}
             />
           )}
@@ -468,6 +482,22 @@ function DetalheUsuario({
           ))}
         </dl>
 
+        {entradas && entradas.length > 0 && (
+          <div className="rounded-xl border border-slate-200 p-4" data-historico-entrar-como>
+            <p className="text-xs font-medium text-slate-500">"Entrar como" nesta conta</p>
+            <ul className="mt-2 space-y-1.5 text-sm">
+              {entradas.slice(0, 5).map((e) => (
+                <li key={e.inicio} className="text-slate-700">
+                  <span className="font-medium text-slate-900">{dataHoraBR(e.inicio)}</span> · {e.motivo ?? "sem motivo"}{" "}
+                  <span className="text-xs text-slate-500">
+                    ({e.acoes} alteração(ões){e.fim ? "" : ", ainda aberta"})
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {u.superadmin ? (
           <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
             O superadmin vem da stack (<code>SUPERADMIN_EMAIL</code> / <code>SUPERADMIN_SENHA</code>) e só usa este
@@ -494,6 +524,43 @@ function DetalheUsuario({
       </div>
     </Modal>
 
+      <Modal aberto={tela === "entrar"} aoFechar={() => !entrando && voltar()} titulo="Entrar como" largura="max-w-md">
+        <form
+          onSubmit={(ev) => {
+            ev.preventDefault();
+            entrarComo();
+          }}
+        >
+          <div className="space-y-3 px-5 py-5">
+            <p className="text-sm text-slate-600">
+              Você vai abrir o sistema na conta de <strong className="font-medium text-slate-900">{u.email}</strong> por
+              até 1 hora. O motivo e cada alteração que fizer ficam registrados, e a empresa vê isso na tela Equipe.
+            </p>
+            <Campo label="Motivo" obrigatorio>
+              <input
+                name="motivo"
+                required
+                minLength={5}
+                maxLength={300}
+                value={motivo}
+                onChange={(ev) => setMotivo(ev.target.value)}
+                placeholder="Ex.: chamado 123, relatório não abre"
+                className="campo"
+              />
+            </Campo>
+            {erroEntrada && <Erro>{erroEntrada}</Erro>}
+          </div>
+          <RodapeModal>
+            <Botao type="button" variante="secundario" onClick={voltar} disabled={entrando}>
+              Cancelar
+            </Botao>
+            <Botao type="submit" disabled={entrando || motivo.trim().length < 5}>
+              {entrando && <LoaderCircle className="h-4 w-4 animate-spin" />}
+              Entrar na conta
+            </Botao>
+          </RodapeModal>
+        </form>
+      </Modal>
       <EditarUsuario usuario={u} aberto={tela === "editar"} aoFechar={voltar} />
       <NovaSenha
         usuario={u}

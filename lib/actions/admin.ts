@@ -204,10 +204,13 @@ export async function adminExcluirUsuario(userId: string): Promise<Resultado> {
  * Termina com redirect (fora do try): trocar o cookie numa action faz o Next
  * redesenhar a tela atual, e o /admin com o cookie da pessoa daria 404.
  */
-export async function adminEntrarComo(userId: string): Promise<Resultado> {
+export async function adminEntrarComo(userId: string, motivoInformado: string): Promise<Resultado> {
   try {
     const { sessao, admin } = await exigirSuperadmin();
     exigirId(userId, "o usuário");
+    // O motivo fica no registro e a empresa o vê na tela Equipe.
+    const motivo = String(motivoInformado ?? "").trim().slice(0, 300);
+    if (motivo.length < 5) return { ok: false, erro: "Diga por que vai entrar na conta (ex.: chamado 123)." };
     if (sessao.entradaComo) return { ok: false, erro: "Volte ao console antes de entrar em outra conta." };
     if (userId === sessao.userId) return { ok: false, erro: "Esta já é a sua conta." };
 
@@ -226,6 +229,7 @@ export async function adminEntrarComo(userId: string): Promise<Resultado> {
         p_minutos: MINUTOS_ENTRAR_COMO,
         p_ip: ipDoCliente(h),
         p_agente: h.get("user-agent"),
+        p_motivo: motivo,
       });
     let { data: sid, error } = await entrar();
     // Banco já atualizado, PostgREST com o cache velho: pede para reler e tenta de novo.
@@ -245,6 +249,31 @@ export async function adminEntrarComo(userId: string): Promise<Resultado> {
     return falha(e);
   }
   redirect("/dashboard");
+}
+
+export type EntradaComoRegistro = {
+  inicio: string;
+  fim: string | null;
+  expira_em: string;
+  superadmin_email: string;
+  motivo: string | null;
+  ip: string | null;
+  acoes: number;
+};
+
+/** Últimas vezes que o console entrou na conta da pessoa (gaveta de detalhes). */
+export async function adminEntradasComo(
+  userId: string,
+): Promise<{ ok: true; entradas: EntradaComoRegistro[] } | { ok: false; erro: string }> {
+  try {
+    const { admin } = await exigirSuperadmin();
+    exigirId(userId, "o usuário");
+    const { data, error } = await admin.rpc("admin_entradas_como", { p_user: userId });
+    if (error) return { ok: false, erro: error.message };
+    return { ok: true, entradas: (data as EntradaComoRegistro[] | null) ?? [] };
+  } catch (e) {
+    return falha(e);
+  }
 }
 
 // --- Empresas de um usuário (gaveta de detalhes) ----------------------------------

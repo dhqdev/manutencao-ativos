@@ -18,6 +18,18 @@ function inteiro(nome, padrao) {
   return Number.isFinite(n) ? n : padrao;
 }
 
+/** Stack sem APP_URL: o app tem o mesmo nome do PostgREST trocando "rest" por "app". */
+function appAoLadoDoRest(restUrl) {
+  try {
+    const u = new URL(restUrl);
+    u.hostname = u.hostname.replace(/rest$/, "app");
+    u.port = "3000";
+    return u.origin;
+  } catch {
+    return "http://app:3000";
+  }
+}
+
 export const config = {
   porta: inteiro("PORT", 3000),
 
@@ -26,8 +38,18 @@ export const config = {
 
   /** PostgREST da stack (rede interna), ex.: http://rest:3000 */
   restUrl: texto("POSTGREST_URL").replace(/\/+$/, ""),
-  /** Mesmo JWT_SECRET do PostgREST: o serviço assina o próprio token de servidor. */
-  jwtSecret: texto("JWT_SECRET"),
+  /**
+   * App na rede interna. O token do banco (papel whatsapp_servico, 5 min) vem
+   * dele, pedido com a WHATSAPP_API_KEY: este serviço não guarda o JWT_SECRET.
+   */
+  appUrl: (texto("APP_URL") || appAoLadoDoRest(texto("POSTGREST_URL"))).replace(/\/+$/, ""),
+
+  /**
+   * Só para stacks antigas que ainda passam JWT_SECRET: se o app não responder,
+   * assina aqui — mas já com o papel restrito, nunca service_role. Tire a
+   * variável da stack (INSTALACAO.md).
+   */
+  jwtSecretLegado: texto("JWT_SECRET"),
 
   /** Aparece no celular em Configurações → Aparelhos conectados. */
   nomeAparelho: texto("WHATSAPP_NOME_APARELHO", "Gestão de Manutenção"),
@@ -56,10 +78,12 @@ export function validarConfig() {
   const faltando = [];
   if (!config.chaveApi) faltando.push("WHATSAPP_API_KEY");
   if (!config.restUrl) faltando.push("POSTGREST_URL");
-  if (!config.jwtSecret) faltando.push("JWT_SECRET");
 
   if (faltando.length) {
     throw new Error(`Variáveis de ambiente obrigatórias ausentes: ${faltando.join(", ")}`);
+  }
+  if (/^TROQUE/.test(config.chaveApi)) {
+    throw new Error("WHATSAPP_API_KEY ainda com o valor de exemplo (TROQUE-...). Gere uma: openssl rand -hex 32.");
   }
   if (config.chaveApi.length < 24) {
     throw new Error("WHATSAPP_API_KEY muito curta. Use pelo menos 24 caracteres aleatórios.");

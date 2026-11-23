@@ -150,7 +150,8 @@ services:
     environment:
       - WHATSAPP_API_KEY=TROQUE-openssl-rand-hex-32
       - POSTGREST_URL=http://manutencao-rest:3000
-      - JWT_SECRET=TROQUE-openssl-rand-hex-32
+      # Sem JWT_SECRET: o token do banco (papel whatsapp_servico) vem do app.
+      - APP_URL=http://manutencao-app:3000
       - WHATSAPP_SEMPRE_ONLINE=true
       - WHATSAPP_DIGITANDO=true
       - WHATSAPP_REJEITAR_CHAMADAS=false

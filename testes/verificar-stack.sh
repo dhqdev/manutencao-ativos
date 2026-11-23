@@ -50,6 +50,10 @@ interno() { docker run --rm --network manutencao_interna curlimages/curl:latest 
 interno http://whatsapp:3000/saude | grep -q '"ok":true' && ok "serviço de WhatsApp no ar" || erro "WhatsApp não respondeu"
 c=$(interno -o /dev/null -w '%{http_code}' http://whatsapp:3000/sessoes/teste); [ "$c" = "401" ] && ok "WhatsApp exige chave (401)" || erro "WhatsApp sem chave respondeu $c"
 interno -H "Authorization: Bearer $WHATSAPP_API_KEY" http://whatsapp:3000/sessoes/manut_teste | grep -q '"status":"desconectado"' && ok "WhatsApp aceita a chave do app" || erro "WhatsApp recusou a chave"
+# Token do banco do WhatsApp: só pela rede interna e só com a chave.
+interno -X POST -H "Authorization: Bearer $WHATSAPP_API_KEY" http://app:3000/api/whatsapp/token | grep -q '"token"' && ok "app emite o token do WhatsApp na rede interna" || erro "app não emitiu o token do WhatsApp"
+c=$(interno -o /dev/null -w '%{http_code}' -X POST -H "Authorization: Bearer errada" http://app:3000/api/whatsapp/token); [ "$c" = "401" ] && ok "token do WhatsApp exige a chave (401)" || erro "token do WhatsApp sem chave: $c"
+confere 404 "token do WhatsApp não sai pela internet" "$BASE/api/whatsapp/token" -X POST -H "Authorization: Bearer $WHATSAPP_API_KEY"
 
 echo "— migrador terminou"
 docker service ps manutencao_migrador --format '{{.CurrentState}}' | head -1 | grep -q "Complete" && ok "migrador: Complete" || erro "migrador: $(docker service ps manutencao_migrador --format '{{.CurrentState}} {{.Error}}' | head -3)"
@@ -65,6 +69,18 @@ r=$(banco -c "select estado || ': ' || coalesce(mensagem, '') from sistema_atual
 echo "$r" | grep -q "^erro: .*não foi encontrada" && ok "versão inexistente recusada sem alterar nada" || erro "atualizador com versão inexistente: $r"
 docker service inspect --format '{{.Spec.TaskTemplate.ContainerSpec.Image}}' manutencao_app | grep -q ":$TAG" && ok "app continua na versão testada" || erro "atualizador mexeu no app"
 banco -c "insert into sistema_atualizacoes (versao) values ('x; rm -rf /')" >/dev/null 2>&1 && erro "banco aceitou versão fora do padrão" || ok "banco recusa versão fora do padrão"
+
+echo "— permissões do banco (RLS e funções)"
+r=$(banco -c "select string_agg(tablename, ', ') from pg_tables where schemaname = 'public' and not rowsecurity")
+[ -z "$r" ] && ok "toda tabela pública com RLS" || erro "tabelas sem RLS: $r"
+r=$(banco -c "select string_agg(p.proname, ', ') from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')")
+[ -z "$r" ] && ok "nenhuma função executável sem login" || erro "funções abertas ao anon: $r"
+r=$(banco -c "select string_agg(p.proname, ', ') from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and (p.proname like 'auth\_%' or p.proname like 'admin\_%') and has_function_privilege('authenticated', p.oid, 'execute')")
+[ -z "$r" ] && ok "auth_* e admin_* só para o servidor" || erro "funções de servidor abertas ao usuário: $r"
+r=$(banco -c "select count(*) from pg_policy where polrelid = 'public.org_membros'::regclass and polcmd <> 'r'")
+[ "$r" = "0" ] && ok "org_membros sem escrita direta" || erro "org_membros tem $r policy(ies) de escrita"
+r=$(banco -c "select string_agg(table_name, ', ') from information_schema.role_table_grants where grantee = 'whatsapp_servico' and table_name not in ('whatsapp_sessoes', 'whatsapp_conexoes')")
+[ -z "$r" ] && ok "papel do WhatsApp só nas tabelas dele" || erro "whatsapp_servico enxerga: $r"
 
 banco -c "select versao from sistema_esquema" | grep -Eq '^v[0-9]{4}\.[0-9]{2}\.[0-9]{2}-[0-9]+$' \
   && ok "migrador gravou a versão do esquema" || erro "sistema_esquema sem versão: $(banco -c "select versao from sistema_esquema" 2>&1)"
