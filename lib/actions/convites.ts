@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getContexto } from "@/lib/session";
+import { getContexto, getContextoSemBloqueio } from "@/lib/session";
 import { createClient } from "@/lib/db/server";
 import { enviarLinkConfirmacao } from "@/lib/auth/links-email";
 import { bloqueadoPorTentativas, registrarTentativa } from "@/lib/auth/usuarios";
@@ -18,7 +18,7 @@ const NAO_NO_ENTRAR_COMO = "Convite é a pessoa quem aceita ou recusa, não o co
 export async function aceitarConvite(id: string): Promise<Resultado> {
   try {
     exigirId(id, "o convite");
-    if ((await getContexto()).entradaComo) return { ok: false, erro: NAO_NO_ENTRAR_COMO };
+    if ((await getContextoSemBloqueio()).entradaComo) return { ok: false, erro: NAO_NO_ENTRAR_COMO };
     const db = await createClient();
     const { error } = await db.rpc("aceitar_convite", { p_id: id });
     if (error) return erroBanco(error);
@@ -33,7 +33,7 @@ export async function aceitarConvite(id: string): Promise<Resultado> {
 export async function recusarConvite(id: string): Promise<Resultado> {
   try {
     exigirId(id, "o convite");
-    if ((await getContexto()).entradaComo) return { ok: false, erro: NAO_NO_ENTRAR_COMO };
+    if ((await getContextoSemBloqueio()).entradaComo) return { ok: false, erro: NAO_NO_ENTRAR_COMO };
     const db = await createClient();
     const { error } = await db.rpc("recusar_convite", { p_id: id });
     if (error) return erroBanco(error);
@@ -62,7 +62,7 @@ export async function cancelarConvite(id: string): Promise<Resultado> {
 /** Manda de novo o link que confirma o e-mail (no máximo 3 por hora). */
 export async function reenviarConfirmacao(): Promise<Resultado> {
   try {
-    const { userId, email, entradaComo } = await getContexto();
+    const { userId, email, entradaComo } = await getContextoSemBloqueio();
     if (entradaComo) return { ok: false, erro: NAO_NO_ENTRAR_COMO };
     if (!emailConfigurado()) {
       return { ok: false, erro: "O envio de e-mail não está configurado neste servidor. Fale com o administrador do sistema." };

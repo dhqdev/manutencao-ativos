@@ -152,9 +152,12 @@ Quem chama é só o app — a chave nunca vai ao navegador (`lib/whatsapp.ts` é
 | `GET /sessoes/:id` | — | o mesmo formato acima |
 | `DELETE /sessoes/:id` | — | remove o aparelho do celular e apaga as credenciais |
 | `POST /sessoes/:id/mensagens` | `{ numero, texto, digitando? }` | `{ ok, id, jid }` · 409 desconectado · 422 número sem WhatsApp |
+| `POST /sessoes/:id/arquivos` | `{ numero, nome, tipo, base64, legenda? }` | `{ ok, id, jid }` · imagem (JPG/PNG/WEBP) com legenda ou PDF como documento, até 8 MB · 415 outro tipo |
 | `POST /sessoes/:id/numeros` | `{ numeros: [] }` | `{ numeros: [{ numero, existe, jid }] }` |
 
-`:id` é a coluna `whatsapp_conexoes.instancia` (`manut_<id-da-empresa>`).
+`:id` é a coluna `whatsapp_conexoes.instancia` (`manut_<id-da-empresa>`), ou
+`sistema_cobranca`: o WhatsApp do dono do sistema, conectado no console
+(aba Assinaturas), que recebe os comprovantes de pagamento das empresas.
 
 ---
 

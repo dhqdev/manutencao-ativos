@@ -107,8 +107,8 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   Faixa `AvisoEntrarComo` no topo do `(app)` via `getContexto().entradaComo`.
   Contagem de sessões/acessos (`admin_usuarios`, `equipe_acessos`,
   `admin_resumo`) ignora `aberta_por`. O dono quer
-  **uma tela só** (`app/admin/page.tsx`: abas Usuários, Clientes e uso e
-  Integrações + bloco da versão);
+  **uma tela só** (`app/admin/page.tsx`: abas Usuários, Clientes e uso,
+  Assinaturas e Integrações + bloco da versão);
   não crie telas novas no console sem ele pedir.
   - Toda página do console começa com `exigirSuperadminTela()`
     (`lib/admin-console.ts`) — layout e página rodam em paralelo, não confie
@@ -116,6 +116,20 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   - Toda ação começa com `exigirSuperadmin()` (`lib/actions/admin.ts`), que
     confere `obterSessao().superadmin` — o posto vem do banco a cada
     requisição, nunca do cookie.
+- **Assinatura (pedido do dono em 24/11/2026)**: aba **Assinaturas** do
+  console (`components/admin/assinaturas.tsx`) e tela `/assinatura` da
+  empresa. Pix copia e cola + QR montados no servidor por `lib/pix.ts` (BR
+  Code estático, CRC16; teste com o exemplo do Banco Central) e
+  `lib/assinatura-servidor.ts` (QR em SVG pelo `qrcode`). Bloqueio:
+  `getContexto()` redireciona para `/assinatura` quando
+  `assinatura.estado === "bloqueada"` (menos no "Entrar como"). O layout do
+  `(app)`, a tela/ações de Assinatura e ações da própria pessoa (trocar de
+  empresa, convites, excluir conta) usam `getContextoSemBloqueio()`. Ação
+  nova que precisa funcionar com a empresa bloqueada: use essa variante.
+  Comprovante vai para `{org_id}/assinatura/` e, depois da resposta
+  (`after()`), segue para o WhatsApp do dono pela sessão `sistema_cobranca`
+  do serviço de WhatsApp (`INSTANCIA_COBRANCA`, rota `/arquivos` para
+  imagem/PDF); o resultado fica em `whatsapp_em`/`whatsapp_erro`.
 - Credenciais de serviços externos (Groq, Backblaze...) **não** viram
   variável da stack: o superadmin cola na aba **Integrações** do console
   (`components/admin/integracoes.tsx`, um cartão por serviço dentro de
@@ -169,6 +183,15 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   - `72-entrar-como.sql` `auth_entrar_como` / `auth_sair_entrada_como` e o
     registro `sistema_entradas_como` (coluna `auth.sessoes.aberta_por` mora
     no `00-fundacao.sql`, porque `20-auth.sql` já a usa)
+  - `74-assinaturas.sql` assinatura mensal por Pix: `assinaturas`
+    (vencimento/isenta por empresa, só leitura para a empresa),
+    `assinatura_pagamentos` (comprovantes), `assinatura_situacao(org)`
+    (estado: sem_cobranca, isenta, em_dia, vencendo, tolerancia, bloqueada),
+    `assinatura_enviar_comprovante` e `admin_assinaturas` /
+    `admin_definir_assinatura` / `admin_avaliar_pagamento`. Config (chave Pix,
+    valor, tolerância, dias grátis, WhatsApp) em `sistema_credenciais`
+    (`CFG` de `lib/assinatura.ts`). `contexto_usuario()` devolve a situação
+    em `assinatura` (chamada dinâmica, porque o 10 roda antes do 74).
   - Coisa nova grande: crie `40-<assunto>.sql` em vez de inchar os outros.
 - Tabela nova: `org_id ... references organizacoes on delete cascade`, índice
   em `org_id`, `enable row level security` e policies separadas por comando

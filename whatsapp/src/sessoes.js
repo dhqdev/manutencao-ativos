@@ -531,6 +531,27 @@ export async function enviarTexto(id, numero, texto, { digitando = config.digita
   });
 }
 
+/**
+ * Envia imagem (com legenda) ou documento PDF. Usado para o comprovante de
+ * pagamento da assinatura chegar no WhatsApp do dono do sistema.
+ */
+export async function enviarArquivo(id, numero, { nome, tipo, conteudo, legenda = "" }) {
+  const s = exigirConectada(id);
+
+  return s.enfileirar(async () => {
+    if (!s.sock) throw new ErroHttp(409, "O WhatsApp desta empresa não está conectado.");
+
+    const jid = await s.resolverJid(numero);
+    if (!jid) throw new ErroHttp(422, `O número ${numero} não tem WhatsApp.`);
+
+    const mensagem = tipo.startsWith("image/")
+      ? { image: conteudo, mimetype: tipo, caption: legenda || undefined }
+      : { document: conteudo, mimetype: tipo, fileName: nome, caption: legenda || undefined };
+    const enviada = await s.sock.sendMessage(jid, mensagem);
+    return { id: enviada?.key?.id ?? null, jid };
+  });
+}
+
 export async function verificarNumeros(id, numeros) {
   const s = exigirConectada(id);
   const resultado = [];

@@ -1,18 +1,22 @@
 import { cookies } from "next/headers";
+import { AvisoAssinatura } from "@/components/shell/aviso-assinatura";
 import { AvisoEntrarComo } from "@/components/shell/aviso-entrar-como";
 import { ConvitesPendentes, type ConvitePendente } from "@/components/shell/convites-pendentes";
 import { usuarioPorId } from "@/lib/auth/usuarios";
 import { createClient } from "@/lib/db/server";
 import { emailConfigurado } from "@/lib/email";
 import { Navegacao } from "@/components/shell/navegacao";
-import { getContexto } from "@/lib/session";
+import { getContextoSemBloqueio } from "@/lib/session";
 import { COOKIE_MENU, menuRecolhido } from "@/lib/menu-lateral";
 import { COOKIE_NATAL, diasParaONatal, natalLigado } from "@/lib/natal";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   // Uma única chamada ao banco traz usuário, empresa e o total de alertas.
   // Os convites vão junto, em paralelo (antes esperavam o contexto).
-  const [ctx, biscoitos, todosConvites] = await Promise.all([getContexto(), cookies(), meusConvites()]);
+  // Sem o bloqueio da assinatura: o layout envolve também a tela de
+  // Assinatura, que abre bloqueada. Cada página (getContexto) é que leva
+  // para /assinatura quando a empresa está bloqueada.
+  const [ctx, biscoitos, todosConvites] = await Promise.all([getContextoSemBloqueio(), cookies(), meusConvites()]);
   // Convites para outras empresas: quem aceita é a pessoa, não o superadmin no "Entrar como".
   const convites = ctx.entradaComo ? [] : todosConvites;
   const emailConfirmado = convites.length ? (await usuarioPorId(ctx.userId))?.email_confirmado !== false : true;
@@ -37,6 +41,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           empresa={ctx.organizacao.nome}
         />
       )}
+      <AvisoAssinatura situacao={ctx.assinatura} />
       {convites.length > 0 && (
         <ConvitesPendentes convites={convites} emailConfirmado={emailConfirmado} podeEnviarEmail={emailConfigurado()} />
       )}

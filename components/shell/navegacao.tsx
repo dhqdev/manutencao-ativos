@@ -20,6 +20,7 @@ import {
   LayoutGrid,
   TriangleAlert,
   Users,
+  Wallet,
   X,
 } from "lucide-react";
 import { Assinatura, Logo } from "@/components/marca";
@@ -47,6 +48,7 @@ const MENU: Item[] = [
   { href: "/assistente", rotulo: "Assistente", Icone: Sparkles, grupo: "Análise" },
   { href: "/equipe", rotulo: "Equipe", Icone: Users, grupo: "Administração" },
   { href: "/configuracoes", rotulo: "Configurações", Icone: Settings, grupo: "Administração" },
+  { href: "/assinatura", rotulo: "Assinatura", Icone: Wallet, grupo: "Administração" },
 ];
 
 const GRUPOS: Grupo[] = ["Operação", "Análise", "Administração"];

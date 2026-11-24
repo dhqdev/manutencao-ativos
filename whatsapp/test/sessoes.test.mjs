@@ -123,6 +123,18 @@ r = await api("POST", "/sessoes/manut_a/numeros", { numeros: ["5511987654321", "
 assert.deepEqual(r.json.numeros.map((n) => n.existe), [true, false]);
 console.log("✓ envio com digitando, nono dígito, número sem WhatsApp, sessão desconectada");
 
+// 7b. arquivo: imagem com legenda e PDF como documento
+const b64 = Buffer.from("conteudo-do-comprovante").toString("base64");
+r = await api("POST", "/sessoes/manut_a/arquivos", { numero: "5521999990000", nome: "pix.png", tipo: "image/png", base64: b64, legenda: "Comprovante" });
+assert.equal(r.status, 200, JSON.stringify(r.json)); assert.equal(__registro.at(-1)[2], "imagem:Comprovante::23");
+r = await api("POST", "/sessoes/manut_a/arquivos", { numero: "5521999990000", nome: "pix.pdf", tipo: "application/pdf", base64: b64 });
+assert.equal(r.status, 200); assert.equal(__registro.at(-1)[2], "documento::pix.pdf:23");
+r = await api("POST", "/sessoes/manut_a/arquivos", { numero: "5521999990000", nome: "x.exe", tipo: "application/x-msdownload", base64: b64 });
+assert.equal(r.status, 415);
+r = await api("POST", "/sessoes/manut_b/arquivos", { numero: "5521999990000", nome: "pix.png", tipo: "image/png", base64: b64 });
+assert.equal(r.status, 409);
+console.log("✓ envio de arquivo (imagem, PDF, tipo recusado, sessão desconectada)");
+
 // 8. queda de rede → reconecta sozinho
 __sockets.at(-1).fechar(408);
 await esperar(3600);

@@ -26,6 +26,7 @@ async function caminhosDoBanco() {
   const fontes: [string, string][] = [
     ["ativos", "foto_url"],
     ["manutencao_anexos", "path"],
+    ["assinatura_pagamentos", "comprovante"],
   ];
   for (const [tabela, coluna] of fontes) {
     for (let de = 0; ; de += 1000) {

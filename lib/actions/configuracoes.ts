@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { ENTRAR_COMO_SEM_SENHA, SEM_PERMISSAO } from "@/lib/permissoes";
-import { getContexto } from "@/lib/session";
+import { getContexto, getContextoSemBloqueio } from "@/lib/session";
 import { createClient } from "@/lib/db/server";
 import { obterSessao } from "@/lib/auth/sessao";
 import { conferirSenha, problemaNaSenha } from "@/lib/auth/senhas";
@@ -73,7 +73,7 @@ export async function salvarPerfil(fd: FormData): Promise<Resultado> {
 /** Troca a empresa ativa (para quem participa de mais de uma). */
 export async function trocarEmpresa(fd: FormData): Promise<Resultado> {
   try {
-    const { userId } = await getContexto();
+    const { userId } = await getContextoSemBloqueio();
     const db = await createClient();
     const orgId = exigirId(textoObrigatorio(fd, "org_id", "a empresa"), "a empresa");
 

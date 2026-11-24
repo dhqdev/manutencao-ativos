@@ -257,6 +257,34 @@ não voltam para a tela (só os 4 últimos caracteres). O cartão mostra se o
 serviço backup está no ar, para onde ele está mandando, as pastas no bucket, o
 botão **Fazer backup agora** e as últimas 10 rodadas (automáticas e manuais).
 
+Na aba **Assinaturas** fica a cobrança mensal por **Pix** (sem gateway: o
+sistema monta o Pix copia e cola e o QR code no padrão BR Code do Banco
+Central, `lib/pix.ts`):
+
+- **Pix da assinatura**: chave Pix (e-mail, CPF, CNPJ, telefone ou aleatória),
+  nome e cidade de quem recebe, **valor mensal**, **tolerância** (dias depois
+  do vencimento antes de bloquear, padrão 3), **dias grátis** para empresa
+  nova (padrão 7) e **seu WhatsApp**, que recebe os comprovantes. Mostra o QR
+  como o cliente vai ver. Sem chave ou sem valor a cobrança fica desligada e
+  ninguém é bloqueado (botão **Desligar cobrança**).
+- **WhatsApp dos avisos**: conecte um WhatsApp seu (QR ou código). Quando um
+  cliente anexa o comprovante, a imagem/PDF chega no número cadastrado, com a
+  empresa, o valor e o link para aprovar. **Enviar teste** confere.
+- **Comprovantes para aprovar**: ver o arquivo, **Aprovar (+1 mês)** ou
+  **Recusar** com motivo (a empresa vê). Aprovar empurra o vencimento 1 mês a
+  partir do vencimento atual (o dia do mês não muda).
+- **Vencimento de cada empresa**: situação (em dia, vence em breve, vencida,
+  bloqueada), a **data de vencimento** editável e a opção **Isenta**.
+- **Histórico de pagamentos**: aprovados (vencimento antes → depois) e recusados.
+
+Do lado da empresa, o menu **Assinatura** mostra a situação, o QR, o copia e
+cola e o envio do comprovante (proprietário ou gestor), com o histórico. Uma
+faixa no topo avisa quando faltam 5 dias ou menos e quando já venceu. Passou
+do vencimento + tolerância, a empresa fica **bloqueada**: qualquer tela leva
+para Assinatura, que continua deixando pagar e anexar. O superadmin no
+"Entrar como" não é barrado. Empresas que já existiam ganharam 30 dias a
+partir da instalação desta versão.
+
 Abaixo fica o bloco **Versão do sistema** (a que está no ar e a
 última publicada no GitHub Packages, com o botão **Atualizar**).
 

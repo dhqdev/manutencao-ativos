@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 import { obterSessao } from "@/lib/auth/sessao";
 import { createClient } from "@/lib/db/server";
+import { assinaturaBloqueia, type SituacaoAssinatura } from "@/lib/assinatura";
 import type { Organizacao, PapelMembro, Profile } from "@/lib/types";
 
 export type Contexto = {
@@ -19,6 +20,8 @@ export type Contexto = {
   superadmin: boolean;
   /** Superadmin dentro desta conta pelo "Entrar como" (aviso no topo). */
   entradaComo: { expiraEm: string } | null;
+  /** Assinatura mensal da empresa (null = banco sem 74-assinaturas.sql). */
+  assinatura: SituacaoAssinatura | null;
 };
 
 type RespostaContexto = {
@@ -28,17 +31,31 @@ type RespostaContexto = {
   organizacao: Organizacao;
   empresas: { id: string; nome: string }[];
   alertas: number;
+  assinatura?: SituacaoAssinatura | null;
 };
 
 /**
+ * Contexto de toda tela e ação da empresa. Assinatura vencida além da
+ * tolerância leva para /assinatura (a única tela que abre bloqueada: dá para
+ * pagar e anexar o comprovante). O superadmin no "Entrar como" não é barrado,
+ * para conseguir dar suporte.
+ */
+export const getContexto = cache(async (): Promise<Contexto> => {
+  const ctx = await getContextoSemBloqueio();
+  if (assinaturaBloqueia(ctx.assinatura) && !ctx.entradaComo) redirect("/assinatura");
+  return ctx;
+});
+
+/**
  * Carrega usuário + empresa atual. Redireciona para /login se não houver sessão.
+ * Não confere a assinatura: só para o layout e a tela/ações de Assinatura.
  *
  * Desempenho: uma consulta valida a sessão e todo o resto vem de UMA chamada
  * ao banco (contexto_usuario). Antes eram 5 consultas em sequência.
  *
  * `cache` garante que layout e página compartilhem o mesmo resultado.
  */
-export const getContexto = cache(async (): Promise<Contexto> => {
+export const getContextoSemBloqueio = cache(async (): Promise<Contexto> => {
   // Sessão conferida no banco. Sem sessão válida (cookie ausente, expirado ou
   // derrubado), /auth/sair limpa o cookie e leva ao login.
   const sessao = await obterSessao();
@@ -169,5 +186,6 @@ function montar(
     alertas: Number(dados.alertas ?? 0),
     superadmin,
     entradaComo,
+    assinatura: dados.assinatura ?? null,
   };
 }

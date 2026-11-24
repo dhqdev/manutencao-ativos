@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { getContexto } from "@/lib/session";
+import { getContexto, getContextoSemBloqueio } from "@/lib/session";
 import { createClient } from "@/lib/db/server";
 import { removerArquivos } from "@/lib/arquivos";
 import { encerrarSessaoAtual } from "@/lib/auth/sessao";
@@ -28,7 +28,7 @@ export async function excluirConta(fd: FormData): Promise<Resultado> {
   let concluido = false;
 
   try {
-    const { userId, email, entradaComo } = await getContexto();
+    const { userId, email, entradaComo } = await getContextoSemBloqueio();
     if (entradaComo) return { ok: false, erro: ENTRAR_COMO_SEM_SENHA };
 
     // Confirmação explícita: digitar o próprio e-mail.

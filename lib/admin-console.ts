@@ -5,7 +5,9 @@ import { notFound, redirect } from "next/navigation";
 import { obterSessao } from "@/lib/auth/sessao";
 import { createAdminClient } from "@/lib/db/admin";
 import type { EmpresaAdmin, UsoEmpresa, UsuarioAdmin } from "@/components/admin/tipos";
-import { diretorioBase, somarPasta } from "@/lib/arquivos";
+import { diretorioBase, somarPasta, urlAssinada } from "@/lib/arquivos";
+import type { PagamentoAssinatura, SituacaoAssinatura } from "@/lib/assinatura";
+import { cobrancaLigada, configCobranca, pixDaEmpresa, type ConfigCobranca } from "@/lib/assinatura-servidor";
 import type { SituacaoGroq } from "@/components/admin/integracoes";
 import { resumoGroq } from "@/lib/integracoes";
 
@@ -74,6 +76,54 @@ export const carregarGroq = cache(async (): Promise<Dados<SituacaoGroq>> => {
   try {
     const { chave, modelo } = await resumoGroq();
     return { dados: { ...chave, modelo }, erro: null };
+  } catch (e) {
+    return { dados: null, erro: e instanceof Error ? e.message : String(e) };
+  }
+});
+
+export type EmpresaAssinatura = {
+  org_id: string;
+  nome: string;
+  isenta: boolean;
+  dono: string | null;
+  ultimo_pagamento: string | null;
+  situacao: SituacaoAssinatura;
+};
+
+export type PagamentoAdmin = PagamentoAssinatura & { empresa: string; enviado_por: string | null; url: string };
+
+export type DadosAssinaturas = {
+  config: ConfigCobranca;
+  ligada: boolean;
+  /** Pix de exemplo (o identificador muda por empresa). */
+  exemplo: { copiaECola: string; qrSvg: string } | null;
+  empresas: EmpresaAssinatura[];
+  pagamentos: PagamentoAdmin[];
+};
+
+/** Aba Assinaturas: configuração, situação de cada empresa e os comprovantes. */
+export const carregarAssinaturas = cache(async (): Promise<Dados<DadosAssinaturas>> => {
+  await exigirSuperadminTela();
+  try {
+    const [lista, config] = await Promise.all([
+      rpc<{ empresas: EmpresaAssinatura[]; pagamentos: (PagamentoAssinatura & { empresa: string; enviado_por: string | null })[] }>(
+        "admin_assinaturas",
+        { empresas: [], pagamentos: [] },
+      ),
+      configCobranca(),
+    ]);
+    if (lista.erro) return { dados: null, erro: lista.erro };
+    const exemplo = await pixDaEmpresa("00000000-0000-0000-0000-000000000000", config).catch(() => null);
+    return {
+      dados: {
+        config,
+        ligada: cobrancaLigada(config),
+        exemplo: exemplo ? { copiaECola: exemplo.copiaECola, qrSvg: exemplo.qrSvg } : null,
+        empresas: lista.dados!.empresas ?? [],
+        pagamentos: (lista.dados!.pagamentos ?? []).map((p) => ({ ...p, url: urlAssinada(p.comprovante, 3600) })),
+      },
+      erro: null,
+    };
   } catch (e) {
     return { dados: null, erro: e instanceof Error ? e.message : String(e) };
   }

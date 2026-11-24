@@ -698,6 +698,7 @@ declare
   v_user  uuid := auth.uid();
   v_org   uuid;
   v_papel public.papel_membro;
+  v_assinatura json;
 begin
   if v_user is null then
     return null;
@@ -722,7 +723,15 @@ begin
     return null;   -- sem empresa: o app chama criar_workspace()
   end if;
 
+  -- Assinatura (74-assinaturas.sql, que roda depois deste arquivo). Chamada
+  -- dinâmica: no primeiro deploy a função ainda não existe por alguns
+  -- segundos, e uma chamada direta quebraria o contexto de todo mundo.
+  if to_regprocedure('public.assinatura_situacao(uuid)') is not null then
+    execute 'select public.assinatura_situacao($1)' into v_assinatura using v_org;
+  end if;
+
   return json_build_object(
+    'assinatura',  v_assinatura,
     'perfil',      (select row_to_json(p) from public.profiles p where p.id = v_user),
     'org_id',      v_org,
     'papel',       v_papel,

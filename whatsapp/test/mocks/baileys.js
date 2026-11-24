@@ -27,7 +27,7 @@ export function makeWASocket(cfg) {
     async sendPresenceUpdate(tipo, jid) { __registro.push(["presence", tipo, jid ?? null]); },
     async presenceSubscribe(jid) { __registro.push(["subscribe", jid]); },
     async onWhatsApp(...ns) { __registro.push(["onWhatsApp", ...ns]); return ns.filter((n) => existentes.has(n)).map((n) => ({ jid: n + "@s.whatsapp.net", exists: true })); },
-    async sendMessage(jid, conteudo) { __registro.push(["send", jid, conteudo.text]); return { key: { id: "MSG" + __registro.length } }; },
+    async sendMessage(jid, conteudo) { __registro.push(["send", jid, conteudo.text ?? (conteudo.image ? "imagem:" : "documento:") + (conteudo.caption ?? "") + ":" + (conteudo.fileName ?? "") + ":" + (conteudo.image ?? conteudo.document)?.length]); return { key: { id: "MSG" + __registro.length } }; },
     async logout() { __registro.push(["logout"]); sock.fechar(401); },
     async end() { sock.fechar(428); },
     async rejectCall() {},

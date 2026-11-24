@@ -150,3 +150,25 @@ export async function verificarNumeros(instancia: string, numeros: string[]) {
   );
   return r.numeros;
 }
+
+/** Envia imagem (com legenda) ou PDF. O serviço recusa acima de 8 MB. */
+export async function enviarArquivo(
+  instancia: string,
+  numero: string,
+  arquivo: { nome: string; tipo: string; conteudo: Buffer; legenda?: string },
+) {
+  return chamar<{ ok: true; id: string | null; jid: string }>(`${rota(instancia)}/arquivos`, {
+    method: "POST",
+    body: {
+      numero: numero.replace(/\D/g, ""),
+      nome: arquivo.nome,
+      tipo: arquivo.tipo,
+      base64: arquivo.conteudo.toString("base64"),
+      legenda: arquivo.legenda ?? "",
+    },
+    timeoutMs: 90_000,
+  });
+}
+
+/** Sessão do WhatsApp do dono do sistema (avisos de assinatura), fora das empresas. */
+export const INSTANCIA_COBRANCA = "sistema_cobranca";

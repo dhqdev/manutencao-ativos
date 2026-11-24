@@ -8,6 +8,7 @@ import {
   conectar,
   desconectar,
   encerrarTodas,
+  enviarArquivo,
   enviarTexto,
   estado,
   restaurarSessoes,
@@ -24,13 +25,18 @@ import {
  *   GET    /sessoes/:id                  estado da sessão
  *   DELETE /sessoes/:id                  desconecta e apaga as credenciais
  *   POST   /sessoes/:id/mensagens        { numero, texto, digitando? }
+ *   POST   /sessoes/:id/arquivos         { numero, nome, tipo, base64, legenda? } → imagem ou documento
  *   POST   /sessoes/:id/numeros          { numeros: [] } → quais têm WhatsApp
  */
 
 validarConfig();
 
 const LIMITE_CORPO = 256 * 1024;
-const ROTA_SESSAO = /^\/sessoes\/([A-Za-z0-9_-]{1,64})(?:\/(conectar|mensagens|numeros))?\/?$/;
+/** Arquivo vai em base64 (+33%): 8 MB de arquivo cabem com folga. */
+const LIMITE_CORPO_ARQUIVO = 12 * 1024 * 1024;
+const LIMITE_ARQUIVO = 8 * 1024 * 1024;
+const TIPOS_ARQUIVO = /^(image\/(jpeg|png|webp)|application\/pdf)$/;
+const ROTA_SESSAO = /^\/sessoes\/([A-Za-z0-9_-]{1,64})(?:\/(conectar|mensagens|arquivos|numeros))?\/?$/;
 
 /** Compara os hashes: tempo constante e sem vazar o tamanho da chave. */
 function autorizado(req) {
@@ -49,12 +55,12 @@ function responder(res, status, corpo) {
   res.end(texto);
 }
 
-async function lerCorpo(req) {
+async function lerCorpo(req, limite = LIMITE_CORPO) {
   let tamanho = 0;
   const partes = [];
   for await (const parte of req) {
     tamanho += parte.length;
-    if (tamanho > LIMITE_CORPO) throw new ErroHttp(413, "Corpo da requisição muito grande.");
+    if (tamanho > limite) throw new ErroHttp(413, "Corpo da requisição muito grande.");
     partes.push(parte);
   }
   if (!partes.length) return {};
@@ -104,6 +110,21 @@ async function tratar(req, res) {
     const enviada = await enviarTexto(id, numero, texto, {
       ...(typeof digitando === "boolean" ? { digitando } : {}),
     });
+    return responder(res, 200, { ok: true, ...enviada });
+  }
+
+  if (acao === "arquivos" && metodo === "POST") {
+    const { numero, nome, tipo, base64, legenda } = await lerCorpo(req, LIMITE_CORPO_ARQUIVO);
+    if (!numeroValido(numero)) throw new ErroHttp(400, "Número inválido.");
+    if (typeof tipo !== "string" || !TIPOS_ARQUIVO.test(tipo)) throw new ErroHttp(415, "Envie imagem (JPG, PNG, WEBP) ou PDF.");
+    if (typeof nome !== "string" || !nome.trim() || nome.length > 200) throw new ErroHttp(400, "Informe o nome do arquivo.");
+    if (legenda !== undefined && (typeof legenda !== "string" || legenda.length > 4000)) throw new ErroHttp(400, "Legenda inválida.");
+    if (typeof base64 !== "string" || !base64) throw new ErroHttp(400, "Arquivo vazio.");
+    const conteudo = Buffer.from(base64, "base64");
+    if (!conteudo.length) throw new ErroHttp(400, "Arquivo vazio.");
+    if (conteudo.length > LIMITE_ARQUIVO) throw new ErroHttp(413, "Arquivo maior que 8 MB.");
+
+    const enviada = await enviarArquivo(id, numero, { nome: nome.trim(), tipo, conteudo, legenda: legenda ?? "" });
     return responder(res, 200, { ok: true, ...enviada });
   }
 

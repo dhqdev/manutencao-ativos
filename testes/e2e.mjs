@@ -465,6 +465,59 @@ await passo("console: integrações com o backup (serviço no ar e backup agora)
   await cartao.getByText("Não configurado").waitFor();
 });
 
+await passo("assinatura: Pix no console, empresa vencida bloqueia, comprovante e aprovação liberam", async () => {
+  await page.goto("/admin?aba=assinaturas");
+  // Formulários com ação no cliente: só depois de a tela hidratar.
+  await page.waitForLoadState("networkidle");
+  const cobranca = page.locator("section", { has: page.getByRole("heading", { name: "Pix da assinatura" }) });
+  await cobranca.locator('input[name="chave"]').fill("pix-e2e@teste.com.br");
+  await cobranca.locator('input[name="nome"]').fill("Fulano E2E");
+  await cobranca.locator('input[name="cidade"]').fill("São Paulo");
+  await cobranca.locator('input[name="valor"]').fill("49,90");
+  await cobranca.getByRole("button", { name: "Salvar", exact: true }).click();
+  await cobranca.getByText("Cobrança ligada").waitFor();
+  // Vencimento da Oficina E2E 10 dias atrás: passou da tolerância (3 dias).
+  const linha = page.locator('li[data-empresa-assinatura="Oficina E2E"]');
+  await linha.locator('input[type="date"]').fill(new Date(Date.now() - 10 * 864e5).toISOString().slice(0, 10));
+  await linha.getByRole("button", { name: "Salvar" }).click();
+  await linha.getByText("Bloqueada", { exact: true }).waitFor();
+
+  // O gestor só consegue abrir a tela de Assinatura, com o QR e o copia e cola.
+  await page.goto("/auth/sair");
+  await entrar(GESTOR, "**/assinatura");
+  await page.locator("[data-bloqueio]").waitFor();
+  await page.locator("[data-qr-pix] svg").waitFor();
+  const pix = await page.locator("textarea[data-pix]").inputValue();
+  verdade(pix.startsWith("000201") && pix.includes("br.gov.bcb.pix") && pix.includes("540549.90"), `Pix estranho: ${pix}`);
+  await page.goto("/manutencoes");
+  await page.waitForURL("**/assinatura");
+  await page.waitForLoadState("networkidle");
+  await page.locator("[data-comprovante-arquivo]").setInputFiles({ name: "comprovante.png", mimeType: "image/png", buffer: PNG });
+  await page.getByRole("button", { name: "Enviar comprovante" }).click();
+  await page.locator("[data-comprovante-enviado]").waitFor();
+  await page.locator("[data-historico-assinatura]").getByText("Em análise", { exact: true }).waitFor();
+
+  // O superadmin aprova: o vencimento anda 1 mês e a empresa volta a entrar.
+  await page.goto("/auth/sair");
+  await entrar(SUPERADMIN, "**/admin");
+  await page.goto("/admin?aba=assinaturas");
+  await page.waitForLoadState("networkidle");
+  await page.locator('li[data-comprovante="Oficina E2E"]').getByRole("button", { name: /Aprovar/ }).click();
+  await page.locator('[data-comprovantes="Histórico de pagamentos"] li[data-comprovante="Oficina E2E"]').getByText("Aprovado", { exact: true }).waitFor();
+  await page.goto("/auth/sair");
+  await entrar(GESTOR);
+  await page.goto("/assinatura");
+  await page.locator("[data-historico-assinatura]").getByText("Aprovado", { exact: true }).waitFor();
+
+  // Desliga a cobrança para o resto do teste.
+  await page.goto("/auth/sair");
+  await entrar(SUPERADMIN, "**/admin");
+  await page.goto("/admin?aba=assinaturas");
+  await page.waitForLoadState("networkidle");
+  await page.getByRole("button", { name: "Desligar cobrança" }).click();
+  await page.getByText("Desligada", { exact: true }).waitFor();
+});
+
 await passo("superadmin bloqueia um usuário e ele não entra mais", async () => {
   await page.goto("/admin");
   await page.locator(`li[data-usuario="${INTRUSO.email}"] button`).click();

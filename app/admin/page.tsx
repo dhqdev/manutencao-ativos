@@ -1,4 +1,5 @@
 import { Abas } from "@/components/abas";
+import { AssinaturasAdmin } from "@/components/admin/assinaturas";
 import { CartaoAtualizacao } from "@/components/admin/atualizacao";
 import { CartaoBackup } from "@/components/admin/backup";
 import { UsoClientes } from "@/components/admin/clientes";
@@ -7,6 +8,7 @@ import { ehFiltroUsuario } from "@/components/admin/tipos";
 import { ListaUsuarios } from "@/components/admin/usuarios";
 import { Cabecalho } from "@/components/ui";
 import {
+  carregarAssinaturas,
   carregarEmpresas,
   carregarGroq,
   carregarUso,
@@ -22,7 +24,8 @@ export const metadata = { title: "Gerência · Console do superadmin" };
 /**
  * A única tela do console do superadmin: gerência dos usuários, quanto cada
  * cliente usa e se o WhatsApp dele está conectado, e as integrações (chaves de
- * serviços externos: o Groq do assistente e o Backblaze B2 do backup). A
+ * serviços externos: o Groq do assistente e o Backblaze B2 do backup), além
+ * das assinaturas (cobrança mensal por Pix, db/sql/74-assinaturas.sql). A
  * versão do sistema (com o botão Atualizar) fica num bloco abaixo.
  */
 export default async function ConsoleAdmin({
@@ -31,14 +34,16 @@ export default async function ConsoleAdmin({
   searchParams: Promise<{ filtro?: string; aba?: string }>;
 }) {
   const sessao = await exigirSuperadminTela();
-  const [{ filtro, aba }, usuarios, empresas, atualizacao, groq, backup] = await Promise.all([
+  const [{ filtro, aba }, usuarios, empresas, atualizacao, groq, backup, assinaturas] = await Promise.all([
     searchParams,
     carregarUsuarios(),
     carregarEmpresas(),
     situacaoAtualizacao(),
     carregarGroq(),
     situacaoBackup(),
+    carregarAssinaturas(),
   ]);
+  const pendentes = assinaturas.dados?.pagamentos.filter((p) => p.situacao === "pendente").length ?? 0;
   const uso = empresas.dados ? await carregarUso(empresas.dados.map((e) => e.id)) : null;
   const erro = usuarios.erro ?? empresas.erro;
 
@@ -54,7 +59,7 @@ export default async function ConsoleAdmin({
         </p>
       ) : (
         <Abas
-          inicial={aba === "clientes" ? 1 : aba === "integracoes" ? 2 : 0}
+          inicial={aba === "clientes" ? 1 : aba === "assinaturas" ? 2 : aba === "integracoes" ? 3 : 0}
           abas={[
             {
               id: "usuarios",
@@ -83,6 +88,19 @@ export default async function ConsoleAdmin({
                 ) : (
                   <UsoClientes empresas={empresas.dados ?? []} uso={uso.dados} />
                 ),
+            },
+            {
+              id: "assinaturas",
+              rotulo: "Assinaturas",
+              // Cobrança mensal por Pix: comprovantes, vencimentos, Pix e WhatsApp dos avisos.
+              contador: pendentes,
+              conteudo: assinaturas.dados ? (
+                <AssinaturasAdmin dados={assinaturas.dados} />
+              ) : (
+                <p className="card px-5 py-4 text-sm text-red-700">
+                  Não foi possível carregar as assinaturas: {assinaturas.erro}. Confira se o migrador da versão nova rodou.
+                </p>
+              ),
             },
             {
               id: "integracoes",

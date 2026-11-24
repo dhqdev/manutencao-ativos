@@ -255,6 +255,21 @@ segunda não enxerga nada da primeira.
 Para evitar recursão infinita, as funções usadas dentro das policies
 (`user_org_ids`, `user_admin_org_ids`) são `SECURITY DEFINER`.
 
+### Assinatura e bloqueio
+
+A empresa só **lê** a própria assinatura e os próprios comprovantes
+(`assinaturas`, `assinatura_pagamentos`: RLS de leitura por `user_org_ids()`,
+sem insert/update/delete para `authenticated`). Enviar comprovante é a função
+`assinatura_enviar_comprovante` (só proprietário/gestor, caminho dentro de
+`{org_id}/assinatura/`, no máximo 3 em análise); vencimento, isenção e
+aprovação são funções `admin_*`, só do `service_role`, chamadas depois de
+conferir o superadmin. Quem paga não consegue mexer no próprio vencimento.
+
+O bloqueio é do app: `getContexto()` leva para `/assinatura` toda tela e ação
+da empresa bloqueada. A tela de Assinatura e as ações dela (e as da própria
+pessoa: trocar de empresa, convites, excluir a conta) usam
+`getContextoSemBloqueio()`.
+
 ---
 
 ## Segredos
