@@ -34,7 +34,13 @@ export type SituacaoAtualizacao = {
   temNova: boolean;
   erroConsulta: string | null;
   urlReleases: string | null;
-  atualizador: { online: boolean; vistoEm: string | null; stack: string | null };
+  atualizador: {
+    online: boolean;
+    vistoEm: string | null;
+    stack: string | null;
+    /** Última limpeza de contêineres parados feita pelo atualizador. */
+    limpeza: { em: string; mensagem: string | null; parados: number | null } | null;
+  };
   pedido: PedidoAtualizacao | null;
 };
 
@@ -107,7 +113,9 @@ async function ultimaPublicada(imagem: string): Promise<{ versao: string | null;
 export async function situacaoAtualizacao(): Promise<SituacaoAtualizacao> {
   const admin = createAdminClient();
   const [sinal, pedidos] = await Promise.all([
-    admin.from("sistema_atualizador").select("visto_em, stack, imagem").eq("id", 1).maybeSingle(),
+    // "*": as colunas da limpeza chegaram depois; banco sem elas não pode
+    // apagar o sinal de vida (o botão Atualizar sumiria).
+    admin.from("sistema_atualizador").select("*").eq("id", 1).maybeSingle(),
     admin
       .from("sistema_atualizacoes")
       .select("id, versao, versao_antes, estado, mensagem, criado_em, concluido_em")
@@ -131,6 +139,13 @@ export async function situacaoAtualizacao(): Promise<SituacaoAtualizacao> {
       online: !!vistoEm && Date.now() - new Date(vistoEm).getTime() < SEM_SINAL_MS,
       vistoEm,
       stack: (sinal.data?.stack as string | undefined) ?? null,
+      limpeza: sinal.data?.limpeza_em
+        ? {
+            em: sinal.data.limpeza_em as string,
+            mensagem: (sinal.data.limpeza_msg as string | null) ?? null,
+            parados: (sinal.data.parados as number | null) ?? null,
+          }
+        : null,
     },
     pedido: ((pedidos.data ?? [])[0] as PedidoAtualizacao | undefined) ?? null,
   };

@@ -142,21 +142,69 @@ esperar_migrador() { # serviço imagem
 # disco. Limpa só o que é desta stack (etiqueta com.docker.stack.namespace) e
 # nunca usa -f: contêiner rodando e imagem em uso por qualquer contêiner (de
 # qualquer stack) ficam. Volumes não são tocados.
+#
+# Quem decide se o contêiner parou "normal" é a tarefa do Swarm, não o código
+# de saída: a imagem ops herda STOPSIGNAL SIGINT do postgres (parada normal =
+# 130) e o PostgREST sai com 255. Olhar o código deixava esses parados para
+# sempre (visto no Portainer em 24/11/2026).
+#
+# Modos:
+#   tudo    depois de uma atualização (pedido do dono, 24/11/2026: terminou de
+#           atualizar, não sobra contêiner parado): remove todo parado da stack
+#   rotina  ao subir e de hora em hora: remove tudo da versão anterior e tudo
+#           que o Swarm parou; só segura por 24 h quem QUEBROU na versão atual,
+#           para os logs (docker service logs) ainda mostrarem o erro
 LIMPEZA_INTERVALO=3600
 ultima_limpeza=0
-limpar_sobras() {
+LIMPEZA=""
+
+parados() {
+  { docker ps -aq --filter "label=com.docker.stack.namespace=$STACK" --filter status=exited
+    docker ps -aq --filter "label=com.docker.stack.namespace=$STACK" --filter status=created
+    docker ps -aq --filter "label=com.docker.stack.namespace=$STACK" --filter status=dead; } 2>/dev/null | sort -u
+}
+
+# Contêiner "created" de uma tarefa que o Swarm ainda quer de pé está subindo
+# agora: não é sobra.
+subindo() { # contêiner
+  [ "$(docker inspect --format '{{.State.Status}}' "$1" 2>/dev/null)" = "created" ] || return 1
+  tarefa=$(docker inspect --format '{{index .Config.Labels "com.docker.swarm.task.id"}}' "$1" 2>/dev/null)
+  [ -n "$tarefa" ] || return 1
+  [ "$(docker inspect --type task --format '{{.DesiredState}}' "$tarefa" 2>/dev/null)" = "running" ]
+}
+
+# Quebrou sozinho (tarefa failed/rejected) e é da imagem que o serviço usa hoje.
+quebrou_na_versao_atual() { # contêiner
+  info=$(docker inspect --format '{{index .Config.Labels "com.docker.swarm.task.id"}} {{index .Config.Labels "com.docker.swarm.service.name"}} {{.Config.Image}}' "$1" 2>/dev/null) || return 1
+  set -- $info
+  [ $# -eq 3 ] || return 1
+  case "$(docker inspect --type task --format '{{.Status.State}}' "$1" 2>/dev/null)" in
+    failed|rejected) ;;
+    *) return 1 ;;   # shutdown/complete/tarefa que o Swarm já esqueceu: sobra
+  esac
+  atual=$(imagem_do_servico "$2" 2>/dev/null) || return 1
+  [ "$(sem_digest "$atual")" = "$(sem_digest "$3")" ]
+}
+
+# Grava o resultado no banco: o console (Versão e atualização) mostra quando
+# foi a última limpeza e quantos parados sobraram.
+registrar_limpeza() { # restantes
+  sql -v msg="$LIMPEZA" -v parados="$1" >/dev/null 2>&1 <<'SQL' || true
+insert into public.sistema_atualizador (id, limpeza_em, limpeza_msg, parados)
+values (1, now(), :'msg', :'parados'::int)
+on conflict (id) do update
+   set limpeza_em = excluded.limpeza_em, limpeza_msg = excluded.limpeza_msg,
+       parados = excluded.parados;
+SQL
+}
+
+limpar_sobras() { # [tudo|rotina]
+  modo="${1:-rotina}"
   removidos=0
-  ids=$( { docker ps -aq --filter "label=com.docker.stack.namespace=$STACK" --filter status=exited
-           docker ps -aq --filter "label=com.docker.stack.namespace=$STACK" --filter status=created
-           docker ps -aq --filter "label=com.docker.stack.namespace=$STACK" --filter status=dead; } 2>/dev/null | sort -u)
-  for c in $ids; do
-    # Saída normal (0) ou parada pelo Swarm (143 = SIGTERM, 137 = SIGKILL no
-    # fim do prazo) sai já. Quem quebrou com outro código fica 24 h, para os
-    # logs (docker service logs) ainda mostrarem o erro.
-    codigo=$(docker inspect --format '{{.State.ExitCode}}' "$c" 2>/dev/null || echo x)
-    case "$codigo" in
-      0|137|143) docker rm "$c" >/dev/null 2>&1 && removidos=$((removidos + 1)) ;;
-    esac
+  for c in $(parados); do
+    subindo "$c" && continue
+    if [ "$modo" != tudo ] && quebrou_na_versao_atual "$c"; then continue; fi
+    docker rm "$c" >/dev/null 2>&1 && removidos=$((removidos + 1))
   done
   antigos=$(docker container prune -f --filter "label=com.docker.stack.namespace=$STACK" --filter until=24h 2>/dev/null | grep -c '^[0-9a-f]\{64\}$' || true)
   removidos=$((removidos + ${antigos:-0}))
@@ -166,7 +214,6 @@ limpar_sobras() {
   # de -f quando a mesma imagem tem mais de uma tag; sem tag, pelo id.
   em_uso=$(docker ps -aq | xargs -r docker inspect --format '{{.Image}}' 2>/dev/null | sort -u)
   minha_tag=$(tag_de "$(imagem_do_servico "$EU")")
-  imagens=0
   docker image ls --no-trunc --format '{{.ID}} {{.Repository}} {{.Tag}}' 2>/dev/null |
     while read -r iid repo tag; do
       case "$repo" in "$BASE"/*) ;; *) continue ;; esac
@@ -178,8 +225,11 @@ limpar_sobras() {
   imagens=$(wc -l < /tmp/imagens-removidas 2>/dev/null || echo 0)
   rm -f /tmp/imagens-removidas
 
-  [ "$removidos" -gt 0 ] || [ "$imagens" -gt 0 ] &&
-    log "limpeza: $removidos contêiner(es) parado(s) e $imagens imagem(ns) antiga(s) removidos"
+  # Confere de verdade: quantos parados a stack ainda tem depois da limpeza.
+  restantes=$(parados | wc -l | tr -d ' ')
+  LIMPEZA="$removidos contêiner(es) parado(s) e $imagens imagem(ns) antiga(s) removidos; $restantes parado(s) na stack"
+  log "limpeza ($modo): $LIMPEZA"
+  registrar_limpeza "$restantes"
   ultima_limpeza=$(date +%s)
 }
 
@@ -274,11 +324,11 @@ atualizar() { # id versão
   # Contêineres da versão anterior já pararam: limpa agora. O meu antigo (e a
   # imagem ops antiga, que ele usa) sai na faxina do novo atualizador ao subir.
   andamento "$id" "Limpando contêineres, imagens e volumes sem uso..."
-  limpar_sobras
+  limpar_sobras tudo
   FAXINA=""
   faxina_geral
 
-  terminar "$id" concluida "Sistema atualizado para $versao. Limpeza: $FAXINA."
+  terminar "$id" concluida "Sistema atualizado para $versao. Limpeza: $LIMPEZA; $FAXINA."
   log "pedido $id: concluído"
 
   # Por último, eu mesmo (o Swarm troca este contêiner e o loop recomeça).
@@ -296,21 +346,37 @@ update public.sistema_atualizacoes
  where estado = 'executando';
 SQL
 
-# Ao subir (inclusive logo depois de uma atualização ou de um deploy pela
-# stack no Portainer) e depois de hora em hora.
-limpar_sobras
-
-# Acabei de ser trocado por uma atualização do console: o contêiner antigo do
-# atualizador e a imagem ops anterior só ficam livres agora. Faxina de novo.
+# Acabei de ser trocado por uma atualização do console? Então o que sobrar
+# parado é da atualização e sai tudo (modo "tudo"); senão, a rotina.
 recente=$(sql <<'SQL' || true
 select 1 from public.sistema_atualizacoes
  where estado = 'concluida' and concluido_em > now() - interval '15 minutes'
  limit 1;
 SQL
 )
+MODO_INICIO=rotina
+[ "$recente" = "1" ] && MODO_INICIO=tudo
+
+# Ao subir (inclusive logo depois de uma atualização ou de um deploy pela
+# stack no Portainer) e depois de hora em hora.
+limpar_sobras "$MODO_INICIO"
+
+# O contêiner antigo do atualizador e a imagem ops anterior só ficam livres
+# agora. Faxina de novo.
 [ "$recente" = "1" ] && faxina_geral
 
+# Revisões depois de subir: num deploy pela stack os serviços trocam ao mesmo
+# tempo e o PostgREST é reiniciado sem esperar (start-first), então parte dos
+# contêineres antigos ainda está parando na limpeza acima. Passa de novo em
+# 1 e em 5 minutos.
+revisoes="60 300"
+inicio=$(date +%s)
+
 while true; do
+  if [ -n "$revisoes" ] && [ $(( $(date +%s) - inicio )) -ge "${revisoes%% *}" ]; then
+    limpar_sobras "$MODO_INICIO"
+    case "$revisoes" in *" "*) revisoes="${revisoes#* }" ;; *) revisoes="" ;; esac
+  fi
   [ $(( $(date +%s) - ultima_limpeza )) -ge "$LIMPEZA_INTERVALO" ] && limpar_sobras
   sinal_de_vida || log "não consegui gravar o sinal de vida"
   pedido=$(sql <<'SQL' || true

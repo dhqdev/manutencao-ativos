@@ -86,6 +86,22 @@ export function CartaoAtualizacao({ situacao }: { situacao: SituacaoAtualizacao 
           </div>
         </dl>
 
+        {atualizador.limpeza && (
+          <p className="flex flex-wrap items-center gap-2 text-xs text-slate-500" data-limpeza>
+            <span>
+              Limpeza de contêineres em {dataHoraBR(atualizador.limpeza.em)}
+              {atualizador.limpeza.mensagem ? `: ${atualizador.limpeza.mensagem}.` : "."}
+            </span>
+            {atualizador.limpeza.parados === 0 ? (
+              <Badge className="bg-emerald-50 text-emerald-700 ring-emerald-600/20">Nenhum parado</Badge>
+            ) : atualizador.limpeza.parados ? (
+              <Badge className="bg-amber-50 text-amber-800 ring-amber-600/20">
+                {atualizador.limpeza.parados} parado(s) na stack
+              </Badge>
+            ) : null}
+          </p>
+        )}
+
         {situacao.erroConsulta && (
           <Aviso>Não consegui consultar o ghcr.io: {situacao.erroConsulta}.</Aviso>
         )}

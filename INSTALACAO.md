@@ -193,9 +193,11 @@ stack uma vez com o arquivo novo e o botão passa a funcionar.
 
 **Sobras:** o `atualizador` apaga sozinho os contêineres parados desta stack
 (substituídos numa atualização, migrador que terminou) e as imagens antigas
-`app`/`whatsapp`/`ops` que nenhum contêiner usa: no fim de cada atualização, ao
-subir e de hora em hora. Contêiner que saiu com erro fica 24 h (para o
-`docker service logs` mostrar o motivo). A lista de tarefas antigas em
+`app`/`whatsapp`/`ops` que nenhum contêiner usa: no fim de cada atualização
+(sem sobrar nenhum parado), ao subir, 1 e 5 minutos depois e de hora em hora.
+Fora de uma atualização, só o contêiner que quebrou na versão atual fica 24 h
+(para o `docker service logs` mostrar o motivo). O console (Versão e
+atualização) mostra a última limpeza e quantos parados sobraram. A lista de tarefas antigas em
 `docker service ps` continua aparecendo: é só o histórico do Swarm, sem
 contêiner nem disco.
 

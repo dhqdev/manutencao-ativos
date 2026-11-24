@@ -421,10 +421,13 @@ vX**. O clique só grava o pedido no banco (`sistema_atualizacoes`); o serviço
 4. por último troca a própria imagem;
 5. apaga as sobras: contêineres parados desta stack (os substituídos e o
    migrador que já terminou) e as imagens `app`/`whatsapp`/`ops` antigas que
-   nenhum contêiner usa. Contêiner que quebrou com erro fica 24 h para os logs
-   mostrarem o motivo. Neste passo, volumes e outras stacks não são tocados. A mesma
-   limpeza roda quando o atualizador sobe (também depois de atualizar a stack
-   pelo Portainer) e de hora em hora. A lista de tarefas antigas em
+   nenhum contêiner usa. Terminou a atualização, não sobra nenhum contêiner
+   parado na stack. Neste passo, volumes e outras stacks não são tocados. A
+   limpeza roda de novo quando o atualizador sobe (também depois de atualizar a
+   stack pelo Portainer), 1 e 5 minutos depois (o que ainda estava parando) e
+   de hora em hora; fora de uma atualização, só o contêiner que quebrou na
+   versão atual fica 24 h para os logs mostrarem o motivo. O console mostra a
+   última limpeza e quantos parados sobraram. A lista de tarefas antigas em
    `docker service ps` continua aparecendo: é só o histórico do Swarm;
 6. faz a faxina do servidor: toda imagem sem contêiner, cache de build,
    volumes anônimos sem uso e volumes com nome **sem uso e vazios** (volume

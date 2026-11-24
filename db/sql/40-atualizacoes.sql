@@ -48,6 +48,13 @@ create table if not exists public.sistema_atualizador (
   versao   text    -- tag em execução (pode ser "latest")
 );
 
+-- Resultado da última limpeza de contêineres parados (limpar_sobras do
+-- atualizador), para o console mostrar se a faxina está funcionando.
+alter table public.sistema_atualizador
+  add column if not exists limpeza_em  timestamptz,
+  add column if not exists limpeza_msg text,
+  add column if not exists parados     int;
+
 alter table public.sistema_atualizador enable row level security;
 revoke all on public.sistema_atualizador from anon, authenticated;
 grant select, insert, update on public.sistema_atualizador to service_role;

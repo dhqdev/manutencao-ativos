@@ -77,6 +77,24 @@ r=$(banco -c "select estado || ': ' || coalesce(mensagem, '') from sistema_atual
 echo "$r" | grep -q "^erro: .*não foi encontrada" && ok "versão inexistente recusada sem alterar nada" || erro "atualizador com versão inexistente: $r"
 docker service inspect --format '{{.Spec.TaskTemplate.ContainerSpec.Image}}' manutencao_app | grep -q ":$TAG" && ok "app continua na versão testada" || erro "atualizador mexeu no app"
 banco -c "insert into sistema_atualizacoes (versao) values ('x; rm -rf /')" >/dev/null 2>&1 && erro "banco aceitou versão fora do padrão" || ok "banco recusa versão fora do padrão"
+# Limpeza dos parados: troca cron e PostgREST como num deploy (o cron, da
+# imagem ops, para com 130 = SIGINT; o PostgREST, com 255), reinicia o
+# atualizador e confere que os contêineres antigos sumiram — o código de
+# saída "estranho" deixava eles para sempre.
+velhos=$(for s in manutencao_cron manutencao_rest; do docker ps -q --filter "label=com.docker.swarm.service.name=$s"; done)
+docker service update --quiet --force manutencao_cron >/dev/null 2>&1
+docker service update --quiet --force manutencao_rest >/dev/null 2>&1
+antes=$(banco -c "select coalesce(limpeza_em, 'epoch') from sistema_atualizador")
+docker service update --quiet --force manutencao_atualizador >/dev/null 2>&1
+# Limpa ao subir e revisa em 1 minuto (o que ainda estava parando).
+for _ in $(seq 1 60); do
+  sobrou=""
+  for c in $velhos; do docker inspect "$c" >/dev/null 2>&1 && sobrou="$sobrou $(docker inspect --format '{{.Name}}:{{.State.ExitCode}}' "$c")"; done
+  [ -z "$sobrou" ] && [ "$(banco -c "select limpeza_em > '$antes'::timestamptz from sistema_atualizador")" = "t" ] && break
+  sleep 2
+done
+[ -z "$sobrou" ] && ok "atualizador apaga os contêineres substituídos (130/255)" || erro "contêineres parados ficaram:$sobrou ($(docker service logs --tail 5 manutencao_atualizador 2>&1))"
+banco -c "select limpeza_msg from sistema_atualizador" | grep -q "parado(s) na stack" && ok "limpeza registrada para o console" || erro "limpeza não registrada no banco"
 
 echo "— permissões do banco (RLS e funções)"
 r=$(banco -c "select string_agg(tablename, ', ') from pg_tables where schemaname = 'public' and not rowsecurity")

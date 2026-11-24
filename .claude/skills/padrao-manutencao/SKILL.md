@@ -449,9 +449,16 @@ Variável nova de ambiente ⇒ atualize **todos** estes lugares no mesmo commit:
   `notify pgrst` pode morrer e o cache velho dá PGRST202 em função nova. Serviço novo que
   usa imagem nossa entra sozinho na atualização (é achado pela base da imagem).
   Sobras (pedido de 24/11/2026): `limpar_sobras` no atualizador apaga
-  contêineres parados com a etiqueta da stack (saída 0/137/143 na hora, outro
-  código depois de 24 h) e imagens da `BASE` sem contêiner usando, menos a tag
-  dele. Roda no fim da atualização, ao subir e de hora em hora. Nunca `-f`.
+  contêineres parados com a etiqueta da stack e imagens da `BASE` sem contêiner
+  usando, menos a tag dele. Nunca `-f`. **Decide pela tarefa do Swarm, não
+  pelo código de saída**: a imagem ops herda `STOPSIGNAL SIGINT` do postgres
+  (parada normal = 130) e o PostgREST sai com 255 — olhar o código deixava os
+  parados para sempre. Modo `tudo` no fim da atualização e ao subir até 15 min
+  depois de uma (pedido de 24/11/2026: não sobra nenhum parado); modo `rotina`
+  ao subir e de hora em hora (segura 24 h só tarefa failed/rejected da imagem
+  atual). Revisa 1 e 5 min depois de subir (start-first ainda parando). Grava
+  o resultado em `sistema_atualizador.limpeza_em/limpeza_msg/parados`, que o
+  console mostra; `verificar-stack.sh` testa trocando cron e PostgREST.
   `faxina_geral` (também pedido do dono, só em atualização pelo console e ao
   subir até 15 min depois de uma): `image prune -a`, `builder prune` e
   volumes sem uso que são anônimos ou, com nome, **vazios** (olhados por um
