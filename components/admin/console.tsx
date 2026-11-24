@@ -125,7 +125,7 @@ export function ConsoleAdmin({
               : "pb-[calc(1.5rem+env(safe-area-inset-bottom))]",
           )}
         >
-          <div key={pathname} className="entrada-pagina mx-auto w-full max-w-6xl">
+          <div key={pathname} className="entrada-pagina mx-auto w-full max-w-[120rem]">
             {children}
           </div>
         </main>

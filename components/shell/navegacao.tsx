@@ -343,8 +343,10 @@ export function Navegacao({
           </div>
         </header>
 
-        <main className="min-w-0 flex-1 px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 sm:p-6 sm:pb-[calc(6rem+env(safe-area-inset-bottom))] lg:p-8 lg:pb-8">
-          <div key={pathname} className="entrada-pagina mx-auto w-full max-w-7xl">
+        {/* Largura: o conteúdo usa a tela (pedido do dono, 24/11/2026). O teto de
+            120rem só segura monitores ultralargos, onde a linha ficaria longa demais. */}
+        <main className="min-w-0 flex-1 px-3 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-3 sm:px-5 sm:pt-5 sm:pb-[calc(6rem+env(safe-area-inset-bottom))] lg:px-6 lg:pb-6 lg:pt-6 2xl:px-8">
+          <div key={pathname} className="entrada-pagina mx-auto w-full max-w-[120rem]">
             {children}
           </div>
         </main>

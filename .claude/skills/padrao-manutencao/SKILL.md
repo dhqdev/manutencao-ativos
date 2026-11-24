@@ -309,6 +309,13 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   no celular (`md:hidden`), cartões compactos. Exemplos:
   `components/manutencoes/tabela-manutencoes.tsx` e `TabelaPlanos` em
   `components/planos/lista-planos.tsx`. Barra de filtros com `campo-compacto`.
+  - Exceção pedida pelo dono (24/11/2026): as **periódicas** abrem em
+    **Quadro** (kanban: uma coluna por situação com os cards
+    `CartaoPlano`, `QuadroPlanos` em `lista-planos.tsx`; no celular as
+    colunas empilham), com alternador Quadro/Lista lembrado no cookie
+    `vista_planos` (`lib/vista-planos.ts`, lido pela página no servidor).
+  - Largura: o conteúdo do `(app)` e do console usa a tela toda até
+    `max-w-[120rem]` (pedido do dono); não volte a centralizar estreito.
   - Lista que pode crescer sem limite (histórico geral) **não** baixa tudo
     para filtrar na tela: filtros, ordem e página vão na URL
     (`lib/historico.ts` valida tudo que vem dela) e o banco pagina

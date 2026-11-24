@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, CalendarDays, ClipboardList, Repeat, TrendingUp, Wallet } from "lucide-react";
@@ -16,11 +17,13 @@ import { IconeCategoria } from "@/lib/icones";
 import { STATUS_ATIVO, dataBR, moeda, numero } from "@/lib/format";
 import { podeGerenciar, podeRegistrar } from "@/lib/permissoes";
 import { getContexto } from "@/lib/session";
+import { COOKIE_VISTA_PLANOS, lerVistaPlanos } from "@/lib/vista-planos";
 import { createClient } from "@/lib/db/server";
 import type { Ativo, Categoria, Manutencao, PlanoStatus } from "@/lib/types";
 
 export default async function AtivoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const vista = lerVistaPlanos((await cookies()).get(COOKIE_VISTA_PLANOS)?.value);
   const { orgId, papel } = await getContexto();
   const gestor = podeGerenciar(papel);
   const registra = podeRegistrar(papel);
@@ -205,6 +208,7 @@ export default async function AtivoPage({ params }: { params: Promise<{ id: stri
                     orgId={orgId}
                     ativos={opcoesAtivos}
                     comFiltros={false}
+                    vistaInicial={vista}
                   />
                 )}
               </div>

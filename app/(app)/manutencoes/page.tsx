@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { CalendarClock, ClipboardList, Package, TriangleAlert } from "lucide-react";
 import { Abas } from "@/components/abas";
 import { LimparHistorico } from "@/components/manutencoes/limpar-historico";
@@ -9,6 +10,7 @@ import { ListaPlanos } from "@/components/planos/lista-planos";
 import { BotaoLink, Cabecalho, EstadoVazio } from "@/components/ui";
 import { podeGerenciar, podeRegistrar } from "@/lib/permissoes";
 import { getContexto } from "@/lib/session";
+import { COOKIE_VISTA_PLANOS, lerVistaPlanos } from "@/lib/vista-planos";
 import { createClient } from "@/lib/db/server";
 import type { PlanoStatus, SituacaoPlano } from "@/lib/types";
 import { urlsAssinadas } from "@/lib/arquivos";
@@ -25,6 +27,7 @@ export default async function ManutencoesPage({
   const parametros = await searchParams;
   const filtro = typeof parametros.filtro === "string" ? parametros.filtro : undefined;
   const filtros = lerFiltros(parametros);
+  const vista = lerVistaPlanos((await cookies()).get(COOKIE_VISTA_PLANOS)?.value);
   const { orgId, papel } = await getContexto();
   const gestor = podeGerenciar(papel);
   const registra = podeRegistrar(papel);
@@ -146,6 +149,7 @@ export default async function ManutencoesPage({
                   ativos={opcoesAtivos}
                   mostrarAtivo
                   filtroInicial={filtro === "alertas" ? "alertas" : "todos"}
+                  vistaInicial={vista}
                 />
               ),
           },

@@ -2,7 +2,19 @@
 
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
-import { CalendarDays, Download, Gauge, Pause, Play, Repeat, Search, User, Wallet } from "lucide-react";
+import {
+  CalendarDays,
+  Download,
+  Gauge,
+  Kanban,
+  List,
+  Pause,
+  Play,
+  Repeat,
+  Search,
+  User,
+  Wallet,
+} from "lucide-react";
 import { BotaoExcluir } from "@/components/confirmar";
 import { DialogoPlano } from "@/components/planos/dialogo-plano";
 import { DialogoManutencao } from "@/components/manutencoes/dialogo-manutencao";
@@ -19,6 +31,7 @@ import {
 } from "@/lib/format";
 import { baixarCsv, nomeCsv } from "@/lib/csv";
 import { csvPlanos } from "@/lib/exportar";
+import { salvarVistaPlanos, type VistaPlanos } from "@/lib/vista-planos";
 import type { PlanoStatus, SituacaoPlano } from "@/lib/types";
 
 export function ListaPlanos({
@@ -28,6 +41,7 @@ export function ListaPlanos({
   mostrarAtivo = false,
   comFiltros = true,
   filtroInicial = "todos",
+  vistaInicial = "quadro",
 }: {
   planos: PlanoStatus[];
   orgId: string;
@@ -35,8 +49,11 @@ export function ListaPlanos({
   mostrarAtivo?: boolean;
   comFiltros?: boolean;
   filtroInicial?: "todos" | SituacaoPlano | "alertas";
+  /** Quadro (kanban por situação) ou lista; vem do cookie (lib/vista-planos.ts). */
+  vistaInicial?: VistaPlanos;
 }) {
   const [busca, setBusca] = useState("");
+  const [vista, setVista] = useState<VistaPlanos>(vistaInicial);
   const [situacao, setSituacao] = useState<"todos" | SituacaoPlano | "alertas">(filtroInicial);
 
   const filtrados = useMemo(() => {
@@ -85,7 +102,36 @@ export function ListaPlanos({
             <option value="em_dia">Em dia</option>
             <option value="inativo">Pausadas</option>
           </select>
+          <div className="flex gap-2">
+          <div className="inline-flex shrink-0 rounded-lg border border-slate-300 bg-superficie p-0.5" role="radiogroup" aria-label="Vista">
+            {(
+              [
+                { id: "quadro", rotulo: "Quadro", Icone: Kanban },
+                { id: "lista", rotulo: "Lista", Icone: List },
+              ] as const
+            ).map(({ id, rotulo, Icone }) => (
+              <button
+                key={id}
+                type="button"
+                role="radio"
+                aria-checked={vista === id}
+                onClick={() => {
+                  setVista(id);
+                  salvarVistaPlanos(id);
+                }}
+                title={id === "quadro" ? "Cards por situação" : "Tabela"}
+                className={cn(
+                  "inline-flex h-[2.125rem] items-center gap-1.5 rounded-md px-2.5 text-[13px] font-medium transition-colors",
+                  vista === id ? "bg-slate-900 text-slate-50" : "text-slate-600 hover:bg-slate-100",
+                )}
+              >
+                <Icone className="h-4 w-4" />
+                {rotulo}
+              </button>
+            ))}
+          </div>
           <Botao
+            className="flex-1 justify-center sm:flex-none"
             variante="secundario"
             disabled={filtrados.length === 0}
             onClick={() => baixarCsv(nomeCsv("preventivas", hoje()), csvPlanos(filtrados))}
@@ -94,6 +140,7 @@ export function ListaPlanos({
             <Download className="h-4 w-4" />
             Exportar
           </Botao>
+          </div>
         </div>
       )}
 
@@ -101,6 +148,8 @@ export function ListaPlanos({
         <p className="card px-6 py-10 text-center text-sm text-slate-500">
           Nenhuma manutenção periódica encontrada.
         </p>
+      ) : vista === "quadro" ? (
+        <QuadroPlanos planos={filtrados} orgId={orgId} ativos={ativos} mostrarAtivo={mostrarAtivo} />
       ) : (
         <>
           <TabelaPlanos planos={filtrados} orgId={orgId} ativos={ativos} mostrarAtivo={mostrarAtivo} />
@@ -244,6 +293,82 @@ function CartaoPlano({
         />
       </div>
     </li>
+  );
+}
+
+const COLUNAS: { id: SituacaoPlano; titulo: string; vazio: string }[] = [
+  { id: "atrasada", titulo: "Atrasadas", vazio: "Nada atrasado." },
+  { id: "proxima", titulo: "Vencendo em breve", vazio: "Nada vencendo agora." },
+  { id: "em_dia", titulo: "Em dia", vazio: "Nenhuma em dia." },
+  { id: "inativo", titulo: "Pausadas", vazio: "Nenhuma pausada." },
+];
+
+/**
+ * Quadro estilo kanban: uma coluna por situação, com os cards. No computador
+ * as colunas ficam lado a lado (e o quadro rola para o lado se não couberem);
+ * no celular ficam empilhadas. Pausadas só aparece quando existe alguma, e uma
+ * coluna que o filtro de situação esconde não aparece.
+ */
+function QuadroPlanos({
+  planos,
+  orgId,
+  ativos,
+  mostrarAtivo,
+}: {
+  planos: PlanoStatus[];
+  orgId: string;
+  ativos: { id: string; nome: string; identificacao: string | null }[];
+  mostrarAtivo: boolean;
+}) {
+  const porSituacao = new Map<SituacaoPlano, PlanoStatus[]>();
+  for (const p of planos) porSituacao.set(p.situacao, [...(porSituacao.get(p.situacao) ?? []), p]);
+
+  // Com filtro de uma situação só, mostra só aquela coluna (larga).
+  const situacoes = new Set(planos.map((p) => p.situacao));
+  const unica = situacoes.size === 1 ? [...situacoes][0] : null;
+  const colunas = COLUNAS.filter((c) =>
+    unica ? c.id === unica : c.id !== "inativo" || porSituacao.has("inativo"),
+  );
+
+  return (
+    // Colunas dividem a largura; sem espaço para todas (tablet, menu aberto),
+    // o quadro rola para o lado. No celular, uma embaixo da outra (Atrasadas
+    // primeiro), com largura total: arrastar escondia cards de quem não sabia.
+    <div className="flex flex-col gap-3 sm:flex-row sm:snap-x sm:snap-mandatory sm:items-start sm:overflow-x-auto sm:pb-2 sm:[scrollbar-width:thin] lg:snap-none">
+      {colunas.map((c) => {
+        const itens = porSituacao.get(c.id) ?? [];
+        const s = SITUACAO_PLANO[c.id];
+        return (
+          <section
+            key={c.id}
+            aria-label={c.titulo}
+            className={cn(
+              "flex w-full flex-col rounded-xl border border-slate-200 bg-slate-100/60 sm:w-[20rem] sm:shrink-0 sm:snap-start lg:w-auto lg:min-w-[19rem] lg:flex-1 lg:shrink",
+              unica && "sm:w-full",
+            )}
+          >
+            <header className="flex items-center gap-2 px-3 py-2.5">
+              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: s.ponto }} aria-hidden />
+              <h3 className="text-[13px] font-semibold text-slate-800">{c.titulo}</h3>
+              <span className="ml-auto rounded-full bg-superficie px-2 py-0.5 text-[11px] font-semibold text-slate-600 ring-1 ring-inset ring-slate-200">
+                {itens.length}
+              </span>
+            </header>
+            {itens.length === 0 ? (
+              <p className="mx-2 mb-2 rounded-lg border border-dashed border-slate-300 px-3 py-6 text-center text-[13px] text-slate-500">
+                {c.vazio}
+              </p>
+            ) : (
+              <ul className={cn("grid gap-2.5 px-2 pb-2", unica && "md:grid-cols-2 xl:grid-cols-3")}>
+                {itens.map((p) => (
+                  <CartaoPlano key={p.id} plano={p} orgId={orgId} ativos={ativos} mostrarAtivo={mostrarAtivo} />
+                ))}
+              </ul>
+            )}
+          </section>
+        );
+      })}
+    </div>
   );
 }
 
