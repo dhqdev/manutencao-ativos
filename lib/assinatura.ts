@@ -97,6 +97,22 @@ export function dataNoDia(iso: string, dia: number | null) {
   return m === 12 ? noMes(a + 1, 1) : noMes(a, m + 1);
 }
 
+/**
+ * Data que a tela do superadmin propõe ao escolher "vence todo dia N" (ou uma
+ * data com o dia já fixo): o dia N do MESMO mês da data (31 em fevereiro vira
+ * o último dia). Se isso já passou, o próximo dia N a partir de hoje — hoje
+ * 24/11 com vencimento 24/12 e dia 5 dá 05/12, não 05/01. Vencimento que já
+ * estava atrasado fica no mês dele: trocar o dia não dá dias de graça.
+ * Sem data, o próximo dia N a partir de hoje.
+ */
+export function vencimentoNoDia(iso: string, dia: number | null, hojeIso: string) {
+  if (!dia) return iso;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return dataNoDia(hojeIso, dia);
+  const noMes = dataNoDia(`${iso.slice(0, 7)}-01`, dia);
+  if (noMes >= hojeIso || iso < hojeIso) return noMes;
+  return dataNoDia(hojeIso, dia);
+}
+
 /** "Mensal, vence todo dia 5" / "Trimestral". */
 export function descreverPlano(ciclo: number | null | undefined, dia: number | null | undefined) {
   const nome = ehCiclo(ciclo) ? CICLOS[ciclo] : CICLOS[1];

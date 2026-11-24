@@ -46,11 +46,11 @@ import {
   ESTADOS_ASSINATURA,
   LISTA_CICLOS,
   SITUACOES_PAGAMENTO,
-  dataNoDia,
   descreverPlano,
+  vencimentoNoDia,
   type EstadoAssinatura,
 } from "@/lib/assinatura";
-import { dataBR, dataHoraBR, moeda } from "@/lib/format";
+import { dataBR, dataHoraBR, hoje, moeda } from "@/lib/format";
 import type { Resultado } from "@/lib/form";
 import { formatarTelefone } from "@/lib/telefone";
 
@@ -598,10 +598,10 @@ function LinhaEmpresa({ e }: { e: EmpresaAssinatura }) {
     ciclo !== (e.ciclo_meses ?? 1) ||
     dia !== (e.dia_vencimento ?? null);
 
-  /** Escolheu o dia: a data já vai para esse dia (o banco grava igual, dataNoDia). */
+  /** Escolheu o dia: a data vai para esse dia no mês certo (vencimentoNoDia); o banco grava igual. */
   function escolherDia(novo: number | null) {
     setDia(novo);
-    if (novo && vencimento) setVencimento(dataNoDia(vencimento, novo));
+    if (novo) setVencimento(vencimentoNoDia(vencimento, novo, hoje()));
   }
   const est = ESTADOS_ASSINATURA[e.situacao?.estado ?? "sem_cobranca"];
   const dias = e.situacao?.dias;
@@ -686,7 +686,7 @@ function LinhaEmpresa({ e }: { e: EmpresaAssinatura }) {
           <input
             type="date"
             value={vencimento}
-            onChange={(ev) => setVencimento(dia && ev.target.value ? dataNoDia(ev.target.value, dia) : ev.target.value)}
+            onChange={(ev) => setVencimento(dia && ev.target.value ? vencimentoNoDia(ev.target.value, dia, hoje()) : ev.target.value)}
             className="campo campo-compacto w-40"
             aria-label={`Vencimento de ${e.nome}`}
           />

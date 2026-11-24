@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { crc16, montarPix, normalizarChavePix, textoPix } from "../../lib/pix.ts";
-import { avisoAssinatura, dataNoDia, descreverPlano, lerValorReais } from "../../lib/assinatura.ts";
+import { avisoAssinatura, dataNoDia, descreverPlano, lerValorReais, vencimentoNoDia } from "../../lib/assinatura.ts";
 
 test("Pix: confere com o exemplo do manual do BR Code (Banco Central)", () => {
   const codigo = montarPix({
@@ -83,4 +83,24 @@ test("Assinatura: dia fixo do vencimento igual ao banco (assinatura_no_dia)", ()
   assert.equal(dataNoDia("2026-11-24", null), "2026-11-24");
   assert.equal(descreverPlano(3, 5), "Trimestral, vence todo dia 5");
   assert.equal(descreverPlano(undefined, null), "Mensal");
+});
+
+test("Assinatura: escolher o dia na tela põe a data no mês certo (vencimentoNoDia)", () => {
+  const hoje = "2026-11-24";
+  // O caso do dono: novembro, dia 5 → 5 de dezembro (não janeiro).
+  assert.equal(vencimentoNoDia("2026-12-24", 5, hoje), "2026-12-05");
+  assert.equal(vencimentoNoDia("2026-11-24", 5, hoje), "2026-12-05");
+  assert.equal(vencimentoNoDia("2026-11-30", 5, hoje), "2026-12-05");
+  assert.equal(vencimentoNoDia("", 5, hoje), "2026-12-05");
+  // Dia que ainda vem neste mês fica neste mês; o mesmo mês mais à frente também.
+  assert.equal(vencimentoNoDia("2026-12-24", 28, hoje), "2026-12-28");
+  assert.equal(vencimentoNoDia("2026-11-24", 28, hoje), "2026-11-28");
+  assert.equal(vencimentoNoDia("2026-11-24", 24, hoje), "2026-11-24");
+  assert.equal(vencimentoNoDia("2027-03-24", 5, hoje), "2027-03-05");
+  // 31 em fevereiro vira o último dia.
+  assert.equal(vencimentoNoDia("2027-02-10", 31, hoje), "2027-02-28");
+  // Atrasada continua atrasada: trocar o dia não dá dias de graça.
+  assert.equal(vencimentoNoDia("2026-10-24", 5, hoje), "2026-10-05");
+  // Sem dia, a data fica como está.
+  assert.equal(vencimentoNoDia("2026-12-24", null, hoje), "2026-12-24");
 });
