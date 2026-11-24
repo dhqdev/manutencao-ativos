@@ -359,6 +359,11 @@ Variável nova de ambiente ⇒ atualize **todos** estes lugares no mesmo commit:
   força o restart do PostgREST da stack (`servicos_postgrest`): o canal de
   `notify pgrst` pode morrer e o cache velho dá PGRST202 em função nova. Serviço novo que
   usa imagem nossa entra sozinho na atualização (é achado pela base da imagem).
+  Sobras (pedido de 24/11/2026): `limpar_sobras` no atualizador apaga
+  contêineres parados com a etiqueta da stack (saída 0/137/143 na hora, outro
+  código depois de 24 h) e imagens da `BASE` sem contêiner usando, menos a tag
+  dele. Roda no fim da atualização, ao subir e de hora em hora. Nunca `-f`,
+  nunca `volume`/`system prune`, nada fora da stack.
 
 ## 6. Testes e CI
 

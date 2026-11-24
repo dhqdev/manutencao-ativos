@@ -191,6 +191,14 @@ imagens: quando a release muda o arquivo da stack (variável ou serviço novo),
 atualize a stack também. Stack antiga, sem o serviço `atualizador`: atualize a
 stack uma vez com o arquivo novo e o botão passa a funcionar.
 
+**Sobras:** o `atualizador` apaga sozinho os contêineres parados desta stack
+(substituídos numa atualização, migrador que terminou) e as imagens antigas
+`app`/`whatsapp`/`ops` que nenhum contêiner usa: no fim de cada atualização, ao
+subir e de hora em hora. Contêiner que saiu com erro fica 24 h (para o
+`docker service logs` mostrar o motivo). Não mexe em volumes nem em outras
+stacks. A lista de tarefas antigas em `docker service ps` continua aparecendo:
+é só o histórico do Swarm, sem contêiner nem disco.
+
 O banco acompanha sozinho: além do migrador, os serviços **backup** e
 **atualizador** comparam, ao subir, a versão da imagem deles com a gravada em
 `sistema_esquema` e aplicam o SQL se o banco estiver atrás (nunca para trás).

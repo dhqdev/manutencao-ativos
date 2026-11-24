@@ -8,6 +8,8 @@
 #   3. troca a imagem dos outros serviços da stack, um de cada vez, esperando
 #      cada um ficar de pé (o app volta sozinho se a versão nova não subir)
 #   4. por último troca a própria imagem
+#   5. limpa as sobras (limpar_sobras): contêineres parados desta stack e
+#      imagens nossas que nenhum contêiner usa mais
 #
 # Precisa do socket do Docker (/var/run/docker.sock) e roda num manager.
 # Só troca a imagem dos serviços da PRÓPRIA stack cujas imagens vêm da mesma
@@ -132,6 +134,52 @@ esperar_migrador() { # serviço imagem
   return 1
 }
 
+# Sobras de atualização: cada troca de imagem deixa o contêiner antigo parado
+# (o Swarm guarda até 5 tarefas por serviço) e a imagem da versão anterior no
+# disco. Limpa só o que é desta stack (etiqueta com.docker.stack.namespace) e
+# nunca usa -f: contêiner rodando e imagem em uso por qualquer contêiner (de
+# qualquer stack) ficam. Volumes não são tocados.
+LIMPEZA_INTERVALO=3600
+ultima_limpeza=0
+limpar_sobras() {
+  removidos=0
+  ids=$( { docker ps -aq --filter "label=com.docker.stack.namespace=$STACK" --filter status=exited
+           docker ps -aq --filter "label=com.docker.stack.namespace=$STACK" --filter status=created
+           docker ps -aq --filter "label=com.docker.stack.namespace=$STACK" --filter status=dead; } 2>/dev/null | sort -u)
+  for c in $ids; do
+    # Saída normal (0) ou parada pelo Swarm (143 = SIGTERM, 137 = SIGKILL no
+    # fim do prazo) sai já. Quem quebrou com outro código fica 24 h, para os
+    # logs (docker service logs) ainda mostrarem o erro.
+    codigo=$(docker inspect --format '{{.State.ExitCode}}' "$c" 2>/dev/null || echo x)
+    case "$codigo" in
+      0|137|143) docker rm "$c" >/dev/null 2>&1 && removidos=$((removidos + 1)) ;;
+    esac
+  done
+  antigos=$(docker container prune -f --filter "label=com.docker.stack.namespace=$STACK" --filter until=24h 2>/dev/null | grep -c '^[0-9a-f]\{64\}$' || true)
+  removidos=$((removidos + ${antigos:-0}))
+
+  # Imagens da nossa base (app, whatsapp, ops) que nenhum contêiner usa,
+  # menos a tag em que eu estou. Remove pelo nome (repo:tag) para não precisar
+  # de -f quando a mesma imagem tem mais de uma tag; sem tag, pelo id.
+  em_uso=$(docker ps -aq | xargs -r docker inspect --format '{{.Image}}' 2>/dev/null | sort -u)
+  minha_tag=$(tag_de "$(imagem_do_servico "$EU")")
+  imagens=0
+  docker image ls --no-trunc --format '{{.ID}} {{.Repository}} {{.Tag}}' 2>/dev/null |
+    while read -r iid repo tag; do
+      case "$repo" in "$BASE"/*) ;; *) continue ;; esac
+      [ "$tag" = "$minha_tag" ] && continue
+      printf '%s\n' "$em_uso" | grep -qx "$iid" && continue
+      if [ "$tag" = "<none>" ]; then alvo="$iid"; else alvo="$repo:$tag"; fi
+      docker image rm "$alvo" >/dev/null 2>&1 && echo "$alvo"
+    done > /tmp/imagens-removidas 2>/dev/null || true
+  imagens=$(wc -l < /tmp/imagens-removidas 2>/dev/null || echo 0)
+  rm -f /tmp/imagens-removidas
+
+  [ "$removidos" -gt 0 ] || [ "$imagens" -gt 0 ] &&
+    log "limpeza: $removidos contêiner(es) parado(s) e $imagens imagem(ns) antiga(s) removidos"
+  ultima_limpeza=$(date +%s)
+}
+
 atualizar() { # id versão
   id="$1"; versao="$2"
   if ! printf '%s' "$versao" | grep -Eq "$VERSAO_VALIDA"; then
@@ -192,6 +240,10 @@ atualizar() { # id versão
   terminar "$id" concluida "Sistema atualizado para $versao."
   log "pedido $id: concluído"
 
+  # Contêineres da versão anterior já pararam: limpa agora. O meu antigo (e a
+  # imagem ops antiga, que ele usa) sai na limpeza do novo atualizador ao subir.
+  limpar_sobras
+
   # Por último, eu mesmo (o Swarm troca este contêiner e o loop recomeça).
   docker service update --quiet --detach --image "$(imagem_nova "$EU" "$versao")" "$EU" >/dev/null 2>&1 || true
 }
@@ -207,7 +259,12 @@ update public.sistema_atualizacoes
  where estado = 'executando';
 SQL
 
+# Ao subir (inclusive logo depois de uma atualização ou de um deploy pela
+# stack no Portainer) e depois de hora em hora.
+limpar_sobras
+
 while true; do
+  [ $(( $(date +%s) - ultima_limpeza )) -ge "$LIMPEZA_INTERVALO" ] && limpar_sobras
   sinal_de_vida || log "não consegui gravar o sinal de vida"
   pedido=$(sql <<'SQL' || true
 update public.sistema_atualizacoes

@@ -273,7 +273,13 @@ vX**. O clique só grava o pedido no banco (`sistema_atualizacoes`); o serviço
 2. roda o migrador da versão nova e espera terminar;
 3. troca a imagem dos outros serviços, um de cada vez (o app volta sozinho
    para a versão anterior se a nova não subir);
-4. por último troca a própria imagem.
+4. por último troca a própria imagem;
+5. apaga as sobras: contêineres parados desta stack (os substituídos e o
+   migrador que já terminou) e as imagens `app`/`whatsapp`/`ops` antigas que
+   nenhum contêiner usa. Contêiner que quebrou com erro fica 24 h para os logs
+   mostrarem o motivo. Volumes e outras stacks não são tocados. A mesma
+   limpeza roda quando o atualizador sobe (também depois de atualizar a stack
+   pelo Portainer) e de hora em hora.
 
 O andamento aparece na tela. Só as imagens mudam: variável nova ou serviço
 novo na stack ainda pedem um deploy pela stack (`deploy.sh` ou Portainer).
