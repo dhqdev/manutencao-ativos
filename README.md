@@ -206,9 +206,9 @@ empresas (dashboard, ativos, manutenções…). Qualquer tela do sistema o devol
 ao console, e ele não pode fazer parte da equipe de nenhuma empresa.
 
 A exceção é o botão **Entrar como**, no detalhe de um usuário: abre o sistema
-na conta da pessoa, sem a senha dela, para ver o que ela vê. A sessão dura
-1 hora, não se renova, não conta como acesso da pessoa e cai se o superadmin
-perder o posto. Uma faixa no topo mostra de quem é a conta e o botão **Voltar
+na conta da pessoa, sem a senha dela, para ver o que ela vê. A sessão vale
+até você voltar ao console ou sair (sem limite de 1 hora), não conta como
+acesso da pessoa e cai se o superadmin perder o posto. Uma faixa no topo mostra de quem é a conta e o botão **Voltar
 ao console** (sair pelo menu também volta). Cada entrada fica registrada em
 `sistema_entradas_como` (quem, na conta de quem, quando, IP e quando saiu).
 Não vale para usuário bloqueado, sem empresa ou outro superadmin.

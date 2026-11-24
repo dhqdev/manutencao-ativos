@@ -97,8 +97,9 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   `/admin` e ele não pode ser membro de equipe (`admin_definir_membro` recusa).
   A única porta é o **"Entrar como"** (pedido do dono em 23/11/2026), no
   detalhe do usuário: `adminEntrarComo()` → `auth_entrar_como()`
-  (`db/sql/72-entrar-como.sql`) cria uma sessão de 1 h (`MINUTOS_ENTRAR_COMO`,
-  `lib/auth/entrar-como.ts`) **da pessoa**, marcada em
+  (`db/sql/72-entrar-como.sql`) cria uma sessão **da pessoa** que vale até ele
+  voltar ao console (sem limite de 1 h, pedido de 24/11/2026; teto técnico de
+  30 dias em `MINUTOS_ENTRAR_COMO`, `lib/auth/entrar-como.ts`), marcada em
   `auth.sessoes.aberta_por`, sem renovar e sem contar como acesso dela, e
   registra em `sistema_entradas_como`. O cookie do superadmin fica em
   `sessao_admin`; `voltarAoConsole()` (rotas `/auth/voltar` e `/auth/sair`, e
@@ -183,6 +184,9 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
 - Use os componentes prontos: `Cabecalho`, `Secao`, `Campo`, `Botao`,
   `BotaoLink`, `Badge`, `EstadoVazio` (`components/ui.tsx`), `Modal` +
   `RodapeModal`, `BotaoExcluir` (confirmação), `Abas`, `FormularioSalvar`.
+  O `Modal` guarda `aoFechar` num ref e só foca o painel ao abrir: efeito
+  que depende de função inline roda a cada tecla e rouba o foco do campo.
+  No e2e, campo de texto em modal se preenche com `pressSequentially`.
   Inputs com a classe `campo`, rótulos com `rotulo`, cartões com `card`.
 - Ícones só do `lucide-react`. Cores: grafite (`slate-900`) é ação, `marca-*`
   é navegação/estado; badges de papel seguem `PAPEIS` de `components/configuracoes/equipe.tsx`

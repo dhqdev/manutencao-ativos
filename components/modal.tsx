@@ -25,11 +25,18 @@ export function Modal({
   largura?: string;
 }) {
   const painel = useRef<HTMLDivElement>(null);
+  // aoFechar costuma ser uma função nova a cada render (arrow inline). Se ela
+  // fosse dependência do efeito, cada letra digitada rodaria o efeito de novo
+  // e o foco voltaria para o painel: o campo só aceitava a primeira letra.
+  const fechar = useRef(aoFechar);
+  useEffect(() => {
+    fechar.current = aoFechar;
+  });
 
   useEffect(() => {
     if (!aberto) return;
 
-    const esc = (e: KeyboardEvent) => e.key === "Escape" && aoFechar();
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && fechar.current();
     document.addEventListener("keydown", esc);
 
     const anterior = document.body.style.overflow;
@@ -42,7 +49,7 @@ export function Modal({
       document.removeEventListener("keydown", esc);
       document.body.style.overflow = anterior;
     };
-  }, [aberto, aoFechar]);
+  }, [aberto]);
 
   if (!aberto) return null;
 

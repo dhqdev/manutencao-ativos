@@ -533,8 +533,8 @@ function DetalheUsuario({
         >
           <div className="space-y-3 px-5 py-5">
             <p className="text-sm text-slate-600">
-              Você vai abrir o sistema na conta de <strong className="font-medium text-slate-900">{u.email}</strong> por
-              até 1 hora. O motivo e cada alteração que fizer ficam registrados, e a empresa vê isso na tela Equipe.
+              Você vai abrir o sistema na conta de <strong className="font-medium text-slate-900">{u.email}</strong> até
+              você voltar ao console. O motivo e cada alteração que fizer ficam registrados, e a empresa vê isso na tela Equipe.
             </p>
             <Campo label="Motivo" obrigatorio>
               <input

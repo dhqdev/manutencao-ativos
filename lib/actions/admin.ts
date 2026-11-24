@@ -197,7 +197,7 @@ export async function adminExcluirUsuario(userId: string): Promise<Resultado> {
 
 /**
  * "Entrar como": abre o sistema na conta da pessoa, sem a senha dela. O banco
- * (auth_entrar_como) confere as regras de novo, cria uma sessão curta marcada
+ * (auth_entrar_como) confere as regras de novo, cria uma sessão marcada
  * com quem a abriu e grava o registro. O cookie do superadmin fica guardado
  * para "Voltar ao console" (lib/auth/entrar-como.ts).
  *

@@ -34,7 +34,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           nome={ctx.profile.nome ?? ctx.email}
           email={ctx.email}
           empresa={ctx.organizacao.nome}
-          expiraEm={ctx.entradaComo.expiraEm}
         />
       )}
       {convites.length > 0 && (

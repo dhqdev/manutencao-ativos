@@ -85,7 +85,8 @@ begin
     raise exception 'Diga por que vai entrar na conta (ex.: "chamado 123: relatório não abre").' using errcode = '22023';
   end if;
 
-  v_expira := now() + make_interval(mins => greatest(5, least(coalesce(p_minutos, 60), 240)));
+  -- Vale até o superadmin voltar ao console; o teto é o de um login comum (30 dias).
+  v_expira := now() + make_interval(mins => greatest(5, least(coalesce(p_minutos, 43200), 43200)));
 
   delete from auth.sessoes where user_id = p_user and expira_em < now();
 

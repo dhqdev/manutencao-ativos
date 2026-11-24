@@ -363,7 +363,8 @@ await passo("console: \"Entrar como\" abre a conta do usuário sem senha e volta
   await page.locator(`li[data-usuario="${GESTOR.email}"] button`).click();
   await page.locator(`[data-detalhe="${GESTOR.email}"]`).getByRole("button", { name: "Entrar como", exact: true }).click();
   // Motivo obrigatório: fica no registro e a empresa vê na tela Equipe.
-  await page.locator('input[name="motivo"]').fill("Teste E2E: conferir relatório");
+  // Digitado letra a letra (não .fill): pega campo que perde o foco a cada tecla.
+  await page.locator('input[name="motivo"]').pressSequentially("Teste E2E: conferir relatório");
   await page.getByRole("button", { name: "Entrar na conta" }).click();
   await page.waitForURL("**/dashboard");
   await page.locator(`[data-entrar-como="${GESTOR.email}"]`).waitFor();

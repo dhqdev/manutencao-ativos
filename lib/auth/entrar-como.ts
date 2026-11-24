@@ -8,14 +8,16 @@ import { COOKIE_SESSAO, COOKIE_SESSAO_ADMIN, apagarCookie, lerCookieSessao, opco
  * "Entrar como": o superadmin abre o sistema na conta de outra pessoa, sem a
  * senha dela, a partir do console (adminEntrarComo em lib/actions/admin.ts).
  *
- * - A sessão da pessoa é curta (MINUTOS_ENTRAR_COMO), não se renova e fica
- *   registrada em sistema_entradas_como (db/sql/72-entrar-como.sql).
+ * - A sessão da pessoa vale até o superadmin voltar ao console ou sair (o
+ *   dono tirou o limite de 1 hora em 24/11/2026). MINUTOS_ENTRAR_COMO é só o
+ *   teto técnico, o mesmo de um login comum; não se renova e fica registrada
+ *   em sistema_entradas_como (db/sql/72-entrar-como.sql).
  * - O cookie do superadmin fica guardado em COOKIE_SESSAO_ADMIN; "Voltar ao
  *   console", "Sair" ou o fim do tempo passam por voltarAoConsole(), que fecha
  *   a sessão emprestada e devolve o cookie dele.
  */
 
-export const MINUTOS_ENTRAR_COMO = 60;
+export const MINUTOS_ENTRAR_COMO = 30 * 24 * 60; // 30 dias, como um login comum
 
 /**
  * Pedido vindo de outro site (link ou <img> apontando para /auth/sair): o

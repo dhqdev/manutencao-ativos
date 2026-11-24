@@ -1,21 +1,18 @@
 import { ArrowLeft, ShieldCheck } from "lucide-react";
-import { horaBR } from "@/lib/format";
 
 /**
  * Faixa no topo enquanto o superadmin está na conta de alguém pelo "Entrar
- * como" (lib/auth/entrar-como.ts). Deixa claro de quem é a conta, até quando
- * vale e como voltar. Sair pelo menu também volta ao console.
+ * como" (lib/auth/entrar-como.ts). Deixa claro de quem é a conta e como
+ * voltar: o acesso vale até ele voltar ao console ou sair. Sair pelo menu também volta ao console.
  */
 export function AvisoEntrarComo({
   nome,
   email,
   empresa,
-  expiraEm,
 }: {
   nome: string;
   email: string;
   empresa: string;
-  expiraEm: string;
 }) {
   return (
     <div
@@ -26,8 +23,8 @@ export function AvisoEntrarComo({
       <ShieldCheck className="hidden h-5 w-5 shrink-0 text-amber-700 sm:block" aria-hidden />
       <p className="min-w-0 flex-1">
         Você está na conta de <strong>{nome}</strong> <span className="text-amber-800">({email})</span> em{" "}
-        <strong>{empresa}</strong>, pelo console do superadmin. Tudo o que fizer fica no nome dessa pessoa. Acesso
-        válido até {horaBR(expiraEm)}.
+        <strong>{empresa}</strong>, pelo console do superadmin. Tudo o que fizer fica no nome dessa pessoa e no
+        registro do console.
       </p>
       <form action="/auth/voltar" method="post" className="shrink-0">
         <button
