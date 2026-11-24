@@ -256,6 +256,7 @@ export function PainelEquipe({
                 placeholder="Buscar por nome, e-mail, cargo ou telefone"
                 aria-label="Buscar na equipe"
                 className="campo pl-9"
+                data-busca
               />
             </div>
             <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5" role="group" aria-label="Filtrar por papel">

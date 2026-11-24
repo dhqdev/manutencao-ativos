@@ -81,12 +81,20 @@ com as variáveis de `whatsapp/src/config.js`).
 | **Dashboard** | Ativos cadastrados, manutenções vencendo, atrasadas, gasto do mês, gasto dos últimos 6 meses, gasto por categoria e últimas manutenções |
 | **Ativos** | Categorias funcionam como pastas. Entrando na pasta, a lista de ativos com busca e filtro de situação |
 | Ativo (detalhe) | Abas de **Histórico** (com fotos/anexos, peças, custo, garantia), **Manutenções periódicas** e **Dados do ativo** |
-| **Manutenções** | Todas as preventivas com alertas de atraso/vencimento + histórico geral |
+| **Manutenções** | Todas as preventivas com alertas de atraso/vencimento + histórico geral em tabela, com busca, filtros (tipo, categoria, ativo, período) e ordem que ficam no link, paginação e **Exportar CSV** (abre no Excel) |
 | **Calendário** | Mês a mês, com realizadas (verde), programadas (azul) e atrasadas (vermelho). Filtra por categoria e por situação |
 | **Estoque** | Pneus com número de fogo, medida, DOT, sulco, valor e situação (estoque, em uso, recapagem, descarte). Movimentações com veículo, posição e KM, e histórico de cada pneu |
 | **Relatórios** | Filtra por período, uma ou mais categorias, ativo e tipo. Histórico com horímetro/KM e seção de pneus (gastos, movimentações, sulco baixo). Gera PDF e compartilha no WhatsApp |
 | **Equipe** | Quem tem acesso, com que papel, último acesso e quem está conectado. Busca, filtro por papel, criar acesso, trocar papel, editar dados, gerar senha nova, desconectar e remover |
-| **Configurações** | Dados da empresa, perfil, senha, aparência (tema e decoração de Natal), **WhatsApp** (com horário do envio), empresa ativa |
+| **Configurações** | Dados da empresa, perfil, senha, aparência (tema, densidade das tabelas e decoração de Natal), **WhatsApp** (com horário do envio), empresa ativa |
+
+### Busca e atalhos de teclado
+
+**Ctrl+K** (⌘K no Mac) ou o botão **Buscar** do menu abre a busca global:
+ativos, manutenções, periódicas, pneus e telas da empresa aberta, e a ação
+"Registrar manutenção". Na busca, **?** mostra todos os atalhos: **/** vai para
+a busca da tela, **N** abre o cadastro novo da tela (manutenção, ativo, pneu),
+**Ctrl+B** recolhe o menu e **Esc** fecha janelas.
 
 ### Natal
 
@@ -110,6 +118,8 @@ No celular a interface muda:
   atalhos e Sair);
 - os **modais sobem da borda inferior**, com alça de arrasto, em vez de aparecer
   no meio da tela;
+- nas listas, ao rolar, aparece uma barrinha fixa com **Filtros** e o botão
+  de novo cadastro da tela;
 - respeita as áreas seguras (notch e barra de gestos).
 
 Sem internet, aparece uma tela avisando — nunca dados de manutenção

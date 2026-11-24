@@ -126,6 +126,74 @@ h3 {
   }
 }
 
+/* Campo mais baixo nas barras de filtro (só do tablet para cima: no celular
+   o campo fica alto para o dedo e com 16px, senão o Safari dá zoom). */
+@utility campo-compacto {
+  @media (width >= 40rem) {
+    min-height: 2.25rem;
+    padding-top: 0.375rem;
+    padding-bottom: 0.375rem;
+    &:is(select) {
+      min-height: 2.25rem;
+    }
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Tabelas de dados (histórico, periódicas, relatórios): densas, cabeçalho
+   fixo ao rolar, números alinhados, rodapé com o total. A densidade vem da
+   preferência do aparelho (lib/densidade.ts): compacta por padrão.
+   --------------------------------------------------------------------------- */
+.tabela-erp {
+  border-collapse: separate;
+  border-spacing: 0;
+  --linha-py: 0.4rem;
+}
+:root.densidade-confortavel .tabela-erp {
+  --linha-py: 0.7rem;
+}
+.tabela-erp th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background-color: var(--color-slate-50);
+  border-bottom: 1px solid var(--color-slate-200);
+  padding: 0.45rem 0.75rem;
+  text-align: left;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-slate-500);
+  white-space: nowrap;
+}
+.tabela-erp td {
+  padding: var(--linha-py) 0.75rem;
+  border-bottom: 1px solid var(--color-slate-100);
+  vertical-align: middle;
+}
+.tabela-erp tbody tr:hover > td,
+.tabela-erp tbody tr.linha-aberta > td {
+  background-color: color-mix(in oklab, var(--color-slate-100) 55%, transparent);
+}
+.tabela-erp tbody tr.linha-detalhe:hover > td {
+  background-color: transparent;
+}
+.tabela-erp tfoot td {
+  background-color: var(--color-slate-50);
+  border-bottom: 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+}
+.tabela-erp th:first-child,
+.tabela-erp td:first-child {
+  padding-left: 1rem;
+}
+.tabela-erp th:last-child,
+.tabela-erp td:last-child {
+  padding-right: 0.75rem;
+}
+
 @utility rotulo {
   display: block;
   margin-bottom: 0.375rem;
@@ -194,17 +262,6 @@ h3 {
   animation: aproximar 0.18s ease-out;
 }
 
-@keyframes subir-suave {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 @keyframes pop {
   from {
     opacity: 0;
@@ -232,23 +289,21 @@ h3 {
  * modais, que moram dentro das telas, deixariam de cobrir a janela inteira.
  */
 @utility entrada-pagina {
-  animation: subir-suave 0.24s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation: aparecer 0.12s ease-out backwards;
 }
 
-/* Filhos aparecem um depois do outro — inspirado no "Animated List" do React Bits. */
+/* Antes os filhos entravam em cascata; num sistema de trabalho isso só atrasa
+   a leitura. Fica um fade curto, todos juntos. */
 @utility lista-escalonada {
   & > * {
-    animation: subir-suave 0.28s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+    animation: aparecer 0.15s ease-out backwards;
   }
-  & > *:nth-child(1) { animation-delay: 0.01s; }
-  & > *:nth-child(2) { animation-delay: 0.03s; }
-  & > *:nth-child(3) { animation-delay: 0.05s; }
-  & > *:nth-child(4) { animation-delay: 0.07s; }
-  & > *:nth-child(5) { animation-delay: 0.09s; }
-  & > *:nth-child(6) { animation-delay: 0.11s; }
-  & > *:nth-child(7) { animation-delay: 0.13s; }
-  & > *:nth-child(8) { animation-delay: 0.15s; }
-  & > *:nth-child(n + 9) { animation-delay: 0.17s; }
+}
+
+@keyframes aparecer {
+  from {
+    opacity: 0;
+  }
 }
 
 /* Clique "afunda" o elemento por um instante. */
@@ -267,8 +322,8 @@ h3 {
     transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
     box-shadow 0.25s ease,
     border-color 0.25s ease;
+  /* Sem "levantar": só a borda e a sombra mudam (visual mais sóbrio). */
   &:hover {
-    transform: translateY(-2px);
     box-shadow: var(--shadow-elevada);
     border-color: var(--color-slate-300);
   }

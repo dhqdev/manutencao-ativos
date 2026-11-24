@@ -36,6 +36,8 @@ export function DialogoManutencao({
   rotulo = "Registrar manutenção",
   variante = "primario",
   tamanho = "md",
+  atalhoNovo = false,
+  abertoInicial = false,
 }: {
   orgId: string;
   ativos: AtivoOpcao[];
@@ -49,11 +51,15 @@ export function DialogoManutencao({
   rotulo?: string;
   variante?: "primario" | "secundario";
   tamanho?: "sm" | "md";
+  /** Botão principal da tela: a tecla N (components/shell/busca-global.tsx) clica nele. */
+  atalhoNovo?: boolean;
+  /** Abre sozinho (vindo de "Registrar manutenção" na busca global, ?novo=1). */
+  abertoInicial?: boolean;
 }) {
   const router = useRouter();
   const editando = Boolean(manutencao);
 
-  const [aberto, setAberto] = useState(false);
+  const [aberto, setAberto] = useState(abertoInicial);
   const [erro, setErro] = useState<string | null>(null);
   const [progresso, setProgresso] = useState<string | null>(null);
   const [arquivos, setArquivos] = useState<File[]>([]);
@@ -67,6 +73,14 @@ export function DialogoManutencao({
   function fechar() {
     if (enviando) return;
     setAberto(false);
+    // Tira o ?novo=1 da URL: recarregar a página não abre o formulário de novo.
+    if (abertoInicial) {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has("novo")) {
+        url.searchParams.delete("novo");
+        window.history.replaceState(window.history.state, "", url);
+      }
+    }
     setArquivos([]);
     setErro(null);
     setProgresso(null);
@@ -137,7 +151,13 @@ export function DialogoManutencao({
           <Pencil className="h-4 w-4" />
         </button>
       ) : (
-        <Botao variante={variante} tamanho={tamanho} onClick={() => setAberto(true)}>
+        <Botao
+          variante={variante}
+          tamanho={tamanho}
+          onClick={() => setAberto(true)}
+          data-atalho-novo={atalhoNovo || undefined}
+          title={atalhoNovo ? `${rotulo} (N)` : undefined}
+        >
           <Plus className="h-4 w-4" />
           {rotulo}
         </Botao>

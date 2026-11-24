@@ -41,6 +41,7 @@ export function ListaAtivos({ ativos }: { ativos: AtivoResumo[] }) {
             onChange={(e) => setBusca(e.target.value)}
             placeholder="Buscar por nome, marca, modelo ou placa..."
             className="campo pl-9"
+            data-busca
           />
         </div>
         <select

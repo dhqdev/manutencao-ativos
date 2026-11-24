@@ -2,7 +2,8 @@ import { CalendarClock, ClipboardList, Package, TriangleAlert } from "lucide-rea
 import { Abas } from "@/components/abas";
 import { LimparHistorico } from "@/components/manutencoes/limpar-historico";
 import { DialogoManutencao } from "@/components/manutencoes/dialogo-manutencao";
-import { ListaManutencoes, type AnexoComUrl, type ItemManutencao } from "@/components/manutencoes/lista-manutencoes";
+import { HistoricoManutencoes } from "@/components/manutencoes/historico";
+import type { AnexoComUrl } from "@/components/manutencoes/tabela-manutencoes";
 import { DialogoPlano } from "@/components/planos/dialogo-plano";
 import { ListaPlanos } from "@/components/planos/lista-planos";
 import { BotaoLink, Cabecalho, EstadoVazio } from "@/components/ui";
@@ -11,51 +12,49 @@ import { getContexto } from "@/lib/session";
 import { createClient } from "@/lib/db/server";
 import type { PlanoStatus, SituacaoPlano } from "@/lib/types";
 import { urlsAssinadas } from "@/lib/arquivos";
+import { POR_PAGINA, lerFiltros, temFiltro } from "@/lib/historico";
+import { buscarHistorico } from "@/lib/historico-servidor";
 
 export const metadata = { title: "Manutenções · Gestão de Manutenção" };
 
 export default async function ManutencoesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filtro?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { filtro } = await searchParams;
+  const parametros = await searchParams;
+  const filtro = typeof parametros.filtro === "string" ? parametros.filtro : undefined;
+  const filtros = lerFiltros(parametros);
   const { orgId, papel } = await getContexto();
   const gestor = podeGerenciar(papel);
   const registra = podeRegistrar(papel);
   const db = await createClient();
 
-  // Anexos vêm junto (filtrados pela empresa) em vez de esperar a lista de
-  // manutenções: uma ida a menos ao banco antes de a tela aparecer.
-  const [{ data: planos }, { data: historico }, { data: ativos }, { data: linhasAnexos }] = await Promise.all([
+  // O histórico vem paginado e filtrado pelo banco (filtros na URL); os
+  // anexos são buscados só para as linhas da página.
+  const [{ data: planos }, historico, { data: ativos }, { data: categorias }] = await Promise.all([
     db.from("vw_planos_status").select("*").eq("org_id", orgId),
-    db
-      .from("vw_manutencoes_completo")
-      .select("*")
-      .eq("org_id", orgId)
-      .order("data_manutencao", { ascending: false })
-      .limit(300),
+    buscarHistorico(db, orgId, filtros, POR_PAGINA, (filtros.pagina - 1) * POR_PAGINA),
     db.from("ativos").select("id, nome, identificacao").eq("org_id", orgId).order("nome"),
-    db
-      .from("manutencao_anexos")
-      .select("id, manutencao_id, nome, path, tipo_mime")
-      .eq("org_id", orgId),
+    db.from("categorias").select("id, nome").eq("org_id", orgId).order("ordem").order("nome"),
   ]);
 
   const listaPlanos = (planos ?? []) as PlanoStatus[];
-  const lista = (historico ?? []) as ItemManutencao[];
+  const lista = historico.linhas;
   const opcoesAtivos = ativos ?? [];
   const opcoesPlanos = listaPlanos.map((p) => ({ id: p.id, tipo: p.tipo, ativo_id: p.ativo_id }));
 
-  // Só os anexos das manutenções carregadas ganham link assinado.
-  const carregadas = new Set(lista.map((m) => m.id));
-  const linhas = (linhasAnexos ?? []).filter((l) => carregadas.has(l.manutencao_id));
-
   let anexos: AnexoComUrl[] = [];
-  if (linhas.length) {
-    const urls = urlsAssinadas(linhas.map((l) => l.path));
-
-    anexos = linhas.map((l, i) => ({
+  const comAnexo = lista.filter((m) => Number(m.total_anexos ?? 0) > 0).map((m) => m.id);
+  if (comAnexo.length) {
+    const { data: linhas } = await db
+      .from("manutencao_anexos")
+      .select("id, manutencao_id, nome, path, tipo_mime")
+      .eq("org_id", orgId)
+      .in("manutencao_id", comAnexo)
+      .order("created_at");
+    const urls = urlsAssinadas((linhas ?? []).map((l) => l.path));
+    anexos = (linhas ?? []).map((l, i) => ({
       id: l.id,
       manutencao_id: l.manutencao_id,
       nome: l.nome,
@@ -89,10 +88,17 @@ export default async function ManutencoesPage({
         descricao="Preventivas programadas, alertas de vencimento e histórico de serviços."
         acoes={
           <>
-            {gestor && lista.length > 0 && <LimparHistorico ativos={opcoesAtivos} />}
+            {gestor && historico.total > 0 && <LimparHistorico ativos={opcoesAtivos} />}
             {gestor && <DialogoPlano ativos={opcoesAtivos} variante="secundario" />}
             {registra && (
-              <DialogoManutencao orgId={orgId} ativos={opcoesAtivos} planos={opcoesPlanos} podeCriarPeriodica={gestor} />
+              <DialogoManutencao
+                orgId={orgId}
+                ativos={opcoesAtivos}
+                planos={opcoesPlanos}
+                podeCriarPeriodica={gestor}
+                atalhoNovo
+                abertoInicial={parametros.novo === "1"}
+              />
             )}
           </>
         }
@@ -146,9 +152,9 @@ export default async function ManutencoesPage({
           {
             id: "historico",
             rotulo: "Histórico realizado",
-            contador: lista.length,
+            contador: historico.total,
             conteudo:
-              lista.length === 0 ? (
+              historico.total === 0 && !temFiltro(filtros) ? (
                 <EstadoVazio
                   icone={<ClipboardList className="h-6 w-6" />}
                   titulo="Nenhuma manutenção registrada"
@@ -160,13 +166,17 @@ export default async function ManutencoesPage({
                   }
                 />
               ) : (
-                <ListaManutencoes
+                <HistoricoManutencoes
+                  filtros={filtros}
                   manutencoes={lista}
+                  total={historico.total}
+                  valorTotal={historico.valorTotal}
+                  simplificado={historico.simplificado}
                   anexos={anexos}
                   orgId={orgId}
                   ativos={opcoesAtivos}
+                  categorias={categorias ?? []}
                   planos={opcoesPlanos}
-                  mostrarAtivo
                 />
               ),
           },

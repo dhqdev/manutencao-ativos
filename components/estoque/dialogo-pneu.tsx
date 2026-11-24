@@ -56,7 +56,7 @@ export function DialogoPneu({ pneu, rotulo = "Novo pneu" }: { pneu?: Pneu; rotul
           <Pencil className="h-4 w-4" />
         </button>
       ) : (
-        <Botao onClick={() => setAberto(true)}>
+        <Botao onClick={() => setAberto(true)} data-atalho-novo title={`${rotulo} (N)`}>
           <Plus className="h-4 w-4" />
           {rotulo}
         </Botao>

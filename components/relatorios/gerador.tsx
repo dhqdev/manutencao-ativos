@@ -29,13 +29,24 @@ import {
 import {
   calcularTotais,
   calcularTotaisPneus,
-  gerarPDF,
   temPneus,
   nomeArquivo,
   resumoTexto,
   type DadosRelatorio,
-} from "@/lib/relatorio-pdf";
+} from "@/lib/relatorio-dados";
 import type { ManutencaoCompleta, PlanoStatus, PneusDoRelatorio, TipoManutencao } from "@/lib/types";
+
+// O jsPDF pesa uns 150 KB: fica fora do carregamento da tela e vem só quando
+// a pessoa pede o PDF (ou pouco depois de a tela abrir, em segundo plano, para
+// o clique não esperar e o navegador não barrar o compartilhamento/nova aba).
+let moduloPdf: Promise<typeof import("@/lib/relatorio-pdf")> | null = null;
+function carregarPdf() {
+  moduloPdf ??= import("@/lib/relatorio-pdf").catch((e) => {
+    moduloPdf = null;
+    throw e;
+  });
+  return moduloPdf;
+}
 
 type Opcao = { id: string; nome: string };
 type CategoriaOpcao = Opcao & { cor: string };
@@ -132,18 +143,34 @@ export function GeradorRelatorio({
     setAte(hojeBR);
   }
 
-  function baixarPDF() {
-    gerarPDF(dados).save(nomeArquivo(dados));
+  useEffect(() => {
+    const t = setTimeout(() => void carregarPdf().catch(() => {}), 1500);
+    return () => clearTimeout(t);
+  }, []);
+
+  async function baixarPDF() {
+    try {
+      const { gerarPDF } = await carregarPdf();
+      gerarPDF(dados).save(nomeArquivo(dados));
+    } catch {
+      setErro("Não foi possível gerar o PDF. Confira a conexão e tente de novo.");
+    }
   }
 
-  function imprimir() {
-    const url = gerarPDF(dados).output("bloburl");
-    window.open(url, "_blank");
+  async function imprimir() {
+    try {
+      const { gerarPDF } = await carregarPdf();
+      const url = gerarPDF(dados).output("bloburl");
+      window.open(url, "_blank");
+    } catch {
+      setErro("Não foi possível gerar o PDF. Confira a conexão e tente de novo.");
+    }
   }
 
   async function compartilharWhatsApp() {
     setCompartilhando(true);
     try {
+      const { gerarPDF } = await carregarPdf();
       const doc = gerarPDF(dados);
       const arquivo = new File([doc.output("blob")], nomeArquivo(dados), {
         type: "application/pdf",
@@ -324,7 +351,38 @@ export function GeradorRelatorio({
                     Nenhuma manutenção realizada no período.
                   </p>
                 ) : (
-                  <div className="overflow-x-auto">
+                  <>
+                  {/* Celular: cartões (a tabela de 7 colunas pedia arrastar para o lado). */}
+                  <ul className="divide-y divide-slate-100 md:hidden print:hidden">
+                    {manutencoes.map((m) => (
+                      <li key={m.id} className="px-4 py-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-xs text-slate-500">
+                              {dataBR(m.data_manutencao)} · {TIPOS_MANUTENCAO[m.tipo]}
+                            </p>
+                            <p className="mt-0.5 text-sm font-medium text-slate-900">{m.descricao}</p>
+                            <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-slate-600">
+                              <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: m.categoria_cor }} aria-hidden />
+                              {m.ativo_nome}
+                              {m.ativo_identificacao ? ` · ${m.ativo_identificacao}` : ""}
+                            </p>
+                            {(m.responsavel || m.empresa) && (
+                              <p className="mt-0.5 truncate text-xs text-slate-500">
+                                {[m.responsavel, m.empresa].filter(Boolean).join(" · ")}
+                              </p>
+                            )}
+                          </div>
+                          <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-900">{moeda(m.valor)}</span>
+                        </div>
+                      </li>
+                    ))}
+                    <li className="flex items-center justify-between bg-slate-50 px-4 py-2.5 text-sm font-semibold">
+                      <span className="text-slate-700">Total</span>
+                      <span className="tabular-nums text-slate-900">{moeda(totais.custoTotal)}</span>
+                    </li>
+                  </ul>
+                  <div className="hidden overflow-x-auto md:block print:block">
                     <table className="w-full min-w-[52rem] text-sm">
                       <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                         <tr>
@@ -391,6 +449,7 @@ export function GeradorRelatorio({
                       </tfoot>
                     </table>
                   </div>
+                  </>
                 )}
               </Secao>
 
@@ -540,7 +599,30 @@ function SecaoPneus({ pneus, filtrado }: { pneus: PneusDoRelatorio; filtrado: bo
       {pneus.movimentacoes.length === 0 ? (
         <p className="px-5 py-8 text-center text-sm text-slate-500">Nenhuma movimentação de pneu no período.</p>
       ) : (
-        <div className="overflow-x-auto">
+        <>
+        <ul className="divide-y divide-slate-100 md:hidden print:hidden">
+          {pneus.movimentacoes.map((m) => (
+            <li key={m.id} className="flex items-start justify-between gap-3 px-4 py-3">
+              <div className="min-w-0">
+                <p className="text-xs text-slate-500">
+                  {dataBR(m.data)} · {TIPOS_MOV_PNEU[m.tipo]}
+                </p>
+                <p className="mt-0.5 text-sm font-medium text-slate-900">
+                  <span className="font-mono">{m.numero_fogo}</span>
+                  <span className="ml-1.5 text-xs font-normal text-slate-500">
+                    {m.marca} · {m.medida}
+                  </span>
+                </p>
+                <p className="mt-0.5 truncate text-xs text-slate-600">
+                  {[m.ativo_nome, m.posicao].filter(Boolean).join(" · ") || "—"}
+                  {m.sulco_mm !== null ? ` · ${numero(m.sulco_mm, 1)} mm` : ""}
+                </p>
+              </div>
+              <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-900">{m.valor ? moeda(m.valor) : "—"}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="hidden overflow-x-auto md:block print:block">
           <table className="w-full min-w-[46rem] text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
               <tr>
@@ -581,6 +663,7 @@ function SecaoPneus({ pneus, filtrado }: { pneus: PneusDoRelatorio; filtrado: bo
             </tbody>
           </table>
         </div>
+        </>
       )}
     </Secao>
   );

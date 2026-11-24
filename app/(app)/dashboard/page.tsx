@@ -12,7 +12,6 @@ import {
   TriangleAlert,
   Wallet,
 } from "lucide-react";
-import { Contador } from "@/components/efeitos/contador";
 import { Enfeites } from "@/components/natal/decoracao";
 import { BarrasCategoria, type GastoCategoria } from "@/components/dashboard/barras-categoria";
 import { type PontoMensal } from "@/components/dashboard/grafico-mensal";
@@ -30,7 +29,7 @@ import {
 } from "@/lib/format";
 import { COOKIE_NATAL, diasParaONatal, natalLigado } from "@/lib/natal";
 import { getContexto } from "@/lib/session";
-import { createClient } from "@/lib/db/server";
+import { createClient, type Db } from "@/lib/db/server";
 import type { ManutencaoCompleta, PlanoStatus } from "@/lib/types";
 
 export const metadata = { title: "Dashboard · Gestão de Manutenção" };
@@ -44,7 +43,7 @@ export default async function DashboardPage() {
   // 21h do último dia) o servidor já estaria no mês seguinte.
   const janelaISO = primeiroDiaDoMes(-5);
 
-  const [{ data: totais }, { data: planos }, { data: recentes }, { data: doPeriodo }, { count: qtdAtivos }] =
+  const [{ data: totais }, { data: planos }, { data: recentes }, gastos, { count: qtdAtivos }] =
     await Promise.all([
       db.rpc("dashboard_resumo", { p_org: orgId }),
       db.from("vw_planos_status").select("*").eq("org_id", orgId).in("situacao", ["atrasada", "proxima"]),
@@ -54,11 +53,7 @@ export default async function DashboardPage() {
         .eq("org_id", orgId)
         .order("data_manutencao", { ascending: false })
         .limit(6),
-      db
-        .from("vw_manutencoes_completo")
-        .select("valor, data_manutencao, categoria_id, categoria_nome, categoria_cor")
-        .eq("org_id", orgId)
-        .gte("data_manutencao", janelaISO),
+      gastosDoPeriodo(db, orgId, janelaISO),
       db
         .from("ativos")
         .select("id", { count: "exact", head: true })
@@ -97,29 +92,15 @@ export default async function DashboardPage() {
     });
   }
 
-  const porCategoria = new Map<string, GastoCategoria>();
-
-  for (const m of doPeriodo ?? []) {
-    const chave = m.data_manutencao.slice(0, 7);
-    const idx = indicePorMes.get(chave);
+  for (const g of gastos.meses) {
+    const idx = indicePorMes.get(g.mes);
     if (idx !== undefined) {
-      meses[idx].valor += Number(m.valor ?? 0);
-      meses[idx].quantidade += 1;
+      meses[idx].valor += Number(g.valor ?? 0);
+      meses[idx].quantidade += Number(g.quantidade ?? 0);
     }
-
-    const atual = porCategoria.get(m.categoria_id) ?? {
-      id: m.categoria_id,
-      nome: m.categoria_nome,
-      cor: m.categoria_cor,
-      valor: 0,
-      quantidade: 0,
-    };
-    atual.valor += Number(m.valor ?? 0);
-    atual.quantidade += 1;
-    porCategoria.set(m.categoria_id, atual);
   }
 
-  const gastosCategoria = [...porCategoria.values()].sort((a, b) => b.valor - a.valor);
+  const gastosCategoria = gastos.categorias;
   const historicoRecente = (recentes ?? []) as ManutencaoCompleta[];
   const primeiroNome = (profile.nome ?? "").split(" ")[0];
 
@@ -134,12 +115,12 @@ export default async function DashboardPage() {
       {natal && <FaixaNatal dias={diasParaONatal()} />}
 
       {/* Indicadores */}
-      <div className="lista-escalonada grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
         <Indicador
           href="/ativos"
           icone={<Package className="h-5 w-5" />}
           rotulo="Ativos cadastrados"
-          valor={<Contador valor={Number(totalAtivos)} />}
+          valor={numero(Number(totalAtivos))}
           detalhe="Equipamentos em operação"
           tom="neutro"
         />
@@ -147,7 +128,7 @@ export default async function DashboardPage() {
           href="/manutencoes?filtro=alertas"
           icone={<CalendarClock className="h-5 w-5" />}
           rotulo="Vencendo em breve"
-          valor={<Contador valor={proximas} />}
+          valor={numero(proximas)}
           detalhe={proximas > 0 ? "Manutenções a programar" : "Nada vencendo agora"}
           tom={proximas > 0 ? "aviso" : "neutro"}
         />
@@ -155,7 +136,7 @@ export default async function DashboardPage() {
           href="/manutencoes?filtro=alertas"
           icone={<TriangleAlert className="h-5 w-5" />}
           rotulo="Atrasadas"
-          valor={<Contador valor={atrasadas} />}
+          valor={numero(atrasadas)}
           detalhe={atrasadas > 0 ? "Exigem ação imediata" : "Nenhuma pendência"}
           tom={atrasadas > 0 ? "critico" : "neutro"}
         />
@@ -163,7 +144,7 @@ export default async function DashboardPage() {
           href="/relatorios"
           icone={<Wallet className="h-5 w-5" />}
           rotulo="Gastos no mês"
-          valor={<Contador valor={Number(resumo.gasto_mes ?? 0)} formato="moeda" />}
+          valor={moeda(resumo.gasto_mes ?? 0)}
           detalhe={`${numero(resumo.manutencoes_mes ?? 0)} manutenção(ões) · ${moeda(
             resumo.gasto_ano ?? 0,
           )} no ano`}
@@ -318,6 +299,50 @@ export default async function DashboardPage() {
   );
 }
 
+type Gastos = { meses: { mes: string; valor: number; quantidade: number }[]; categorias: GastoCategoria[] };
+
+/**
+ * Gasto por mês e por categoria, somado no banco (dashboard_gastos, 45-desempenho.sql).
+ * Banco sem a função ainda (imagem nova antes do migrador): soma aqui, como antes.
+ */
+async function gastosDoPeriodo(db: Db, orgId: string, desde: string): Promise<Gastos> {
+  const { data, error } = await db.rpc("dashboard_gastos", { p_org: orgId, p_desde: desde });
+  if (!error && data) {
+    const g = data as Gastos;
+    return {
+      meses: g.meses ?? [],
+      categorias: (g.categorias ?? []).map((c) => ({ ...c, valor: Number(c.valor), quantidade: Number(c.quantidade) })),
+    };
+  }
+
+  const { data: linhas } = await db
+    .from("vw_manutencoes_completo")
+    .select("valor, data_manutencao, categoria_id, categoria_nome, categoria_cor")
+    .eq("org_id", orgId)
+    .gte("data_manutencao", desde);
+
+  const porMes = new Map<string, { mes: string; valor: number; quantidade: number }>();
+  const porCategoria = new Map<string, GastoCategoria>();
+  for (const m of linhas ?? []) {
+    const mes = m.data_manutencao.slice(0, 7);
+    const pm = porMes.get(mes) ?? { mes, valor: 0, quantidade: 0 };
+    pm.valor += Number(m.valor ?? 0);
+    pm.quantidade += 1;
+    porMes.set(mes, pm);
+    const c = porCategoria.get(m.categoria_id) ?? {
+      id: m.categoria_id,
+      nome: m.categoria_nome,
+      cor: m.categoria_cor,
+      valor: 0,
+      quantidade: 0,
+    };
+    c.valor += Number(m.valor ?? 0);
+    c.quantidade += 1;
+    porCategoria.set(m.categoria_id, c);
+  }
+  return { meses: [...porMes.values()], categorias: [...porCategoria.values()].sort((a, b) => b.valor - a.valor) };
+}
+
 /** Bom dia / boa tarde / boa noite no horário de Brasília (o servidor roda em UTC). */
 function saudacao() {
   const hora = Number(
@@ -410,16 +435,16 @@ function Indicador({
   }[tom];
 
   return (
-    <Link href={href} className="card cartao-vivo pressionavel group min-w-0 p-3.5 sm:p-5">
+    <Link href={href} className="card cartao-vivo group min-w-0 p-3.5 sm:p-4">
       <div className="flex items-start justify-between gap-2 sm:gap-3">
         <p className="min-w-0 text-[11px] font-medium uppercase leading-tight tracking-wide text-slate-500 sm:text-xs">
           {rotulo}
         </p>
-        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6 sm:h-10 sm:w-10 sm:rounded-xl [&_svg]:h-4 [&_svg]:w-4 sm:[&_svg]:h-5 sm:[&_svg]:w-5 ${cores}`}>
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg sm:h-10 sm:w-10 sm:rounded-xl [&_svg]:h-4 [&_svg]:w-4 sm:[&_svg]:h-5 sm:[&_svg]:w-5 ${cores}`}>
           {icone}
         </span>
       </div>
-      <p className="mt-1 truncate text-xl font-semibold tracking-tight text-slate-900 sm:mt-2 sm:text-2xl">{valor}</p>
+      <p className="mt-1 truncate text-xl font-semibold tabular-nums tracking-tight text-slate-900 sm:mt-1.5 sm:text-2xl">{valor}</p>
       <p className="mt-1 truncate text-[11px] text-slate-500 sm:mt-2 sm:text-xs">{detalhe}</p>
     </Link>
   );

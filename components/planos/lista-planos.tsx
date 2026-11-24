@@ -2,20 +2,23 @@
 
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
-import { CalendarDays, Gauge, Pause, Play, Repeat, Search, User, Wallet } from "lucide-react";
+import { CalendarDays, Download, Gauge, Pause, Play, Repeat, Search, User, Wallet } from "lucide-react";
 import { BotaoExcluir } from "@/components/confirmar";
 import { DialogoPlano } from "@/components/planos/dialogo-plano";
 import { DialogoManutencao } from "@/components/manutencoes/dialogo-manutencao";
-import { Badge, cn } from "@/components/ui";
+import { Badge, Botao, cn } from "@/components/ui";
 import { alternarPlano, excluirPlano } from "@/lib/actions/planos";
 import {
   SITUACAO_PLANO,
   dataBR,
   descreverPeriodicidade,
   descreverPrazo,
+  hoje,
   moeda,
   numero,
 } from "@/lib/format";
+import { baixarCsv, nomeCsv } from "@/lib/csv";
+import { csvPlanos } from "@/lib/exportar";
 import type { PlanoStatus, SituacaoPlano } from "@/lib/types";
 
 export function ListaPlanos({
@@ -67,6 +70,7 @@ export function ListaPlanos({
               onChange={(e) => setBusca(e.target.value)}
               placeholder="Buscar por tipo, ativo ou responsável..."
               className="campo pl-9"
+              data-busca
             />
           </div>
           <select
@@ -81,6 +85,15 @@ export function ListaPlanos({
             <option value="em_dia">Em dia</option>
             <option value="inativo">Pausadas</option>
           </select>
+          <Botao
+            variante="secundario"
+            disabled={filtrados.length === 0}
+            onClick={() => baixarCsv(nomeCsv("preventivas", hoje()), csvPlanos(filtrados))}
+            title="Baixar a lista filtrada em planilha (CSV)"
+          >
+            <Download className="h-4 w-4" />
+            Exportar
+          </Botao>
         </div>
       )}
 
@@ -89,11 +102,14 @@ export function ListaPlanos({
           Nenhuma manutenção periódica encontrada.
         </p>
       ) : (
-        <ul className="grid gap-3 xl:grid-cols-2">
-          {filtrados.map((p) => (
-            <CartaoPlano key={p.id} plano={p} orgId={orgId} ativos={ativos} mostrarAtivo={mostrarAtivo} />
-          ))}
-        </ul>
+        <>
+          <TabelaPlanos planos={filtrados} orgId={orgId} ativos={ativos} mostrarAtivo={mostrarAtivo} />
+          <ul className="grid gap-2.5 md:hidden">
+            {filtrados.map((p) => (
+              <CartaoPlano key={p.id} plano={p} orgId={orgId} ativos={ativos} mostrarAtivo={mostrarAtivo} />
+            ))}
+          </ul>
+        </>
       )}
     </div>
   );
@@ -228,5 +244,132 @@ function CartaoPlano({
         />
       </div>
     </li>
+  );
+}
+
+/** Computador: uma linha por plano, colunas fixas, ações no fim. */
+function TabelaPlanos({
+  planos,
+  orgId,
+  ativos,
+  mostrarAtivo,
+}: {
+  planos: PlanoStatus[];
+  orgId: string;
+  ativos: { id: string; nome: string; identificacao: string | null }[];
+  mostrarAtivo: boolean;
+}) {
+  return (
+    <div className="card hidden max-h-[calc(100dvh-13rem)] overflow-auto md:block">
+      <table className="tabela-erp w-full text-sm">
+        <thead>
+          <tr>
+            <th className="w-32">Situação</th>
+            <th>Plano</th>
+            {mostrarAtivo && <th>Ativo</th>}
+            <th className="hidden lg:table-cell">Periodicidade</th>
+            <th className="w-32">Próxima</th>
+            <th className="w-32">Prazo</th>
+            <th className="hidden xl:table-cell">Responsável</th>
+            <th className="w-56 text-right">
+              <span className="sr-only">Ações</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {planos.map((p) => (
+            <LinhaPlano key={p.id} p={p} orgId={orgId} ativos={ativos} mostrarAtivo={mostrarAtivo} />
+          ))}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colSpan={mostrarAtivo ? 8 : 7} className="text-slate-600">
+              {planos.length} plano{planos.length === 1 ? "" : "s"}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
+}
+
+function LinhaPlano({
+  p,
+  orgId,
+  ativos,
+  mostrarAtivo,
+}: {
+  p: PlanoStatus;
+  orgId: string;
+  ativos: { id: string; nome: string; identificacao: string | null }[];
+  mostrarAtivo: boolean;
+}) {
+  const [alternando, iniciar] = useTransition();
+  const s = SITUACAO_PLANO[p.situacao];
+  const porHoras = p.periodicidade_unidade === "horas";
+  return (
+    <tr className={cn(p.situacao === "inativo" && "opacity-60")}>
+      <td>
+        <Badge className={s.classe}>{s.label}</Badge>
+      </td>
+      <td className="max-w-[16rem] truncate font-medium text-slate-900">{p.tipo}</td>
+      {mostrarAtivo && (
+        <td className="max-w-[14rem] truncate">
+          <Link href={`/ativos/${p.ativo_id}`} className="text-slate-700 hover:text-marca-700">
+            {p.ativo_nome}
+          </Link>
+        </td>
+      )}
+      <td className="hidden whitespace-nowrap text-slate-600 lg:table-cell">
+        {descreverPeriodicidade(p.periodicidade_valor, p.periodicidade_unidade)}
+      </td>
+      <td className="whitespace-nowrap tabular-nums text-slate-700">
+        {porHoras ? `${numero(p.proximo_horimetro)} h/km` : dataBR(p.proxima_data)}
+      </td>
+      <td
+        className={cn(
+          "whitespace-nowrap font-medium",
+          p.situacao === "atrasada" ? "text-red-600" : p.situacao === "proxima" ? "text-amber-600" : "text-slate-600",
+        )}
+      >
+        {porHoras
+          ? p.horas_restantes !== null && p.horas_restantes !== undefined
+            ? `${numero(p.horas_restantes)} h`
+            : "—"
+          : descreverPrazo(p.dias_restantes)}
+      </td>
+      <td className="hidden max-w-[10rem] truncate text-slate-600 xl:table-cell">{p.responsavel || "—"}</td>
+      <td>
+        <div className="flex items-center justify-end gap-0.5">
+          <DialogoManutencao
+            orgId={orgId}
+            ativos={ativos}
+            ativoPadrao={p.ativo_id}
+            planos={[{ id: p.id, tipo: p.tipo, ativo_id: p.ativo_id }]}
+            planoPadrao={p.id}
+            rotulo="Dar baixa"
+            variante="secundario"
+            tamanho="sm"
+          />
+          <button
+            type="button"
+            disabled={alternando}
+            onClick={() => iniciar(async () => void (await alternarPlano(p.id, !p.ativo)))}
+            title={p.ativo ? "Pausar plano" : "Reativar plano"}
+            aria-label={p.ativo ? "Pausar plano" : "Reativar plano"}
+            className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+          >
+            {p.ativo ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+          </button>
+          <DialogoPlano ativos={ativos} plano={p} />
+          <BotaoExcluir
+            compacto
+            acao={excluirPlano.bind(null, p.id)}
+            titulo="Excluir plano preventivo"
+            mensagem={`O plano "${p.tipo}" deixará de gerar alertas. O histórico de manutenções não é afetado.`}
+          />
+        </div>
+      </td>
+    </tr>
   );
 }

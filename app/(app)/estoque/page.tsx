@@ -10,7 +10,13 @@ import type { Pneu } from "@/lib/types";
 
 export const metadata = { title: "Estoque · Gestão de Manutenção" };
 
-export default async function EstoquePage() {
+export default async function EstoquePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string | string[] }>;
+}) {
+  const { q } = await searchParams;
+  const buscaInicial = (Array.isArray(q) ? q[0] : q ?? "").slice(0, 80);
   const { orgId, papel } = await getContexto();
   const gestor = podeGerenciar(papel);
   const db = await createClient();
@@ -88,7 +94,7 @@ export default async function EstoquePage() {
             <Indicador rotulo="Valor em estoque" valor={moeda(valorEstoque)} Icone={Wallet} cor="text-slate-700 bg-slate-100" />
           </div>
 
-          <ListaPneus pneus={pneus} ativos={ativosPneu} gestor={gestor} registra={podeRegistrar(papel)} />
+          <ListaPneus pneus={pneus} ativos={ativosPneu} gestor={gestor} registra={podeRegistrar(papel)} buscaInicial={buscaInicial} key={buscaInicial} />
         </>
       )}
     </>

@@ -26,50 +26,44 @@ export default async function AtivoPage({ params }: { params: Promise<{ id: stri
   const registra = podeRegistrar(papel);
   const db = await createClient();
 
-  const { data: ativo } = await db
-    .from("ativos")
-    .select("*, categoria:categorias(*)")
-    .eq("id", id)
-    .eq("org_id", orgId)
-    .maybeSingle();
-
-  if (!ativo) notFound();
-
-  const [{ data: manutencoes }, { data: planos }, { data: categorias }, { data: ativosOrg }] =
+  // Tudo numa leva só (antes eram 3 idas ao banco em fila). Ativo de outra
+  // empresa volta vazio pelo filtro de org_id e pelo RLS; aí o resto é descartado.
+  const [{ data: ativo }, { data: manutencoes }, { data: planos }, { data: categorias }, { data: ativosOrg }, { data: linhas }] =
     await Promise.all([
+      db.from("ativos").select("*, categoria:categorias(*)").eq("id", id).eq("org_id", orgId).maybeSingle(),
       db
         .from("manutencoes")
         .select("*")
         .eq("ativo_id", id)
+        .eq("org_id", orgId)
         .order("data_manutencao", { ascending: false }),
-      db.from("vw_planos_status").select("*").eq("ativo_id", id),
+      db.from("vw_planos_status").select("*").eq("ativo_id", id).eq("org_id", orgId),
       db.from("categorias").select("id, nome").eq("org_id", orgId).order("ordem").order("nome"),
       db.from("ativos").select("id, nome, identificacao").eq("org_id", orgId).order("nome"),
+      // Anexos das manutenções deste ativo, pelo vínculo com a manutenção.
+      db
+        .from("manutencao_anexos")
+        .select("id, manutencao_id, nome, path, tipo_mime, manutencoes!inner(ativo_id)")
+        .eq("org_id", orgId)
+        .eq("manutencoes.ativo_id", id)
+        .order("created_at"),
     ]);
 
+  if (!ativo) notFound();
+
   const historico = (manutencoes ?? []) as Manutencao[];
-  const idsManutencao = historico.map((m) => m.id);
 
-  // Anexos + links temporários para visualização.
+  // Links temporários para visualização.
   let anexos: AnexoComUrl[] = [];
-  if (idsManutencao.length) {
-    const { data: linhas } = await db
-      .from("manutencao_anexos")
-      .select("id, manutencao_id, nome, path, tipo_mime")
-      .in("manutencao_id", idsManutencao)
-      .order("created_at");
-
-    if (linhas?.length) {
-      const urls = urlsAssinadas(linhas.map((l) => l.path));
-
-      anexos = linhas.map((l, i) => ({
-        id: l.id,
-        manutencao_id: l.manutencao_id,
-        nome: l.nome,
-        tipo_mime: l.tipo_mime,
-        url: urls[i],
-      }));
-    }
+  if (linhas?.length) {
+    const urls = urlsAssinadas(linhas.map((l) => l.path));
+    anexos = linhas.map((l, i) => ({
+      id: l.id,
+      manutencao_id: l.manutencao_id,
+      nome: l.nome,
+      tipo_mime: l.tipo_mime,
+      url: urls[i],
+    }));
   }
 
   const item = ativo as Ativo & { categoria: Categoria };

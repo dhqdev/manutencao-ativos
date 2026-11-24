@@ -11,9 +11,10 @@ import { COOKIE_NATAL, diasParaONatal, natalLigado } from "@/lib/natal";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   // Uma única chamada ao banco traz usuário, empresa e o total de alertas.
-  const [ctx, biscoitos] = await Promise.all([getContexto(), cookies()]);
+  // Os convites vão junto, em paralelo (antes esperavam o contexto).
+  const [ctx, biscoitos, todosConvites] = await Promise.all([getContexto(), cookies(), meusConvites()]);
   // Convites para outras empresas: quem aceita é a pessoa, não o superadmin no "Entrar como".
-  const convites = ctx.entradaComo ? [] : await meusConvites();
+  const convites = ctx.entradaComo ? [] : todosConvites;
   const emailConfirmado = convites.length ? (await usuarioPorId(ctx.userId))?.email_confirmado !== false : true;
 
   return (
@@ -45,6 +46,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 }
 
 async function meusConvites(): Promise<ConvitePendente[]> {
-  const { data } = await (await createClient()).rpc("meus_convites");
-  return (data as ConvitePendente[] | null) ?? []; // banco sem 73-convites.sql: nada
+  try {
+    const { data } = await (await createClient()).rpc("meus_convites");
+    return (data as ConvitePendente[] | null) ?? []; // banco sem 73-convites.sql: nada
+  } catch {
+    return []; // sem sessão: o getContexto() ao lado já leva ao login
+  }
 }

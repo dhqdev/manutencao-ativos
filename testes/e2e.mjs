@@ -190,6 +190,25 @@ await passo("o anexo baixa como PDF", async () => {
   verdade(r.headers()["content-type"] === "application/pdf", `tipo: ${r.headers()["content-type"]}`);
 });
 
+await passo("histórico: busca e filtro pela URL, no banco, e planilha CSV", async () => {
+  await page.goto(`/manutencoes?filtro=historico&q=${encodeURIComponent("óleo E2E")}`);
+  await page.getByText("Troca de óleo E2E").first().waitFor();
+  await page.goto("/manutencoes?filtro=historico&q=nada-com-isso");
+  await page.getByText("Nenhuma manutenção encontrada com esses filtros.").waitFor();
+  const r = await page.request.get(`/api/exportar/manutencoes?q=${encodeURIComponent("óleo E2E")}`);
+  verdade(r.status() === 200, `csv: ${r.status()}`);
+  verdade(/text\/csv/.test(r.headers()["content-type"] ?? ""), `tipo: ${r.headers()["content-type"]}`);
+  verdade((await r.text()).includes("Troca de óleo E2E"), "a planilha não trouxe a manutenção");
+});
+
+await passo("busca global (Ctrl+K) acha o ativo e abre a ficha", async () => {
+  await page.goto("/dashboard");
+  await page.keyboard.press("Control+k");
+  await page.getByPlaceholder("Buscar ativo, manutenção, pneu ou tela...").fill("Trator E2E");
+  await page.getByRole("option", { name: /Trator E2E/ }).first().click();
+  await page.waitForURL("**/ativos/**");
+});
+
 await passo("relatórios abrem", async () => {
   await page.goto("/relatorios");
   await page.getByRole("heading", { name: /Relatórios/ }).first().waitFor();

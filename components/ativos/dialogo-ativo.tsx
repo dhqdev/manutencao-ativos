@@ -128,7 +128,7 @@ export function DialogoAtivo({
           Editar
         </Botao>
       ) : (
-        <Botao variante={variante} onClick={() => setAberto(true)}>
+        <Botao variante={variante} onClick={() => setAberto(true)} data-atalho-novo title={`${rotulo} (N)`}>
           <Plus className="h-4 w-4" />
           {rotulo}
         </Botao>

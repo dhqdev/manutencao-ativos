@@ -5,6 +5,8 @@ import { FormularioSalvar } from "@/components/configuracoes/formulario-salvar";
 import { PainelWhatsapp, type ConexaoAtual } from "@/components/configuracoes/whatsapp";
 import { ZonaPerigo } from "@/components/configuracoes/zona-perigo";
 import { SeletorTema } from "@/components/tema/alternar-tema";
+import { SeletorDensidade } from "@/components/tema/seletor-densidade";
+import { COOKIE_DENSIDADE, lerDensidade } from "@/lib/densidade";
 import { AlternarNatal } from "@/components/natal/decoracao";
 import { Cabecalho, Campo, Secao } from "@/components/ui";
 import { alterarSenha, salvarEmpresa, salvarPerfil, trocarEmpresa } from "@/lib/actions/configuracoes";
@@ -198,6 +200,10 @@ export default async function ConfiguracoesPage() {
             </p>
             <div className="max-w-md space-y-3">
               <SeletorTema />
+              <div>
+                <p className="mb-2 text-sm text-slate-500">Densidade das tabelas</p>
+                <SeletorDensidade inicial={lerDensidade(biscoitos.get(COOKIE_DENSIDADE)?.value)} />
+              </div>
               {epocaDeNatal() && (
                 <AlternarNatal ligado={natalLigado(biscoitos.get(COOKIE_NATAL)?.value)} />
               )}

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { cookies } from "next/headers";
 import { RegistrarServiceWorker } from "@/components/registrar-sw";
+import { COOKIE_DENSIDADE, classeDensidade, lerDensidade } from "@/lib/densidade";
 import { COOKIE_TEMA, COR_BARRA, classeTema, lerTema } from "@/lib/tema";
 import "./globals.css";
 
@@ -48,7 +49,9 @@ export async function generateViewport(): Promise<Viewport> {
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const tema = lerTema((await cookies()).get(COOKIE_TEMA)?.value);
+  const biscoitos = await cookies();
+  const tema = lerTema(biscoitos.get(COOKIE_TEMA)?.value);
+  const densidade = lerDensidade(biscoitos.get(COOKIE_DENSIDADE)?.value);
 
   return (
     // Extensões como o Dark Reader carimbam atributos no <html> antes do React
@@ -56,7 +59,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     // elemento: divergência real dentro do app continua sendo reportada.
     <html
       lang="pt-BR"
-      className={`${inter.variable} ${classeTema(tema)}`.trim()}
+      className={`${inter.variable} ${classeTema(tema)} ${classeDensidade(densidade)}`.replace(/\s+/g, " ").trim()}
       suppressHydrationWarning
     >
       <body className="font-sans">

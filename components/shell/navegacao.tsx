@@ -14,6 +14,7 @@ import {
   LogOut,
   type LucideIcon,
   Package,
+  Search,
   Settings,
   Sparkles,
   LayoutGrid,
@@ -25,6 +26,9 @@ import { Assinatura, Logo } from "@/components/marca";
 import { CartaoNatal, Gorro, NeveMenu, PiscaPisca, Treno } from "@/components/natal/decoracao";
 import { cn } from "@/components/ui";
 import { AlternarTema } from "@/components/tema/alternar-tema";
+import { BarraAcoesCelular } from "@/components/shell/barra-acoes-celular";
+import { BuscaGlobal, abrirBuscaGlobal } from "@/components/shell/busca-global";
+import { podeRegistrar } from "@/lib/permissoes";
 import { iniciais } from "@/lib/format";
 import { salvarMenuRecolhido } from "@/lib/menu-lateral";
 import type { PapelMembro } from "@/lib/types";
@@ -176,6 +180,29 @@ export function Navegacao({
           />
         </button>
 
+        {/* Busca global: o mesmo que Ctrl+K. */}
+        <div className={cn("relative pb-2", recolhido ? "px-3" : "px-3")}>
+          <button
+            type="button"
+            onClick={abrirBuscaGlobal}
+            className={cn(
+              "group relative flex w-full items-center rounded-lg bg-white/5 text-sm text-slate-400 ring-1 ring-inset ring-white/10 transition-colors hover:bg-white/10 hover:text-slate-200",
+              recolhido ? "justify-center py-2" : "gap-2.5 px-3 py-2",
+            )}
+            aria-label="Buscar (Ctrl+K)"
+          >
+            <Search className="h-4 w-4 shrink-0" />
+            {recolhido ? (
+              <Dica>Buscar · Ctrl+K</Dica>
+            ) : (
+              <>
+                <span className="flex-1 text-left">Buscar...</span>
+                <kbd className="rounded border border-white/15 px-1.5 py-px font-sans text-[10.5px] text-slate-400">Ctrl K</kbd>
+              </>
+            )}
+          </button>
+        </div>
+
         <nav
           className={cn(
             "relative flex flex-1 flex-col px-3 py-2",
@@ -290,6 +317,14 @@ export function Navegacao({
               </p>
               <p className="truncate text-[11px] leading-tight text-slate-500">{nomeUsuario}</p>
             </div>
+            <button
+              type="button"
+              onClick={abrirBuscaGlobal}
+              className="rounded-lg p-2 text-slate-500 transition-colors active:bg-slate-100"
+              aria-label="Buscar"
+            >
+              <Search className="h-5 w-5" />
+            </button>
             <AlternarTema className="text-slate-500 active:bg-slate-100" />
             <Link
               href="/manutencoes?filtro=alertas"
@@ -314,6 +349,9 @@ export function Navegacao({
       </div>
 
       {natal.ligado && <Treno />}
+
+      <BuscaGlobal destinos={MENU} podeRegistrar={podeRegistrar(papel)} />
+      <BarraAcoesCelular />
 
       {/* ---------------- Menu suspenso (celular) ---------------- */}
       {menuAberto && (

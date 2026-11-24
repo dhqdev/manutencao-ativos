@@ -29,14 +29,17 @@ export function ListaPneus({
   ativos,
   gestor,
   registra,
+  buscaInicial = "",
 }: {
   pneus: PneuComVeiculo[];
   ativos: AtivoOpcao[];
   gestor: boolean;
   registra: boolean;
+  /** Vem da busca global (`/estoque?q=...`). */
+  buscaInicial?: string;
 }) {
   const [filtro, setFiltro] = useState<(typeof FILTROS)[number]["id"]>("todos");
-  const [busca, setBusca] = useState("");
+  const [busca, setBusca] = useState(buscaInicial);
   const [historico, setHistorico] = useState<PneuComVeiculo | null>(null);
 
   const sulcoBaixo = (p: Pneu) =>
@@ -94,6 +97,7 @@ export function ListaPneus({
             onChange={(e) => setBusca(e.target.value)}
             placeholder="Buscar nº de fogo, medida, veículo..."
             className="campo pl-9"
+            data-busca
           />
         </label>
       </div>

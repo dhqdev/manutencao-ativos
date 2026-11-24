@@ -153,6 +153,15 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   - `60-equipe.sql` `equipe_acessos()`: último acesso e sessões abertas da
     equipe (dados de `auth.*` que o PostgREST não expõe)
   - `70-integracoes.sql` `sistema_credenciais` (chaves do console)
+  - `45-desempenho.sql` índices compostos (`org_id` + data) e as funções de
+    leitura que somam/paginam no banco: `dashboard_gastos`,
+    `resumo_ativos_categoria`, `historico_manutencoes` (filtros + ordem +
+    página, devolve `{ total, valor_total, linhas }`) e `busca_global`.
+    Todas `security invoker` (o RLS de quem chama vale), revogadas de
+    `public, anon` e liberadas para `authenticated`. Função de leitura é
+    `stable` e **não** cria tabela temporária (o PostgREST roda GET em
+    transação só leitura). A tela que chama tem um caminho antigo para
+    quando o banco ainda não tem a função (imagem nova antes do migrador).
   - `80-esquema.sql` `sistema_esquema`: versão do SQL aplicado (fica por
     último; arquivo novo vem antes dele)
   - `71-backup.sql` `sistema_backups` (rodadas e pedidos de "backup agora")
@@ -268,6 +277,39 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   Envolva a chamada em `chamarAcao(() => acao(fd))` (`lib/acao-cliente.ts`):
   queda de rede ou aba com versão antiga vira mensagem no formulário em vez
   de derrubar a tela.
+- **Listas com cara de ERP**: no computador, tabela densa com a classe
+  `tabela-erp` (globals.css: cabeçalho fixo, linhas compactas, rodapé com o
+  total) dentro de um `div` com `max-h-[calc(100dvh-13rem)] overflow-auto`;
+  no celular (`md:hidden`), cartões compactos. Exemplos:
+  `components/manutencoes/tabela-manutencoes.tsx` e `TabelaPlanos` em
+  `components/planos/lista-planos.tsx`. Barra de filtros com `campo-compacto`.
+  - Lista que pode crescer sem limite (histórico geral) **não** baixa tudo
+    para filtrar na tela: filtros, ordem e página vão na URL
+    (`lib/historico.ts` valida tudo que vem dela) e o banco pagina
+    (`historico_manutencoes`, `lib/historico-servidor.ts`). Lista pequena
+    (histórico de um ativo) filtra e ordena na própria tela.
+  - Somas e contagens de tela (dashboard, categoria) vêm prontas do banco,
+    não de baixar as linhas e somar no Node.
+  - Exportar: CSV com `paraCsv` (`lib/csv.ts`: `;`, vírgula decimal, BOM,
+    célula que começa com `= + - @` ganha apóstrofo) e as colunas de
+    `lib/exportar.ts`. Lista na tela → `baixarCsv` no navegador; lista
+    paginada → rota `app/api/exportar/<lista>/route.ts` com os mesmos filtros.
+- **Teclado**: busca global Ctrl+K (`components/shell/busca-global.tsx`,
+  `busca_global` no banco); `/` foca o campo com `data-busca` da tela; `N`
+  clica no botão com `data-atalho-novo` (o principal de novo cadastro: já
+  está em `DialogoManutencao` com `atalhoNovo`, `DialogoAtivo`,
+  `DialogoPneu`). Tela nova com busca ou cadastro: ponha esses atributos.
+  A lista de atalhos fica em `ATALHOS` (o `?` mostra). No celular,
+  `BarraAcoesCelular` usa os mesmos atributos para a barrinha "Filtros / Novo".
+- **Movimento sóbrio**: nada de número contando, entrada em cascata ou
+  cartão que "levanta"/ícone que gira no hover. Entrada de tela e de lista é
+  só um fade curto (`aparecer`).
+- Densidade das tabelas: cookie `densidade` (`lib/densidade.ts`, compacta
+  por padrão), classe no `<html>` pelo `app/layout.tsx`, escolha em
+  Configurações → Aparência.
+- Biblioteca pesada só no clique: o jsPDF (`lib/relatorio-pdf.ts`) é
+  carregado por `import()` em `components/relatorios/gerador.tsx`; cálculos e
+  textos do relatório ficam em `lib/relatorio-dados.ts`, sem o jsPDF.
 - Fronteiras de erro: `app/(app)/error.tsx` (mantém o menu), `app/error.tsx`
   e `app/global-error.tsx`, todas com `ErroTela` (`components/erro-tela.tsx`).
   No Next 16 a prop é `retry` (não `reset`).

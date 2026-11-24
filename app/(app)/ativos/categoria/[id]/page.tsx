@@ -8,7 +8,7 @@ import { urlsDasFotos } from "@/lib/fotos";
 import { IconeCategoria } from "@/lib/icones";
 import { podeGerenciar } from "@/lib/permissoes";
 import { getContexto } from "@/lib/session";
-import { createClient } from "@/lib/db/server";
+import { createClient, type Db } from "@/lib/db/server";
 import type { Ativo, Categoria } from "@/lib/types";
 
 export default async function CategoriaPage({ params }: { params: Promise<{ id: string }> }) {
@@ -17,46 +17,16 @@ export default async function CategoriaPage({ params }: { params: Promise<{ id: 
   const gestor = podeGerenciar(papel);
   const db = await createClient();
 
-  const { data: categoria } = await db
-    .from("categorias")
-    .select("*")
-    .eq("id", id)
-    .eq("org_id", orgId)
-    .maybeSingle();
+  // Tudo em paralelo: a categoria de outra empresa (ou inexistente) volta vazia
+  // pelo RLS e pelo filtro de org_id, e aí as outras respostas são descartadas.
+  const [{ data: categoria }, { data: ativos }, { data: categorias }, resumo] = await Promise.all([
+    db.from("categorias").select("*").eq("id", id).eq("org_id", orgId).maybeSingle(),
+    db.from("ativos").select("*").eq("categoria_id", id).eq("org_id", orgId).order("nome"),
+    db.from("categorias").select("id, nome").eq("org_id", orgId).order("ordem").order("nome"),
+    resumoDosAtivos(db, id),
+  ]);
 
   if (!categoria) notFound();
-
-  const [{ data: ativos }, { data: categorias }] = await Promise.all([
-    db.from("ativos").select("*").eq("categoria_id", id).order("nome"),
-    db.from("categorias").select("id, nome").eq("org_id", orgId).order("ordem").order("nome"),
-  ]);
-
-  const ids = (ativos ?? []).map((a) => a.id);
-
-  const [{ data: manutencoes }, { data: planos }] = await Promise.all([
-    ids.length
-      ? db.from("manutencoes").select("ativo_id, valor, data_manutencao").in("ativo_id", ids)
-      : Promise.resolve({ data: [] as { ativo_id: string; valor: number; data_manutencao: string }[] }),
-    ids.length
-      ? db.from("vw_planos_status").select("ativo_id, situacao").in("ativo_id", ids)
-      : Promise.resolve({ data: [] as { ativo_id: string; situacao: string }[] }),
-  ]);
-
-  const resumo = new Map<string, { total: number; custo: number; ultima: string | null }>();
-  for (const m of manutencoes ?? []) {
-    const r = resumo.get(m.ativo_id) ?? { total: 0, custo: 0, ultima: null };
-    r.total += 1;
-    r.custo += Number(m.valor ?? 0);
-    if (!r.ultima || m.data_manutencao > r.ultima) r.ultima = m.data_manutencao;
-    resumo.set(m.ativo_id, r);
-  }
-
-  const alertas = new Map<string, number>();
-  for (const p of planos ?? []) {
-    if (p.situacao === "proxima" || p.situacao === "atrasada") {
-      alertas.set(p.ativo_id, (alertas.get(p.ativo_id) ?? 0) + 1);
-    }
-  }
 
   const fotos = await urlsDasFotos((ativos ?? []).map((a) => a.foto_url));
 
@@ -67,7 +37,7 @@ export default async function CategoriaPage({ params }: { params: Promise<{ id: 
       total_manutencoes: r?.total ?? 0,
       custo_total: r?.custo ?? 0,
       ultima_manutencao: r?.ultima ?? null,
-      alertas: alertas.get(a.id) ?? 0,
+      alertas: r?.alertas ?? 0,
       foto_assinada: a.foto_url ? (fotos.get(a.foto_url) ?? null) : null,
     };
   });
@@ -129,4 +99,49 @@ export default async function CategoriaPage({ params }: { params: Promise<{ id: 
       )}
     </>
   );
+}
+
+type Resumo = { total: number; custo: number; ultima: string | null; alertas: number };
+
+/**
+ * Totais por ativo somados no banco (resumo_ativos_categoria, 45-desempenho.sql).
+ * Banco sem a função ainda: soma aqui, como antes.
+ */
+async function resumoDosAtivos(db: Db, categoriaId: string) {
+  const resumo = new Map<string, Resumo>();
+  const { data, error } = await db.rpc("resumo_ativos_categoria", { p_categoria: categoriaId });
+  if (!error && data) {
+    for (const r of data as { ativo_id: string; total: number; custo: number; ultima: string | null; alertas: number }[]) {
+      resumo.set(r.ativo_id, {
+        total: Number(r.total),
+        custo: Number(r.custo),
+        ultima: r.ultima,
+        alertas: Number(r.alertas),
+      });
+    }
+    return resumo;
+  }
+
+  const { data: ativos } = await db.from("ativos").select("id").eq("categoria_id", categoriaId);
+  const ids = (ativos ?? []).map((a) => a.id);
+  if (!ids.length) return resumo;
+  const [{ data: manutencoes }, { data: planos }] = await Promise.all([
+    db.from("manutencoes").select("ativo_id, valor, data_manutencao").in("ativo_id", ids),
+    db.from("vw_planos_status").select("ativo_id, situacao").in("ativo_id", ids),
+  ]);
+  const de = (id: string) => resumo.get(id) ?? { total: 0, custo: 0, ultima: null, alertas: 0 };
+  for (const m of manutencoes ?? []) {
+    const r = de(m.ativo_id);
+    r.total += 1;
+    r.custo += Number(m.valor ?? 0);
+    if (!r.ultima || m.data_manutencao > r.ultima) r.ultima = m.data_manutencao;
+    resumo.set(m.ativo_id, r);
+  }
+  for (const p of planos ?? []) {
+    if (p.situacao !== "proxima" && p.situacao !== "atrasada") continue;
+    const r = de(p.ativo_id);
+    r.alertas += 1;
+    resumo.set(p.ativo_id, r);
+  }
+  return resumo;
 }
