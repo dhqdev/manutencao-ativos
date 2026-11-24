@@ -576,9 +576,9 @@ await passo("assinatura: Pix no console, empresa vencida bloqueia, comprovante l
   await empresa.getByRole("button", { name: "Desbloquear" }).click();
   await empresa.getByRole("button", { name: "Bloquear acesso" }).waitFor();
   // Plano e dia fixo do vencimento: a data vai para o dia escolhido.
-  await empresa.getByLabel("Plano de Oficina E2E").selectOption("3");
-  await empresa.getByLabel("Dia do vencimento de Oficina E2E").selectOption("10");
-  verdade((await empresa.getByLabel("Vencimento de Oficina E2E").inputValue()).endsWith("-10"), "vencimento não foi para o dia 10");
+  await empresa.getByLabel("Plano de Oficina E2E", { exact: true }).selectOption("3");
+  await empresa.getByLabel("Dia do vencimento de Oficina E2E", { exact: true }).selectOption("10");
+  verdade((await empresa.getByLabel("Vencimento de Oficina E2E", { exact: true }).inputValue()).endsWith("-10"), "vencimento não foi para o dia 10");
   await empresa.getByRole("button", { name: "Salvar" }).click();
   await empresa.getByText(/Trimestral, vence todo dia 10/).waitFor();
 
