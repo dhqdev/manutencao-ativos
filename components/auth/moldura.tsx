@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 import { cookies } from "next/headers";
 import { BellRing, FileText, FolderTree, History, ShieldCheck, type LucideIcon } from "lucide-react";
-import { Assinatura, Logo } from "@/components/marca";
-import { Gorro, NeveMenu } from "@/components/natal/decoracao";
+import { LogoFestivo } from "@/components/festas/acessorios";
+import { Ambiente } from "@/components/festas/particulas";
+import { Assinatura } from "@/components/marca";
 import { AlternarTema } from "@/components/tema/alternar-tema";
-import { COOKIE_NATAL, natalLigado } from "@/lib/natal";
+import { festaNaTela } from "@/lib/festas";
 import { Vitrine } from "./vitrine";
 
 const DESTAQUES: { Icone: LucideIcon; texto: string }[] = [
@@ -34,22 +35,6 @@ function Aurora() {
   );
 }
 
-/** Logo com o gorro de Natal por cima, quando a decoração está ligada. */
-function LogoComGorro({ natal, tamanho }: { natal: boolean; tamanho?: "sm" | "md" | "lg" }) {
-  const gorro =
-    tamanho === "lg"
-      ? "absolute -right-3 -top-4 h-9 w-9 rotate-[18deg]"
-      : tamanho === "sm"
-        ? "absolute -right-2 -top-2.5 h-5 w-5 rotate-[18deg]"
-        : "absolute -right-2 -top-3 h-6 w-6 rotate-[18deg]";
-  return (
-    <span className="relative">
-      <Logo tamanho={tamanho} />
-      {natal && <Gorro className={gorro} />}
-    </span>
-  );
-}
-
 export async function MolduraAuth({
   titulo,
   subtitulo,
@@ -63,20 +48,21 @@ export async function MolduraAuth({
   rodape?: ReactNode;
   aviso?: string;
 }) {
-  const natal = natalLigado((await cookies()).get(COOKIE_NATAL)?.value);
+  // Enfeite da data comemorativa da vez (lib/festas.ts), se houver.
+  const festa = festaNaTela(await cookies())?.id;
 
   return (
     <main className="flex min-h-dvh flex-col bg-[#040817] lg:grid lg:grid-cols-[1.1fr_1fr] lg:bg-slate-50">
       {/* ---------- Topo (celular) ---------- */}
       <header className="tema-original area-segura-superior relative overflow-hidden bg-[#040817] text-white lg:hidden">
         <Aurora />
-        {natal && <NeveMenu />}
+        {festa && <Ambiente festa={festa} />}
         <div className="relative flex justify-end px-4 pt-3">
           <AlternarTema className="text-slate-400 active:bg-white/10" />
         </div>
         <div className="entrada-pagina relative flex flex-col items-center px-6 pb-11 text-center">
           <span className="rounded-[22px] bg-white/[0.04] p-2.5 ring-1 ring-white/10">
-            <LogoComGorro natal={natal} tamanho="lg" />
+            <LogoFestivo festa={festa} tamanho="lg" />
           </span>
           <p className="mt-3.5 text-lg font-semibold tracking-tight">Manutenção</p>
           <p className="text-sm text-slate-400">Gestão de ativos</p>
@@ -86,10 +72,10 @@ export async function MolduraAuth({
       {/* ---------- Painel de marca (desktop) ---------- */}
       <aside className="tema-original relative hidden flex-col overflow-hidden bg-[#040817] px-12 py-10 text-white lg:flex xl:px-16">
         <Aurora />
-        {natal && <NeveMenu />}
+        {festa && <Ambiente festa={festa} />}
 
         <div className="relative flex items-center gap-3">
-          <LogoComGorro natal={natal} />
+          <LogoFestivo festa={festa} />
           <Assinatura tom="claro" />
         </div>
 

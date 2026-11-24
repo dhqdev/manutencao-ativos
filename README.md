@@ -133,7 +133,7 @@ com as variáveis de `whatsapp/src/config.js`).
 | **Assistente** | Chat com IA que responde em português sobre os dados da empresa ([detalhes](#assistente-de-ia)) |
 | **Assinatura** | Situação da mensalidade, QR do Pix, copia e cola e envio do comprovante ([detalhes](#assinatura-por-pix)) |
 | **Equipe** | Quem tem acesso, com que papel, último acesso e quem está conectado. Busca, filtro por papel, criar acesso, trocar papel, editar dados, gerar senha nova, desconectar e remover |
-| **Configurações** | Dados da empresa, perfil, senha, aparência (tema, densidade das tabelas e decoração de Natal), **WhatsApp** (com horário do envio), empresa ativa |
+| **Configurações** | Dados da empresa, perfil, senha, aparência (tema, densidade das tabelas e enfeites das datas comemorativas), **WhatsApp** (com horário do envio), empresa ativa |
 
 ### Busca e atalhos de teclado
 
@@ -143,13 +143,31 @@ ativos, manutenções, periódicas, pneus e telas da empresa aberta, e a ação
 a busca da tela, **N** abre o cadastro novo da tela (manutenção, ativo, pneu),
 **Ctrl+B** recolhe o menu e **Esc** fecha janelas.
 
-### Natal
+### Datas comemorativas
 
-De 15 de novembro até o Dia de Reis (6 de janeiro) o sistema ganha luzinhas no
-menu, neve leve, gorro no logo, uma faixa de boas festas no Dashboard e um
-trenó que atravessa o alto da tela de vez em quando. Depois some sozinho. Cada
-aparelho pode desligar em **Configurações → Aparência**, e quem pediu menos
-animação no sistema operacional não vê neve nem trenó.
+O sistema ganha um enfeite discreto **30 dias antes** de cada data e ele some
+sozinho quando a data passa, sem precisar de deploy nem de ninguém ligar:
+
+| Data | Quando | Enfeite |
+|---|---|---|
+| Natal | 25/12 | luzinhas no menu, neve leve, gorro no logo |
+| Ano Novo | 1º/01 (fica até o Dia de Reis) | estrelas cintilando, brilho no logo |
+| Carnaval | sábado a terça, calculado pela Páscoa | confete, máscara no logo |
+| Páscoa | domingo de Páscoa (calculado) | orelhas de coelho, ovinhos pendurados |
+| Dia do Trabalhador | 1º/05 | capacete no logo |
+| Dia das Mães | 2º domingo de maio | pétalas, coraçãozinho |
+| São João | 24/06 (fica até o São Pedro, 29/06) | bandeirinhas, fagulhas da fogueira, chapéu de palha |
+| Dia dos Pais | 2º domingo de agosto | gravata-borboleta |
+| Independência | 07/09 | roseta verde e amarela |
+| Dia das Crianças | 12/10 | bolhas de sabão, balão |
+
+No pé do menu um cartão conta os dias, com uma barrinha da espera. Na última
+semana (e no dia) entra uma faixa fina no Dashboard com um recado útil (por
+exemplo, programar as manutenções antes do feriado). Quando duas datas se
+encostam (Natal e Ano Novo), a mais próxima aparece e a outra assume depois.
+Cada aparelho pode desligar em **Configurações → Aparência**, que também mostra
+as próximas datas. Quem pediu menos animação no sistema operacional vê os
+enfeites parados, sem neve, confete nem bolhas.
 
 ### Aplicativo no celular (PWA)
 

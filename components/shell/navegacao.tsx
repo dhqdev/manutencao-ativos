@@ -23,8 +23,10 @@ import {
   Wallet,
   X,
 } from "lucide-react";
-import { Assinatura, Logo } from "@/components/marca";
-import { CartaoNatal, Gorro, NeveMenu, PiscaPisca, Treno } from "@/components/natal/decoracao";
+import { Assinatura } from "@/components/marca";
+import { LogoFestivo } from "@/components/festas/acessorios";
+import { CartaoFesta, EnfeiteBorda } from "@/components/festas/enfeites";
+import { Ambiente } from "@/components/festas/particulas";
 import { cn } from "@/components/ui";
 import { AlternarTema } from "@/components/tema/alternar-tema";
 import { BarraAcoesCelular } from "@/components/shell/barra-acoes-celular";
@@ -32,6 +34,7 @@ import { BuscaGlobal, abrirBuscaGlobal } from "@/components/shell/busca-global";
 import { podeRegistrar } from "@/lib/permissoes";
 import { iniciais } from "@/lib/format";
 import { salvarMenuRecolhido } from "@/lib/menu-lateral";
+import type { FestaDoDia } from "@/lib/festas";
 import type { PapelMembro } from "@/lib/types";
 
 type Grupo = "Operação" | "Análise" | "Administração";
@@ -70,7 +73,7 @@ export function Navegacao({
   papel,
   alertas,
   recolhidoInicial,
-  natal,
+  festa,
   children,
 }: {
   nomeUsuario: string;
@@ -79,8 +82,8 @@ export function Navegacao({
   papel: PapelMembro;
   alertas: number;
   recolhidoInicial: boolean;
-  /** Decoração de Natal ligada (lib/natal.ts) e dias até o dia 25. */
-  natal: { ligado: boolean; dias: number | null };
+  /** Data comemorativa da vez (lib/festas.ts); null fora de época ou com os enfeites desligados. */
+  festa: FestaDoDia | null;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -139,10 +142,10 @@ export function Navegacao({
         )}
         aria-label="Menu lateral"
       >
-        {natal.ligado && (
+        {festa && (
           <>
-            <NeveMenu />
-            <PiscaPisca className="top-0" quantidade={recolhido ? 3 : 9} />
+            <Ambiente festa={festa.id} />
+            <EnfeiteBorda festa={festa.id} onde="menu" compacto={recolhido} />
           </>
         )}
         <div
@@ -153,10 +156,7 @@ export function Navegacao({
             className="group relative flex min-w-0 flex-1 items-center gap-3"
             aria-label={recolhido ? `${nomeEmpresa} · Dashboard` : undefined}
           >
-            <span className="relative">
-              <Logo />
-              {natal.ligado && <Gorro className="absolute -right-2 -top-3 h-6 w-6 rotate-[18deg]" />}
-            </span>
+            <LogoFestivo festa={festa?.id} />
             {recolhido ? (
               <Dica>{nomeEmpresa}</Dica>
             ) : (
@@ -253,7 +253,7 @@ export function Navegacao({
           )}
         </nav>
 
-        {natal.ligado && !recolhido && <CartaoNatal dias={natal.dias} />}
+        {festa && !recolhido && <CartaoFesta festa={festa} />}
 
         <div className="relative border-t border-white/10 p-3">
           <div
@@ -307,12 +307,9 @@ export function Navegacao({
       >
         {/* ---------------- Topo (celular) ---------------- */}
         <header className="no-print area-segura-superior sticky top-0 z-20 border-b border-slate-200 bg-superficie/95 backdrop-blur lg:hidden">
-          {natal.ligado && <PiscaPisca className="-bottom-[9px]" quantidade={11} />}
+          {festa && <EnfeiteBorda festa={festa.id} onde="celular" />}
           <div className="flex items-center gap-2.5 px-4 py-2">
-            <span className="relative">
-              <Logo tamanho="sm" />
-              {natal.ligado && <Gorro className="absolute -right-2 -top-2.5 h-5 w-5 rotate-[18deg]" />}
-            </span>
+            <LogoFestivo festa={festa?.id} tamanho="sm" />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold leading-tight text-slate-900">
                 {nomeEmpresa}
@@ -351,8 +348,6 @@ export function Navegacao({
           </div>
         </main>
       </div>
-
-      {natal.ligado && <Treno />}
 
       <BuscaGlobal destinos={MENU} podeRegistrar={podeRegistrar(papel)} />
       <BarraAcoesCelular />

@@ -8,7 +8,7 @@ import { emailConfigurado } from "@/lib/email";
 import { Navegacao } from "@/components/shell/navegacao";
 import { getContextoSemBloqueio } from "@/lib/session";
 import { COOKIE_MENU, menuRecolhido } from "@/lib/menu-lateral";
-import { COOKIE_NATAL, diasParaONatal, natalLigado } from "@/lib/natal";
+import { festaNaTela } from "@/lib/festas";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   // Uma única chamada ao banco traz usuário, empresa e o total de alertas.
@@ -29,10 +29,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       papel={ctx.papel}
       alertas={ctx.alertas}
       recolhidoInicial={menuRecolhido(biscoitos.get(COOKIE_MENU)?.value)}
-      natal={{
-        ligado: natalLigado(biscoitos.get(COOKIE_NATAL)?.value),
-        dias: diasParaONatal(),
-      }}
+      festa={festaNaTela(biscoitos)}
     >
       {ctx.entradaComo && (
         <AvisoEntrarComo

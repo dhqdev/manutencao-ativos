@@ -119,6 +119,21 @@ await passo("menu lateral recolhe, mostra a dica e lembra depois de recarregar",
   await page.getByRole("button", { name: "Recolher menu" }).waitFor();
 });
 
+await passo("enfeites de datas comemorativas: agenda automática e desligar neste aparelho", async () => {
+  await page.goto("/configuracoes");
+  // A agenda é calculada (Páscoa e Carnaval mudam de ano para ano): sempre tem alguma data.
+  await page.locator("[data-agenda-festas]").getByText(/^(Agora|Próximas): .+\d{2}\/\d{2}/).waitFor();
+  const chave = page.getByRole("switch", { name: /Enfeites de datas comemorativas/ });
+  const cookie = async () => (await contexto.cookies()).find((c) => c.name === "enfeites")?.value;
+  verdade(await chave.isChecked(), "enfeites deveriam vir ligados");
+  await page.locator("label", { hasText: "Enfeites de datas comemorativas" }).click();
+  verdade((await cookie()) === "desligado", `cookie depois de desligar: ${await cookie()}`);
+  await page.reload();
+  verdade(!(await chave.isChecked()), "a escolha não ficou guardada");
+  await page.locator("label", { hasText: "Enfeites de datas comemorativas" }).click();
+  verdade((await cookie()) === "ligado", `cookie depois de religar: ${await cookie()}`);
+});
+
 await passo("as 6 categorias padrão existem", async () => {
   await page.goto("/ativos");
   const total = await page.locator('a[href^="/ativos/categoria/"]').count();

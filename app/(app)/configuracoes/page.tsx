@@ -7,12 +7,13 @@ import { ZonaPerigo } from "@/components/configuracoes/zona-perigo";
 import { SeletorTema } from "@/components/tema/alternar-tema";
 import { SeletorDensidade } from "@/components/tema/seletor-densidade";
 import { COOKIE_DENSIDADE, lerDensidade } from "@/lib/densidade";
-import { AlternarNatal } from "@/components/natal/decoracao";
+import { AlternarEnfeites } from "@/components/festas/alternar";
+import { diaCurto } from "@/components/festas/temas";
 import { Cabecalho, Campo, Secao } from "@/components/ui";
 import { alterarSenha, salvarEmpresa, salvarPerfil, trocarEmpresa } from "@/lib/actions/configuracoes";
 import { dataBR } from "@/lib/format";
 import { podeGerenciar } from "@/lib/permissoes";
-import { COOKIE_NATAL, epocaDeNatal, natalLigado } from "@/lib/natal";
+import { enfeitesLigados, festaDoDia, proximasFestas } from "@/lib/festas";
 import { getContexto } from "@/lib/session";
 import { createClient } from "@/lib/db/server";
 
@@ -204,9 +205,7 @@ export default async function ConfiguracoesPage() {
                 <p className="mb-2 text-sm text-slate-500">Densidade das tabelas</p>
                 <SeletorDensidade inicial={lerDensidade(biscoitos.get(COOKIE_DENSIDADE)?.value)} />
               </div>
-              {epocaDeNatal() && (
-                <AlternarNatal ligado={natalLigado(biscoitos.get(COOKIE_NATAL)?.value)} />
-              )}
+              <AlternarEnfeites ligado={enfeitesLigados(biscoitos)} agenda={agendaDasFestas()} />
             </div>
           </div>
         </Secao>
@@ -272,4 +271,15 @@ function Info({ rotulo, valor }: { rotulo: string; valor: string }) {
       <p className="mt-1 text-lg font-semibold text-slate-900">{valor}</p>
     </div>
   );
+}
+
+/** "Agora: Natal (25/12). Depois: Ano Novo 01/01 · Carnaval 06/02 · Páscoa 28/03." */
+function agendaDasFestas() {
+  const agora = festaDoDia();
+  const depois = proximasFestas(4)
+    .filter((f) => f.id !== agora?.id)
+    .slice(0, 3)
+    .map((f) => `${f.nome} ${diaCurto(f.inicio)}`)
+    .join(" · ");
+  return agora ? `Agora: ${agora.nome} (${diaCurto(agora.inicio)}). Depois: ${depois}.` : `Próximas: ${depois}.`;
 }

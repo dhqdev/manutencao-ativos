@@ -274,12 +274,24 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
 - Nada de efeito em todo clique (as faíscas foram tiradas a pedido do dono).
   Enfeite é discreto, `aria-hidden`, `pointer-events-none`, `no-print` e some
   com `prefers-reduced-motion`.
-- Natal: `lib/natal.ts` decide a época (15/11 a 6/1, fuso de Brasília) e o
-  cookie `natal` deixa cada aparelho desligar. Decoração em
-  `components/natal/decoracao.tsx` (luzes, neve no menu, gorro, bolinhas
-  `Enfeites`, trenó com renas desenhadas em SVG com degradê e patas em
-  galope). Animação nova de enfeite entra também no bloco
-  `prefers-reduced-motion` do `globals.css`.
+- Datas comemorativas (pedido do dono em 24/11/2026): `lib/festas.ts` liga
+  cada data **30 dias antes** e desliga sozinha depois (fuso de Brasília);
+  Páscoa (Meeus), Carnaval (Páscoa − 50 a − 47) e Dia das Mães/Pais (2º
+  domingo) são calculados. Datas sobrepostas: a mais próxima ganha. Cookie
+  `enfeites` deixa cada aparelho desligar (o antigo `natal=desligado` ainda
+  vale). Leia no servidor com `festaNaTela(await cookies())`. Visual em
+  `components/festas/`: `temas.ts` (cores, ícone, textos), `enfeites.tsx`
+  (borda do menu: pisca-pisca no Natal, bandeirinhas no São João, filete nas
+  outras; `CartaoFesta` no menu; `FaixaFesta` no Dashboard só na última
+  semana), `particulas.tsx` (`Ambiente`: neve, confete...) e
+  `acessorios.tsx` (`LogoFestivo`: gorro, capacete, orelhas...). O trenó com
+  renas foi **tirado a pedido do dono**: nada atravessando a tela. Enfeite é
+  minimalista: só transform/opacity, sorteio com semente (`sorteio.ts`, sem
+  `Math.random` nem `Math.sin`: hidratação), degradê SVG com `useIdSvg`
+  (o logo aparece duas vezes na página). Data nova: entra em `festasDoAno`,
+  `TEMAS` e `ACESSORIOS` (+ teste em `testes/unidade/festas.test.mjs`).
+  Animação nova entra também no bloco `prefers-reduced-motion` do
+  `globals.css`.
 - Tem que funcionar no celular (é PWA): barra inferior + menu "Mais"; modais
   viram folha que desce do topo (`Modal`, animação `folha-topo`); só o menu
   "Mais" sobe da barra inferior. Item novo de menu vai em `MENU` de
@@ -293,7 +305,7 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   nome vem da `Dica` (hover/foco) e de um texto `sr-only` no link.
 - Telas de entrada (`/login`, `/cadastro`, `/recuperar-senha`, `/nova-senha`)
   usam `MolduraAuth` (`components/auth/moldura.tsx`, server component: lê o
-  cookie do Natal para pôr o gorro e a neve) e os campos de
+  cookie dos enfeites para pôr o detalhe da data no logo e o `Ambiente`) e os campos de
   `components/auth/campos.tsx` (`CampoSenha` já avisa Caps Lock ligado).
   Formulário cliente importa `Alerta` de `components/auth/alerta.tsx`, nunca
   de `moldura.tsx` (ela usa `next/headers`). A ilustração do painel é a
@@ -302,8 +314,8 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   perna vira um visto, num selo azul fixo que serve em fundo claro e escuro;
   sem prop de tom). Mudou o traço (`TRACO_MARCA`)? Atualize `app/icon.svg` e
   `app/apple-icon.svg`, rode `node scripts/gerar-icones.mjs` (PNGs do PWA) e
-  suba `VERSAO` em `public/sw.js` (os ícones ficam em cache). Gorro de Natal
-  vai num `span relative` em volta do `Logo`.
+  suba `VERSAO` em `public/sw.js` (os ícones ficam em cache). No menu e nas
+  telas de entrada o logo é o `LogoFestivo` (com o detalhe da data da vez).
 - Formulário cliente: `useTransition` + chamar a action + mostrar `erro` +
   `router.refresh()` no sucesso (veja `FormModal` em `components/admin/comum.tsx`).
   Envolva a chamada em `chamarAcao(() => acao(fd))` (`lib/acao-cliente.ts`):

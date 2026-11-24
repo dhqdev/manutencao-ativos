@@ -362,150 +362,191 @@ h3 {
 }
 
 /* ---------------------------------------------------------------------------
-   Natal (components/natal/decoracao.tsx). Só aparece na época (lib/natal.ts).
+   Datas comemorativas (components/festas/). Só aparecem 30 dias antes de cada
+   data (lib/festas.ts). Animação só de transform e opacity: a GPU cuida, sem
+   repintar a tela. Duração, atraso e amplitude vêm do style de cada peça.
 --------------------------------------------------------------------------- */
-@keyframes natal-piscar {
+
+/* Lâmpada do pisca-pisca: só a camada acesa (vidro + halo) muda. */
+@keyframes festa-luz {
   0%,
   100% {
     opacity: 1;
-    box-shadow: 0 0 6px 1px currentColor;
   }
-  50% {
-    opacity: 0.35;
-    box-shadow: none;
+  45%,
+  55% {
+    opacity: 0.12;
   }
 }
 
-@keyframes natal-cair {
+@utility festa-luz {
+  animation: festa-luz 3s ease-in-out infinite;
+}
+
+@keyframes festa-cair {
   from {
-    transform: translate3d(0, -1rem, 0) rotate(0deg);
+    transform: translate3d(0, 0, 0);
   }
   to {
-    transform: translate3d(1.5rem, 100dvh, 0) rotate(240deg);
+    transform: translate3d(0, calc(100dvh + 3rem), 0);
   }
 }
 
-/* Atravessa da esquerda para a direita, saindo inteiro dos dois lados. */
-@keyframes natal-voar {
+@utility festa-cair {
+  animation: festa-cair 14s linear infinite;
+}
+
+/* Sobe e some (fagulhas, bolhas); --altura diz até onde. */
+@keyframes festa-subir {
+  0% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0;
+  }
+  12%,
+  70% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(0, calc(-1 * var(--altura, 100dvh)), 0);
+    opacity: 0;
+  }
+}
+
+@utility festa-subir {
+  animation: festa-subir 8s ease-out infinite;
+}
+
+/* Balanço de lado enquanto cai ou sobe, como no ar de verdade. */
+@keyframes festa-oscilar {
   from {
-    transform: translate3d(-340px, 0, 0);
+    transform: translate3d(calc(-1 * var(--amplitude, 8px)), 0, 0) rotate(-14deg);
   }
   to {
-    transform: translate3d(calc(100vw + 40px), -24px, 0);
+    transform: translate3d(var(--amplitude, 8px), 0, 0) rotate(14deg);
   }
 }
 
-@keyframes natal-balancar {
+@utility festa-oscilar {
+  animation: festa-oscilar 4s ease-in-out infinite alternate;
+}
+
+/* Papel girando no ar (confete, pétala): o giro em 3D faz ele "piscar" de lado. */
+@keyframes festa-girar-3d {
+  to {
+    transform: rotate3d(var(--eixo-x, 1), var(--eixo-y, 0.4), 0, 360deg);
+  }
+}
+
+@utility festa-girar-3d {
+  animation: festa-girar-3d 2s linear infinite;
+}
+
+@keyframes festa-cintilar {
   0%,
   100% {
-    transform: translateY(0) rotate(-1.5deg);
-  }
-  50% {
-    transform: translateY(-10px) rotate(1.5deg);
-  }
-}
-
-/* Galope: as patas giram a partir do quadril (topo do traço). */
-@keyframes natal-galope-frente {
-  from {
-    transform: rotate(-14deg);
-  }
-  to {
-    transform: rotate(10deg);
-  }
-}
-
-@keyframes natal-galope-tras {
-  from {
-    transform: rotate(12deg);
-  }
-  to {
-    transform: rotate(-12deg);
-  }
-}
-
-@keyframes natal-pulsar {
-  0%,
-  100% {
-    opacity: 0.55;
-    transform: scale(0.85);
+    opacity: 0.2;
+    transform: scale(0.6);
   }
   50% {
     opacity: 1;
-    transform: scale(1.25);
+    transform: scale(1);
   }
 }
 
-@keyframes natal-cintilar {
+@utility festa-cintilar {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: festa-cintilar 3s ease-in-out infinite;
+}
+
+/* Pingentes e balão: a origem (onde o fio prende) vem do style. */
+@keyframes festa-pendulo {
   0%,
   100% {
-    opacity: 0.25;
-    transform: scale(0.7);
+    transform: rotate(-6deg);
   }
   50% {
-    opacity: 1;
+    transform: rotate(6deg);
+  }
+}
+
+@utility festa-pendulo {
+  transform-box: view-box;
+  animation: festa-pendulo 3.2s ease-in-out infinite;
+}
+
+/* Bandeirinha no vento: gira um tiquinho a partir do barbante. (O centrar
+   vem da classe -translate-x-1/2, que no Tailwind 4 é a propriedade
+   `translate`, separada do transform.) */
+@keyframes festa-tremular {
+  0%,
+  100% {
+    transform: rotate(-5deg);
+  }
+  50% {
+    transform: rotate(5deg);
+  }
+}
+
+@utility festa-tremular {
+  transform-origin: 50% 0;
+  animation: festa-tremular 3s ease-in-out infinite;
+}
+
+/* Brilho que passa pelo filete do topo e some por uns segundos. */
+@keyframes festa-reflexo {
+  0% {
+    transform: translateX(-100%);
+  }
+  35%,
+  100% {
+    transform: translateX(300%);
+  }
+}
+
+@utility festa-reflexo {
+  animation: festa-reflexo 9s ease-in-out infinite;
+}
+
+/* Coração do Dia das Mães: duas batidas e uma pausa longa. */
+@keyframes festa-batida {
+  0%,
+  24%,
+  100% {
+    transform: scale(1);
+  }
+  6% {
+    transform: scale(1.16);
+  }
+  12% {
+    transform: scale(1);
+  }
+  18% {
     transform: scale(1.1);
   }
 }
 
-@utility natal-patas-frente {
-  transform-box: fill-box;
-  transform-origin: 0% 0%;
-  animation: natal-galope-frente 0.45s ease-in-out infinite alternate;
+@utility festa-batida {
+  animation: festa-batida 2.8s ease-in-out infinite;
 }
 
-@utility natal-patas-tras {
-  transform-box: fill-box;
-  transform-origin: 100% 0%;
-  animation: natal-galope-tras 0.45s ease-in-out infinite alternate;
-}
-
-@utility natal-nariz {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: natal-pulsar 1.2s ease-in-out infinite;
-}
-
-@utility natal-brilho {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: natal-cintilar 1s ease-in-out infinite;
-}
-
-@keyframes natal-pendular {
+/* Orelha de coelho da Páscoa: parada quase sempre, mexe rapidinho de vez em quando. */
+@keyframes festa-orelha {
   0%,
+  86%,
   100% {
-    transform: rotate(-7deg);
+    transform: rotate(0deg);
   }
-  50% {
-    transform: rotate(7deg);
+  90% {
+    transform: rotate(-16deg);
+  }
+  94% {
+    transform: rotate(4deg);
   }
 }
 
-/* A origem (ponto onde o fio prende) vem do style de cada bolinha. */
-@utility natal-enfeite {
-  transform-box: view-box;
-  animation: natal-pendular 3.2s ease-in-out infinite;
-}
-
-@utility natal-luz {
-  animation: natal-piscar 1.8s ease-in-out infinite;
-}
-
-@utility natal-neve {
-  animation-name: natal-cair;
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
-  animation-fill-mode: backwards;
-}
-
-@utility natal-treno {
-  animation: natal-voar 13s linear forwards;
-  will-change: transform;
-}
-
-@utility natal-balanco {
-  animation: natal-balancar 1.6s ease-in-out infinite;
+@utility festa-orelha {
+  animation: festa-orelha 6s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -518,18 +559,17 @@ h3 {
   .pop-in,
   .reluzente,
   .anim-flutuar,
-  .natal-luz,
-  .natal-balanco,
-  .natal-patas-frente,
-  .natal-patas-tras,
-  .natal-nariz,
-  .natal-brilho,
-  .natal-enfeite {
+  .festa-luz,
+  .festa-cintilar,
+  .festa-pendulo,
+  .festa-tremular,
+  .festa-batida,
+  .festa-orelha {
     animation: none !important;
   }
-  /* Neve e trenó parados não fazem sentido: somem. */
-  .natal-neve,
-  .natal-treno {
+  /* Neve, confete, fagulhas e bolhas parados não fazem sentido: somem. */
+  .festa-ambiente,
+  .festa-reflexo {
     display: none !important;
   }
   .pressionavel:active,

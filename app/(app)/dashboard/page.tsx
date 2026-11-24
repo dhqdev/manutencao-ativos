@@ -6,13 +6,13 @@ import {
   ChartColumn,
   ChevronRight,
   ClipboardList,
-  Gift,
   Package,
   TrendingUp,
   TriangleAlert,
   Wallet,
 } from "lucide-react";
-import { Enfeites } from "@/components/natal/decoracao";
+import { FaixaFesta } from "@/components/festas/enfeites";
+import { naRetaFinal } from "@/components/festas/temas";
 import { BarrasCategoria, type GastoCategoria } from "@/components/dashboard/barras-categoria";
 import { type PontoMensal } from "@/components/dashboard/grafico-mensal";
 import { GraficoMensalLazy } from "@/components/dashboard/grafico-mensal-lazy";
@@ -27,7 +27,7 @@ import {
   numero,
   primeiroDiaDoMes,
 } from "@/lib/format";
-import { COOKIE_NATAL, diasParaONatal, natalLigado } from "@/lib/natal";
+import { festaNaTela } from "@/lib/festas";
 import { getContexto } from "@/lib/session";
 import { createClient, type Db } from "@/lib/db/server";
 import type { ManutencaoCompleta, PlanoStatus } from "@/lib/types";
@@ -37,7 +37,7 @@ export const metadata = { title: "Dashboard · Gestão de Manutenção" };
 export default async function DashboardPage() {
   const [{ orgId, profile }, biscoitos] = await Promise.all([getContexto(), cookies()]);
   const db = await createClient();
-  const natal = natalLigado(biscoitos.get(COOKIE_NATAL)?.value);
+  const festa = festaNaTela(biscoitos);
 
   // Meses de Brasília: o container roda em UTC, e na virada do mês (depois das
   // 21h do último dia) o servidor já estaria no mês seguinte.
@@ -112,7 +112,7 @@ export default async function DashboardPage() {
         acoes={<BotaoLink href="/relatorios" variante="secundario">Gerar relatório</BotaoLink>}
       />
 
-      {natal && <FaixaNatal dias={diasParaONatal()} />}
+      {festa && naRetaFinal(festa) && <FaixaFesta festa={festa} />}
 
       {/* Indicadores */}
       <div className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
@@ -387,28 +387,6 @@ function VazioPainel({
       <p className="mt-3 text-sm font-semibold text-slate-900">{titulo}</p>
       <p className="mt-1 max-w-xs text-sm text-slate-500">{texto}</p>
       {acao && <div className="mt-4">{acao}</div>}
-    </div>
-  );
-}
-
-function FaixaNatal({ dias }: { dias: number | null }) {
-  const contagem =
-    dias === null
-      ? "Que o ano novo venha com tudo em dia."
-      : dias === 0
-        ? "Hoje é Natal! Bom descanso para toda a equipe."
-        : `${dias === 1 ? "Falta 1 dia" : `Faltam ${dias} dias`} para o Natal. Que tal deixar as preventivas em dia antes das festas?`;
-
-  return (
-    <div className="relative mb-4 flex items-center gap-3 overflow-hidden rounded-xl border border-red-200/70 bg-gradient-to-r from-red-50 via-superficie to-emerald-50 px-4 py-3 sm:mb-6">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-600 text-white shadow-sm">
-        <Gift className="h-[18px] w-[18px]" />
-      </span>
-      <div className="min-w-0 flex-1 sm:pr-20">
-        <p className="text-sm font-semibold text-slate-900">Boas festas!</p>
-        <p className="text-xs text-slate-600 sm:text-[13px]">{contagem}</p>
-      </div>
-      <Enfeites className="absolute -top-px right-4 hidden h-12 w-16 sm:block" />
     </div>
   );
 }
