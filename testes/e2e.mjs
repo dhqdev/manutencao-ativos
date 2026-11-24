@@ -203,8 +203,16 @@ await passo("histórico: busca e filtro pela URL, no banco, e planilha CSV", asy
 
 await passo("busca global (Ctrl+K) acha o ativo e abre a ficha", async () => {
   await page.goto("/dashboard");
-  await page.keyboard.press("Control+k");
-  await page.getByPlaceholder("Buscar ativo, manutenção, pneu ou tela...").fill("Trator E2E");
+  // O atalho só existe depois de o React hidratar a tela: tecla apertada antes
+  // disso se perde. Espera a rede assentar e tenta de novo se a busca não abriu.
+  await page.waitForLoadState("networkidle");
+  const caixa = page.getByPlaceholder("Buscar ativo, manutenção, pneu ou tela...");
+  for (let i = 0; i < 5 && !(await caixa.isVisible()); i++) {
+    await page.keyboard.press("Control+k");
+    await caixa.waitFor({ timeout: 2000 }).catch(() => {});
+  }
+  verdade(await caixa.isVisible(), "Ctrl+K não abriu a busca global");
+  await caixa.fill("Trator E2E");
   await page.getByRole("option", { name: /Trator E2E/ }).first().click();
   await page.waitForURL("**/ativos/**");
 });
