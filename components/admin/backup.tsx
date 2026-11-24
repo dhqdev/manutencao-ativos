@@ -8,7 +8,7 @@ import { Badge, Botao, Campo, Secao } from "@/components/ui";
 import { chamarAcao } from "@/lib/acao-cliente";
 import { adminBackupAgora, adminRemoverBackblaze, adminSalvarBackblaze, adminTestarBackblaze } from "@/lib/actions/backup";
 import type { RodadaBackup, SituacaoBackup } from "@/lib/backup";
-import { dataHoraBR } from "@/lib/format";
+import { dataBR, dataHoraBR } from "@/lib/format";
 import { tamanho } from "./tipos";
 
 /**
@@ -23,6 +23,7 @@ export function CartaoBackup({ situacao }: { situacao: SituacaoBackup }) {
   const [msg, setMsg] = useState<{ tipo: "ok" | "erro"; texto: string } | null>(null);
   const [ocupado, iniciar] = useTransition();
   const form = useRef<HTMLFormElement>(null);
+  const [modo, setModo] = useState(b2.modo);
 
   // Enquanto o backup roda, a tela acompanha sozinha.
   useEffect(() => {
@@ -45,7 +46,11 @@ export function CartaoBackup({ situacao }: { situacao: SituacaoBackup }) {
   }
 
   const dados = () => new FormData(form.current ?? undefined);
-  const horario = servico.hora !== null ? `todo dia às ${servico.hora}h30` : "todo dia de madrugada";
+  const cada = servico.cadaDias;
+  const quando = cada === null ? "de madrugada" : cada === 1 ? "todo dia" : `a cada ${cada} dias`;
+  const horario = `${quando}${servico.hora !== null ? ` às ${servico.hora}h30` : ""}${
+    servico.proximo ? ` · próximo em ${dataBR(servico.proximo)}` : ""
+  }`;
   const pasta = b2.pasta;
 
   return (
@@ -90,6 +95,12 @@ export function CartaoBackup({ situacao }: { situacao: SituacaoBackup }) {
             {servico.b2Origem === "console" || servico.b2Origem === "variaveis" ? (
               <span className="text-slate-900">
                 <span className="font-mono">{servico.b2Destino}</span>
+                {servico.b2Modo && (
+                  <span className="text-slate-500">
+                    {" "}
+                    · {servico.b2Modo === "espelho" ? "espelho do app" : "com histórico"}
+                  </span>
+                )}
                 {servico.b2Origem === "variaveis" && <span className="text-slate-500"> (variáveis da stack)</span>}
               </span>
             ) : (
@@ -149,37 +160,47 @@ export function CartaoBackup({ situacao }: { situacao: SituacaoBackup }) {
             <Campo label="Pasta dentro do bucket" hint="Padrão: manutencao">
               <input name="pasta" className="campo font-mono" defaultValue={b2.pasta} autoComplete="off" />
             </Campo>
-            <Campo label="Dias guardados no B2" hint="Dumps do banco e arquivos apagados. Padrão: 30">
-              <input name="dias" type="number" min={1} max={3650} className="campo" defaultValue={b2.dias} />
+            <Campo label="Backup automático a cada (dias)" hint="Padrão: 15. O botão Fazer backup agora conta como o último.">
+              <input name="cada_dias" type="number" min={1} max={90} className="campo" defaultValue={b2.cadaDias} />
             </Campo>
             <Campo
-              label="Senha de criptografia"
-              obrigatorio={!b2.criptografado}
+              label="Como o B2 guarda"
               hint={
-                b2.criptografado
-                  ? "Ligada. Em branco mantém a atual. Sem ela o backup não abre: guarde num lugar seguro."
-                  : "Obrigatória: criptografa tudo antes de sair do servidor. Guarde: sem ela o backup não abre."
+                modo === "espelho"
+                  ? "Igual ao app: só o backup mais novo do banco, e o que é apagado no app sai do B2."
+                  : "Guarda os backups do banco e os arquivos apagados pelos dias abaixo."
               }
             >
-              <input
-                name="senha_criptografia"
-                type="password"
+              <select
+                name="modo"
                 className="campo"
-                autoComplete="new-password"
-                placeholder={b2.criptografado ? "••••••••" : ""}
-                required={!b2.criptografado}
-              />
+                value={modo}
+                onChange={(e) => setModo(e.target.value === "historico" ? "historico" : "espelho")}
+              >
+                <option value="espelho">Espelho do app (recomendado)</option>
+                <option value="historico">Com histórico</option>
+              </select>
             </Campo>
+            {modo === "historico" && (
+              <Campo label="Dias guardados no B2" hint="Backups do banco e arquivos apagados. Padrão: 30">
+                <input name="dias" type="number" min={1} max={3650} className="campo" defaultValue={b2.dias} />
+              </Campo>
+            )}
           </div>
 
           <div className="flex items-start gap-2 rounded-lg bg-slate-50 px-3 py-2.5 text-xs text-slate-600">
             <FolderTree className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden />
             <div className="min-w-0 font-mono leading-5">
-              <p className="truncate">{pasta}/banco/AAAA/MM/banco-AAAAMMDD-HHMM.dump</p>
-              <p className="truncate">{pasta}/arquivos/… (fotos e anexos, espelhados)</p>
-              <p className="truncate">{pasta}/arquivos-removidos/AAAAMMDD-HHMM/…</p>
+              <p className="truncate">
+                {pasta}/banco/AAAA/MM/banco-AAAAMMDD-HHMM.dump{modo === "espelho" && " (só o mais novo)"}
+              </p>
+              <p className="truncate">{pasta}/arquivos/&lt;empresa&gt;/… (fotos e anexos, um a um)</p>
+              {modo === "historico" && <p className="truncate">{pasta}/arquivos-removidos/AAAAMMDD-HHMM/…</p>}
               {b2.criptografado && (
-                <p className="mt-1 font-sans text-slate-500">Com criptografia, os nomes no bucket também ficam embaralhados.</p>
+                <p className="mt-1 font-sans text-slate-500">
+                  Senha de criptografia salva antes: os nomes no bucket ficam embaralhados. Remova e salve de novo para
+                  tirar.
+                </p>
               )}
             </div>
           </div>

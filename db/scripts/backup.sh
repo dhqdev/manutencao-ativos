@@ -1,10 +1,12 @@
 #!/bin/sh
-# Backup diário do banco (pg_dump, formato custom) e dos arquivos (fotos e
-# anexos), com retenção, no volume "backups". Com o Backblaze B2 configurado
+# Backup do banco (pg_dump, formato custom) e dos arquivos (fotos e anexos),
+# a cada BACKUP_CADA_DIAS dias (padrão 15; o console pode mudar), com
+# retenção, no volume "backups". Com o Backblaze B2 configurado
 # (no console do superadmin, aba Integrações, ou pelas variáveis B2_* da
 # stack), também manda tudo para fora do servidor — veja INSTALACAO.md.
 #
-#   backup.sh          fica no ar: roda todo dia às BACKUP_HORA:30 e atende o
+#   backup.sh          fica no ar: roda às BACKUP_HORA:30 quando o último backup
+#                      bom tem BACKUP_CADA_DIAS dias ou mais, e atende o
 #                      botão "Fazer backup agora" do console
 #   backup.sh agora    roda uma vez e sai (para testar ou antes de mexer em algo)
 #
@@ -18,6 +20,7 @@ HORA="${BACKUP_HORA:-3}"          # hora local (TZ) em que roda
 DIAS="${BACKUP_DIAS:-14}"         # quantos dias manter no servidor
 ARQUIVOS="${ARQUIVOS_DIR:-/dados/arquivos}"
 INTERVALO="${BACKUP_INTERVALO:-15}"  # segundos entre olhadas na fila do console
+FUSO="${TZ:-America/Sao_Paulo}"
 
 mkdir -p "$DESTINO"
 
@@ -36,39 +39,52 @@ credencial() {
 # --- Backblaze B2 (opcional) ----------------------------------------------------
 # Onde as credenciais são lidas, em ordem:
 #   1. console do superadmin (sistema_credenciais): b2_key_id, b2_app_key,
-#      b2_bucket, b2_pasta, b2_dias, b2_senha_criptografia
+#      b2_bucket, b2_pasta, b2_dias, b2_senha_criptografia, b2_modo
+#      (e backup_cada_dias, que vale mesmo sem o B2)
 #   2. variáveis da stack (reserva, para quem já configurou assim):
 #      B2_KEY_ID      keyID da Application Key (Backblaze → Application Keys)
 #      B2_APP_KEY     applicationKey (aparece uma vez só, na criação da chave)
 #      B2_BUCKET      nome do bucket (privado)
 #      B2_PASTA       pasta dentro do bucket (padrão: manutencao)
-#      B2_DIAS        quantos dias manter os dumps do banco no B2 (padrão: 30)
-#      B2_SENHA_CRIPTOGRAFIA  (opcional) criptografa tudo antes de sair do
+#      B2_MODO        espelho (padrão) ou historico, veja abaixo
+#      B2_DIAS        no modo historico, quantos dias manter os dumps no B2 (padrão: 30)
+#      B2_SENHA_CRIPTOGRAFIA  (opcional, o console não pede) criptografa antes de sair do
 #                     servidor. GUARDE ESSA SENHA: sem ela o backup não abre.
 #
 # Pastas no bucket:
-#   <pasta>/banco/AAAA/MM/banco-AAAAMMDD-HHMM.dump   um dump por dia
-#   <pasta>/arquivos/<org_id>/...                    fotos e anexos espelhados
-#   <pasta>/arquivos-removidos/AAAAMMDD-HHMM/...     o que foi apagado no sistema
-# Dumps e removidos ficam B2_DIAS dias. As credenciais são relidas a cada
-# rodada: trocar a chave no console vale já no próximo backup.
+#   <pasta>/banco/AAAA/MM/banco-AAAAMMDD-HHMM.dump   dump do banco
+#   <pasta>/arquivos/<org_id>/...                    fotos e anexos, um a um
+#   <pasta>/arquivos-removidos/AAAAMMDD-HHMM/...     (só no historico) o que foi apagado
+# Modo espelho (pedido do dono em 24/11/2026): o bucket fica igual ao app.
+# Só o dump mais novo fica (o anterior sai depois que o novo subiu inteiro) e
+# o arquivo apagado no app é apagado no bucket. Modo historico: dumps e
+# removidos ficam B2_DIAS dias. As credenciais são relidas a cada rodada:
+# trocar a chave no console vale já no próximo backup.
 B2_ORIGEM=desligado
 B2_IMPRESSAO=""
 
 configurar_b2() {
+  # Intervalo do automático: do console, senão da stack, senão 15 dias.
+  cada=$(credencial backup_cada_dias)
+  [ -n "$cada" ] || cada="${BACKUP_CADA_DIAS:-}"
+  case "$cada" in ''|*[!0-9]*|0) CADA_DIAS=15 ;; *) CADA_DIAS="$cada" ;; esac
+
   c_id=$(credencial b2_key_id); c_chave=$(credencial b2_app_key); c_bucket=$(credencial b2_bucket)
   if [ -n "$c_id" ] && [ -n "$c_chave" ] && [ -n "$c_bucket" ]; then
     B2_ORIGEM=console
     ID="$c_id"; CHAVE="$c_chave"; BUCKET="$c_bucket"
     PASTA=$(credencial b2_pasta); B2D=$(credencial b2_dias); SENHA=$(credencial b2_senha_criptografia)
+    MODO=$(credencial b2_modo)
   elif [ -n "${B2_KEY_ID:-}" ] && [ -n "${B2_APP_KEY:-}" ] && [ -n "${B2_BUCKET:-}" ]; then
     B2_ORIGEM=variaveis
     ID="$B2_KEY_ID"; CHAVE="$B2_APP_KEY"; BUCKET="$B2_BUCKET"
     PASTA="${B2_PASTA:-}"; B2D="${B2_DIAS:-}"; SENHA="${B2_SENHA_CRIPTOGRAFIA:-}"
+    MODO="${B2_MODO:-}"
   else
     B2_ORIGEM=desligado
-    ID=""; CHAVE=""; BUCKET=""; PASTA=""; B2D=""; SENHA=""
+    ID=""; CHAVE=""; BUCKET=""; PASTA=""; B2D=""; SENHA=""; MODO=""
   fi
+  case "$MODO" in historico) B2_MODO_USO=historico ;; *) B2_MODO_USO=espelho ;; esac
   B2_BUCKET_USO="$BUCKET"
   B2_PASTA_USO="${PASTA:-manutencao}"
   case "$B2D" in ''|*[!0-9]*) B2_DIAS_USO=30 ;; *) B2_DIAS_USO="$B2D" ;; esac
@@ -93,16 +109,18 @@ configurar_b2() {
 
   # Mudou a configuração? Confere a chave na hora: erro de digitação aparece
   # no log (e no console) logo, não só às 3h30 da manhã.
-  impressao="$B2_ORIGEM|$ID|$CHAVE|$BUCKET|$B2_PASTA_USO|$B2_DIAS_USO|$SENHA"
+  impressao="$B2_ORIGEM|$ID|$CHAVE|$BUCKET|$B2_PASTA_USO|$B2_DIAS_USO|$SENHA|$B2_MODO_USO|$CADA_DIAS"
   if [ "$impressao" != "$B2_IMPRESSAO" ]; then
     B2_IMPRESSAO="$impressao"
     if [ "$B2_ORIGEM" = desligado ]; then
-      log "Backblaze B2 desligado: só o backup local vai rodar"
+      log "Backblaze B2 desligado: só o backup local vai rodar (a cada $CADA_DIAS dias)"
     else
       # shellcheck disable=SC2086
       if $RC lsf "b2:$BUCKET" --max-depth 1 >/dev/null 2>&1; then
-        log "Backblaze B2 conectado ($B2_ORIGEM): $BUCKET/$B2_PASTA_USO (banco por $B2_DIAS_USO dias)$([ "$B2_CRIPTO" = true ] && echo ', criptografado')"
-        [ "$B2_CRIPTO" = true ] || aviso "AVISO: o backup sai para o B2 SEM criptografia (senhas em hash, chaves e dados de todas as empresas). Defina a senha de criptografia no console ou em B2_SENHA_CRIPTOGRAFIA."
+        if [ "$B2_MODO_USO" = espelho ]; then modo_txt="espelho do app"; else modo_txt="histórico de $B2_DIAS_USO dias"; fi
+        log "Backblaze B2 conectado ($B2_ORIGEM): $BUCKET/$B2_PASTA_USO ($modo_txt, a cada $CADA_DIAS dias)$([ "$B2_CRIPTO" = true ] && echo ', criptografado')"
+        # Sem senha (o padrão desde 24/11/2026): os arquivos ficam legíveis no
+        # painel do B2, protegidos pelo bucket privado e pela chave restrita.
       else
         aviso "AVISO: não consegui acessar o bucket $BUCKET no Backblaze B2. Confira o keyID, a applicationKey e o nome do bucket ($B2_ORIGEM)."
       fi
@@ -146,8 +164,12 @@ enviar_b2() {
   fi
 
   if [ -d "$ARQUIVOS" ]; then
+    # Arquivo por arquivo (só o que mudou sobe). No espelho, o que sumiu do
+    # app é apagado do bucket; no histórico, vai para arquivos-removidos/.
+    guardar=""
+    [ "$B2_MODO_USO" = historico ] && guardar="--backup-dir $(no_b2 "arquivos-removidos/$carimbo")"
     # shellcheck disable=SC2086
-    if com_insistencia $RC sync "$ARQUIVOS" "$(no_b2 arquivos)" --backup-dir "$(no_b2 "arquivos-removidos/$carimbo")"; then
+    if com_insistencia $RC sync "$ARQUIVOS" "$(no_b2 arquivos)" $guardar; then
       log "B2: arquivos ok"
     else
       aviso "FALHOU o envio dos arquivos para o B2"
@@ -155,8 +177,17 @@ enviar_b2() {
     fi
   fi
 
-  # Retenção no B2 só depois de um envio bom, pelo mesmo motivo da local.
-  if [ "$B2_RESULTADO" = ok ]; then
+  # Retenção no B2 só depois de um envio bom, pelo mesmo motivo da local:
+  # no espelho, o dump anterior só sai quando o novo já está inteiro lá.
+  if [ "$B2_RESULTADO" = ok ] && [ "$B2_MODO_USO" = espelho ]; then
+    if [ -f "$DESTINO/banco-$carimbo.dump" ]; then
+      # shellcheck disable=SC2086
+      $RC delete "$(no_b2 banco)" --filter "- banco-$carimbo.dump" --filter "+ banco-*.dump" --filter "- *" --rmdirs 2>&1 | grep -v "^$" || true
+    fi
+    # Sobra do modo histórico (ou de antes do espelho): nada antigo fica.
+    # shellcheck disable=SC2086
+    $RC purge "$(no_b2 arquivos-removidos)" >/dev/null 2>&1 || true
+  elif [ "$B2_RESULTADO" = ok ]; then
     # shellcheck disable=SC2086
     $RC delete "$(no_b2 banco)" --min-age "${B2_DIAS_USO}d" --include 'banco-*.dump' --rmdirs 2>&1 | grep -v "^$" || true
     # shellcheck disable=SC2086
@@ -197,11 +228,24 @@ fechar_rodada() {
 sinal_de_vida() {
   destino=""
   [ "$B2_ORIGEM" != desligado ] && destino="$B2_BUCKET_USO/$B2_PASTA_USO"
-  echo "insert into sistema_backup_servico (id, visto_em, hora, dias, b2_origem, b2_destino)
-        values (1, now(), :'hora', :'dias', :'origem', nullif(:'destino', ''))
+  echo "insert into sistema_backup_servico (id, visto_em, hora, dias, b2_origem, b2_destino, cada_dias, b2_modo)
+        values (1, now(), :'hora', :'dias', :'origem', nullif(:'destino', ''), :'cada', :'modo')
         on conflict (id) do update set visto_em = excluded.visto_em, hora = excluded.hora,
-          dias = excluded.dias, b2_origem = excluded.b2_origem, b2_destino = excluded.b2_destino" \
-    | sql -v hora="$HORA" -v dias="$DIAS" -v origem="$B2_ORIGEM" -v destino="$destino" >/dev/null
+          dias = excluded.dias, b2_origem = excluded.b2_origem, b2_destino = excluded.b2_destino,
+          cada_dias = excluded.cada_dias, b2_modo = excluded.b2_modo" \
+    | sql -v hora="$HORA" -v dias="$DIAS" -v origem="$B2_ORIGEM" -v destino="$destino" \
+          -v cada="$CADA_DIAS" -v modo="$B2_MODO_USO" >/dev/null
+}
+
+# O automático só roda quando o último backup bom (automático ou do botão)
+# tem CADA_DIAS dias ou mais, contando em dias do fuso da stack. Sem nenhum
+# backup bom, ou sem a tabela (base antiga), está vencido: melhor sobrar
+# backup do que faltar. Falhou? Tenta de novo no dia seguinte.
+backup_vencido() {
+  r=$(echo "select coalesce((max(iniciado_em) at time zone :'fuso')::date + :'cada'::int
+                 <= (now() at time zone :'fuso')::date, true)
+            from sistema_backups where estado = 'ok'" | sql -v fuso="$FUSO" -v cada="$CADA_DIAS")
+  [ "$r" != f ]
 }
 
 fazer_backup() {
@@ -290,7 +334,7 @@ echo "update sistema_backups set estado = 'erro', concluido_em = now(),
 
 configurar_b2
 sinal_de_vida
-log "no ar: todo dia às ${HORA}h30, mantendo ${DIAS} dias em $DESTINO"
+log "no ar: a cada ${CADA_DIAS} dias às ${HORA}h30, mantendo ${DIAS} dias em $DESTINO"
 
 # Subiu depois da hora de hoje: o próximo agendado é amanhã (como antes).
 ultimo_dia=""
@@ -305,7 +349,11 @@ while true; do
     fazer_backup manual || true
   elif [ "$ultimo_dia" != "$(date +%F)" ] && passou_da_hora; then
     ultimo_dia=$(date +%F)
-    fazer_backup agendado || true
+    if backup_vencido; then
+      fazer_backup agendado || true
+    else
+      log "automático de hoje pulado: o último backup bom tem menos de $CADA_DIAS dias"
+    fi
   fi
   sinal_de_vida
 done

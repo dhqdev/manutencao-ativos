@@ -217,8 +217,11 @@ whatsapp, cron, backup, migrador, atualizador) e `docker service logs -f traefik
 
 ### Backups
 
-Todo dia às 3h30 (`BACKUP_HORA`), mantendo 14 dias (`BACKUP_DIAS`), no volume
-`manutencao_backups`:
+A cada 15 dias às 3h30 (`BACKUP_CADA_DIAS` e `BACKUP_HORA`; o intervalo também
+se muda no console), mantendo 14 dias (`BACKUP_DIAS`), no volume
+`manutencao_backups`. O automático conta a partir do último backup bom, então
+um **Fazer backup agora** no console também adia o próximo. Se uma rodada
+falhar, ele tenta de novo na madrugada seguinte.
 
 ```bash
 sudo ls -lh /var/lib/docker/volumes/manutencao_backups/_data/
@@ -244,14 +247,17 @@ primeiros 10 GB grátis) e compatível com o `rclone`, que já vem na imagem `op
    *Files in Bucket*: **Private**. Ligar *Default Encryption* não custa nada.
 3. **Application Keys → Add a New Application Key**: *Allow access to Bucket(s)*:
    só esse bucket; *Type of Access*: **Read and Write**. Copie o **keyID** e a
-   **applicationKey** (ela aparece uma vez só).
+   **applicationKey** (ela aparece uma vez só). Não use a *Master Application
+   Key*: ela abre todos os buckets da conta.
+   Em **Configurações de ciclo de vida** do bucket, escolha **Keep only the last
+   version**: assim nem versão velha de arquivo fica cobrando espaço.
 4. No console do superadmin, **Gerência → Integrações → Backup no Backblaze
-   B2**: cole o keyID, a applicationKey e o nome do bucket (pasta e dias de
-   retenção são opcionais) e clique em **Salvar**. O console confere a chave na
+   B2**: cole o keyID, a applicationKey e o nome do bucket (pasta, intervalo e
+   modo são opcionais) e clique em **Salvar**. O console confere a chave na
    API do Backblaze antes de gravar (bucket inexistente, chave sem acesso a ele
    ou bucket público são recusados). O serviço backup relê as credenciais a
-   cada rodada: não precisa mexer na stack. A applicationKey e a senha de
-   criptografia nunca voltam para a tela (só os 4 últimos caracteres).
+   cada rodada: não precisa mexer na stack. A applicationKey nunca volta para a
+   tela (só os 4 últimos caracteres).
 
    Alternativa (reserva, usada só se o console estiver vazio): as variáveis
    do serviço de backup (`infra/.env` ou na stack do Portainer):
@@ -261,8 +267,9 @@ primeiros 10 GB grátis) e compatível com o `rclone`, que já vem na imagem `op
    B2_APP_KEY='applicationKey'
    B2_BUCKET='suaempresa-manutencao-backup'
    B2_PASTA='manutencao'          # pasta dentro do bucket
-   B2_DIAS='30'                   # dias que os dumps do banco ficam no B2
-   B2_SENHA_CRIPTOGRAFIA=''       # recomendado: criptografa antes de enviar (sem ela o log avisa)
+   B2_MODO='espelho'              # espelho (igual ao app) ou historico
+   B2_DIAS='30'                   # só no historico: dias que os dumps ficam no B2
+   B2_SENHA_CRIPTOGRAFIA=''       # opcional: criptografa antes de enviar
    ```
 
 5. No log do backup deve aparecer `Backblaze B2 conectado (console)` (ou
@@ -270,15 +277,17 @@ primeiros 10 GB grátis) e compatível com o `rclone`, que já vem na imagem `op
    O cartão do console mostra o destino em uso, se o serviço está no ar e as
    últimas rodadas (data, tamanho do banco e dos arquivos, se o B2 deu certo).
 
-O que vai para lá, todo dia depois do backup local das 3h30:
+O que vai para lá, depois de cada backup local:
 
 | No bucket | O quê |
 |---|---|
-| `manutencao/banco/AAAA/MM/banco-AAAAMMDD-HHMM.dump` | Um dump do banco por dia, em pastas por ano e mês, guardado pelos dias de retenção (padrão 30) |
-| `manutencao/arquivos/` | Espelho das fotos e anexos (só o que mudou sobe) |
-| `manutencao/arquivos-removidos/AAAAMMDD-HHMM/` | O que foi apagado no sistema, guardado pelos mesmos dias |
+| `manutencao/banco/AAAA/MM/banco-AAAAMMDD-HHMM.dump` | Dump do banco. No **espelho** (padrão) só fica o mais novo; no **histórico**, um por rodada, pelos dias de retenção (padrão 30) |
+| `manutencao/arquivos/<empresa>/…` | Fotos e anexos, arquivo por arquivo (só o que mudou sobe). No espelho, o que foi apagado no app sai do bucket |
+| `manutencao/arquivos-removidos/AAAAMMDD-HHMM/` | Só no histórico: o que foi apagado no sistema, pelos mesmos dias |
 
-A retenção no B2 só apaga cópias antigas depois de um envio bom, como a local.
+No modo **espelho** o bucket fica igual ao app, sem guardar informação
+antiga. O dump anterior só é apagado depois que o novo subiu inteiro, e nada
+é apagado no B2 se o envio falhar.
 
 **Testar agora**, sem esperar a madrugada: botão **Fazer backup agora** no
 cartão do console (o serviço pega o pedido em até 15 segundos e a tela
@@ -288,9 +297,11 @@ acompanha), ou pelo Portainer → Containers → backup → Console, ou na VM:
 docker exec -it $(docker ps -qf name=manutencao_backup) /ops/backup.sh agora
 ```
 
-> Com a senha de criptografia (no console ou `B2_SENHA_CRIPTOGRAFIA`) os nomes e o conteúdo ficam ilegíveis no painel
-> do Backblaze. **Guarde essa senha fora do servidor**: sem ela o backup não
-> abre. Não troque depois de começar (os arquivos antigos continuariam na senha velha).
+> Sem senha de criptografia (o padrão), os arquivos aparecem com o nome de
+> verdade em **Browse Files** do Backblaze e se baixam direto por lá. Quem
+> protege é o bucket privado, a chave restrita a ele e a criptografia do
+> próprio B2. Com `B2_SENHA_CRIPTOGRAFIA` (só pela stack) nomes e conteúdo
+> ficam ilegíveis no painel e **sem essa senha o backup não abre**.
 
 **Baixar do B2 para restaurar** (traz para o volume de backups e depois segue
 os passos de restauração abaixo). Se as credenciais estão só no console,

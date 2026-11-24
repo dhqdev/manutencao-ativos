@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 import {
   finalDoSegredo,
   normalizarPasta,
+  proximoBackup,
+  validarCadaDias,
+  validarModo,
   validarAppKey,
   validarBucket,
   validarDias,
@@ -48,4 +51,21 @@ test("dias de retenção e senha de criptografia", () => {
 test("finalDoSegredo mostra só os 4 últimos", () => {
   assert.equal(finalDoSegredo("K005abcdefgh1234"), "…1234");
   assert.equal(finalDoSegredo(null), null);
+});
+
+test("modo do B2 e intervalo do automático", () => {
+  assert.equal(validarModo(null), "espelho");
+  assert.equal(validarModo("historico"), "historico");
+  assert.throws(() => validarModo("tudo"));
+  assert.equal(validarCadaDias(null), 15);
+  assert.equal(validarCadaDias(1), 1);
+  assert.throws(() => validarCadaDias(0));
+  assert.throws(() => validarCadaDias(91));
+});
+
+test("próximo backup: 15 dias depois do último bom, nunca no passado", () => {
+  assert.equal(proximoBackup(null, 15, "2026-11-24"), "2026-11-24");
+  assert.equal(proximoBackup("2026-11-24", 15, "2026-11-24"), "2026-12-09");
+  assert.equal(proximoBackup("2026-12-25", 15, "2026-12-26"), "2027-01-09");
+  assert.equal(proximoBackup("2026-10-01", 15, "2026-11-24"), "2026-11-24");
 });

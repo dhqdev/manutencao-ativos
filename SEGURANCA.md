@@ -167,8 +167,10 @@ O `infra/portainer.yml` traz `TROQUE-...` nos segredos, e esse texto é
 público. O `deploy.sh` recusa, o app não sobe com `JWT_SECRET`,
 `SESSAO_SECRET` ou `ARQUIVOS_SECRET` de exemplo, o migrador não aceita a
 `SUPERADMIN_SENHA` de exemplo e o WhatsApp não aceita a chave de exemplo. A
-senha de criptografia do backup no B2 virou obrigatória no console; pelas
-variáveis da stack ela continua opcional, mas o log avisa a cada mudança.
+senha de criptografia do backup no B2 chegou a ser obrigatória no console; o
+dono pediu (24/11/2026) para tirar e deixar simples. Hoje ela é opcional e só
+pelas variáveis da stack: a proteção é o bucket privado, a chave restrita a
+ele e a criptografia em repouso do B2.
 
 ### 10. Entrada do navegador ia crua para o banco
 
@@ -337,8 +339,8 @@ Fotos e anexos ficam no volume `manutencao_arquivos`. Nada é público:
   As credenciais ficam em `sistema_credenciais`, com RLS ligado e sem policy
   (só a chave de servidor lê); a applicationKey e a senha de criptografia
   nunca voltam para o navegador, e o app só grava depois de conferir o posto
-  de superadmin na sessão. Elas vão junto no dump do banco: use a senha de
-  criptografia do backup para o B2 não guardar a própria chave em claro.
+  de superadmin na sessão. Elas vão junto no dump do banco, por isso use uma
+  chave do B2 restrita ao bucket do backup (nunca a Master Application Key).
 - **Senha forte para o superadmin** (`SUPERADMIN_SENHA`): ele enxerga e altera
   todas as empresas. As funções `admin_*` do banco só rodam com a chave de
   servidor, e o app confere o posto na sessão (no banco) em cada tela e ação

@@ -31,7 +31,7 @@ migrador · cron (resumo do WhatsApp) · backup diário · atualizador
 | **whatsapp** | Servidor Baileys sempre ligado (QR, "digitando", reconexão) |
 | **migrador** | Aplica `db/sql/*.sql` a cada deploy (idempotente) e cria/atualiza o superadmin |
 | **cron** | Chama a rotina do resumo diário do WhatsApp de hora em hora |
-| **backup** | `pg_dump` + arquivos todo dia, com retenção, e cópia no Backblaze B2 (credenciais no console do superadmin, aba Integrações) |
+| **backup** | `pg_dump` + arquivos a cada 15 dias, com retenção, e cópia no Backblaze B2 (credenciais no console do superadmin, aba Integrações) |
 | **atualizador** | Aplica a release nova quando o superadmin clica em **Atualizar** no console (tem o socket do Docker; não abre porta) |
 | **traefik** | Porta de entrada, HTTPS automático, painel protegido por senha |
 
@@ -250,8 +250,9 @@ o **Groq** do assistente de IA (chave, modelo e botão **Testar conexão**) e o
 backup.
 
 Na aba **Integrações** ficam as credenciais dos serviços de fora. O cartão
-**Backup no Backblaze B2** recebe keyID, applicationKey, bucket, pasta, dias de
-retenção e a senha de criptografia (opcional); **Testar conexão** confere a
+**Backup no Backblaze B2** recebe keyID, applicationKey, bucket, pasta, de
+quantos em quantos dias roda o automático (padrão 15) e como o B2 guarda
+(espelho do app, o padrão, ou com histórico pelos dias de retenção); **Testar conexão** confere a
 chave na API do Backblaze, e **Salvar** só grava se o teste passar. Os segredos
 não voltam para a tela (só os 4 últimos caracteres). O cartão mostra se o
 serviço backup está no ar, para onde ele está mandando, as pastas no bucket, o

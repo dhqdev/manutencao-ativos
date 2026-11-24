@@ -190,6 +190,8 @@ services:
       <<: *banco
       BACKUP_DIAS: ${BACKUP_DIAS:-14}
       BACKUP_HORA: ${BACKUP_HORA:-3}
+      # Automático a cada N dias (o console pode mudar). O botão do console conta.
+      BACKUP_CADA_DIAS: ${BACKUP_CADA_DIAS:-15}
       ARQUIVOS_DIR: /dados/arquivos
       # Cópia fora do servidor no Backblaze B2. Prefira o console do superadmin
       # (Gerência → Integrações); estas variáveis só valem com o console vazio.
@@ -197,6 +199,8 @@ services:
       B2_APP_KEY: ${B2_APP_KEY:-}
       B2_BUCKET: ${B2_BUCKET:-}
       B2_PASTA: ${B2_PASTA:-manutencao}
+      # espelho: o bucket fica igual ao app; historico: guarda B2_DIAS dias.
+      B2_MODO: ${B2_MODO:-espelho}
       B2_DIAS: ${B2_DIAS:-30}
       B2_SENHA_CRIPTOGRAFIA: ${B2_SENHA_CRIPTOGRAFIA:-}
     volumes:

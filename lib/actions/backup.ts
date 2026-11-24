@@ -8,7 +8,9 @@ import {
   normalizarPasta,
   validarAppKey,
   validarBucket,
+  validarCadaDias,
   validarDias,
+  validarModo,
   validarKeyId,
   validarSenhaCripto,
 } from "@/lib/backup-regras";
@@ -46,15 +48,18 @@ async function lerFormulario(fd: FormData) {
   if (!appKey) throw new Error("Informe a applicationKey.");
   const bucket = validarBucket(textoObrigatorio(fd, "bucket", "o bucket"));
   const pasta = normalizarPasta(texto(fd, "pasta"));
-  const dias = validarDias(inteiro(fd, "dias"));
+  // No espelho a tela esconde os dias: fica o que já estava salvo.
+  const diasSalvos = salvo.b2_dias ? Number(salvo.b2_dias) : null;
+  const dias = validarDias(inteiro(fd, "dias") ?? diasSalvos);
+  const modo = validarModo(texto(fd, "modo"));
+  const cadaDias = validarCadaDias(inteiro(fd, "cada_dias"));
 
-  // Senha de criptografia obrigatória: em branco mantém a salva. O dump leva
-  // senhas (hash), chaves de integração e os dados de todas as empresas; sem
-  // criptografia, quem obtivesse a chave do bucket lia tudo.
+  // Senha de criptografia opcional (pedido do dono em 24/11/2026: "quero algo
+  // simples"). O bucket é privado e o B2 criptografa em repouso; a tela não
+  // pede mais a senha, mas uma já salva (ou digitada aqui) continua valendo.
   const senhaNova = texto(fd, "senha_criptografia");
   const senha = senhaNova ? validarSenhaCripto(senhaNova) : (salvo.b2_senha_criptografia ?? null);
-  if (!senha) throw new Error("Informe a senha de criptografia do backup (guarde-a: sem ela o backup não abre).");
-  return { keyId, appKey, bucket, pasta, dias, senha };
+  return { keyId, appKey, bucket, pasta, dias, modo, cadaDias, senha };
 }
 
 export async function adminTestarBackblaze(fd: FormData): Promise<Resultado> {
@@ -85,7 +90,9 @@ export async function adminSalvarBackblaze(fd: FormData): Promise<Resultado> {
       ["b2_bucket", f.bucket],
       ["b2_pasta", f.pasta],
       ["b2_dias", String(f.dias)],
-      ["b2_senha_criptografia", f.senha],
+      ["b2_modo", f.modo],
+      ["backup_cada_dias", String(f.cadaDias)],
+      ...(f.senha ? [["b2_senha_criptografia", f.senha]] : []),
     ].map(([chave, valor]) => ({ chave, valor, atualizado_em: agora, atualizado_por: sessao.userId }));
 
     const { error } = await db.from("sistema_credenciais").upsert(linhas, { onConflict: "chave" });

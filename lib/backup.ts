@@ -1,7 +1,18 @@
 import "server-only";
 import { createAdminClient } from "@/lib/db/admin";
 import { obterCredenciais } from "@/lib/integracoes";
-import { CHAVES_B2, DIAS_PADRAO, PASTA_PADRAO, finalDoSegredo, type ChaveB2 } from "@/lib/backup-regras";
+import {
+  CADA_DIAS_PADRAO,
+  CHAVES_B2,
+  DIAS_PADRAO,
+  MODO_PADRAO,
+  PASTA_PADRAO,
+  finalDoSegredo,
+  proximoBackup,
+  type ChaveB2,
+  type ModoB2,
+} from "@/lib/backup-regras";
+import { hoje } from "@/lib/format";
 
 /**
  * Backup no console do superadmin: credenciais do Backblaze B2 (sem nunca
@@ -37,6 +48,9 @@ export type SituacaoBackup = {
     bucket: string | null;
     pasta: string;
     dias: number;
+    modo: ModoB2;
+    /** Intervalo do automático salvo no console (vale mesmo sem o B2). */
+    cadaDias: number;
     criptografado: boolean;
     atualizadoEm: string | null;
   };
@@ -47,6 +61,11 @@ export type SituacaoBackup = {
     dias: number | null;
     b2Origem: "console" | "variaveis" | "desligado" | null;
     b2Destino: string | null;
+    /** O que o serviço está usando de fato (console, stack ou padrão). */
+    cadaDias: number | null;
+    b2Modo: ModoB2 | null;
+    /** Data (AAAA-MM-DD) do próximo automático, pela mesma regra do serviço. */
+    proximo: string | null;
   };
   rodadas: RodadaBackup[];
   erro: string | null;
@@ -59,20 +78,30 @@ export async function credenciaisB2(): Promise<Partial<Record<ChaveB2, string>>>
 
 export async function situacaoBackup(): Promise<SituacaoBackup> {
   const admin = createAdminClient();
-  const [cred, sinal, rodadas] = await Promise.all([
+  const [cred, sinal, rodadas, ultimoOk] = await Promise.all([
     admin.from("sistema_credenciais").select("chave, valor, atualizado_em").in("chave", [...CHAVES_B2]),
-    admin.from("sistema_backup_servico").select("visto_em, hora, dias, b2_origem, b2_destino").eq("id", 1).maybeSingle(),
+    // select("*"): base com o 71 antigo (sem cada_dias/b2_modo) continua lendo.
+    admin.from("sistema_backup_servico").select("*").eq("id", 1).maybeSingle(),
     admin
       .from("sistema_backups")
       .select("id, origem, estado, b2, arquivo, bytes_banco, bytes_arquivos, mensagem, criado_em, iniciado_em, concluido_em")
       .order("id", { ascending: false })
       .limit(10),
+    admin
+      .from("sistema_backups")
+      .select("iniciado_em")
+      .eq("estado", "ok")
+      .order("iniciado_em", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   const c = new Map((cred.data ?? []).map((l) => [l.chave as string, l]));
   const valor = (k: ChaveB2) => (c.get(k)?.valor as string | undefined) ?? null;
   const datas = [...c.values()].map((l) => l.atualizado_em as string).sort();
   const vistoEm = (sinal.data?.visto_em as string | undefined) ?? null;
+  const cadaServico = (sinal.data?.cada_dias as number | null | undefined) ?? null;
+  const iniciadoOk = (ultimoOk.data?.iniciado_em as string | undefined) ?? null;
 
   return {
     b2: {
@@ -82,6 +111,8 @@ export async function situacaoBackup(): Promise<SituacaoBackup> {
       bucket: valor("b2_bucket"),
       pasta: valor("b2_pasta") ?? PASTA_PADRAO,
       dias: Number(valor("b2_dias") ?? DIAS_PADRAO),
+      modo: valor("b2_modo") === "historico" ? "historico" : MODO_PADRAO,
+      cadaDias: Number(valor("backup_cada_dias") ?? CADA_DIAS_PADRAO),
       criptografado: !!valor("b2_senha_criptografia"),
       atualizadoEm: datas.at(-1) ?? null,
     },
@@ -92,6 +123,9 @@ export async function situacaoBackup(): Promise<SituacaoBackup> {
       dias: (sinal.data?.dias as number | null | undefined) ?? null,
       b2Origem: (sinal.data?.b2_origem as SituacaoBackup["servico"]["b2Origem"] | undefined) ?? null,
       b2Destino: (sinal.data?.b2_destino as string | null | undefined) ?? null,
+      cadaDias: cadaServico,
+      b2Modo: (sinal.data?.b2_modo as ModoB2 | null | undefined) ?? null,
+      proximo: cadaServico ? proximoBackup(iniciadoOk ? hoje(new Date(iniciadoOk)) : null, cadaServico, hoje()) : null,
     },
     rodadas: (rodadas.data ?? []) as RodadaBackup[],
     erro: cred.error?.message ?? rodadas.error?.message ?? null,

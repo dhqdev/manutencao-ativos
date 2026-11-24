@@ -68,7 +68,7 @@ grant select, insert, update on public.sistema_backups to service_role;
 create table if not exists public.sistema_backup_servico (
   id        int primary key default 1 check (id = 1),
   visto_em  timestamptz not null default now(),
-  hora      int,      -- roda todo dia às <hora>h30 (fuso da stack)
+  hora      int,      -- o automático roda às <hora>h30 (fuso da stack)
   dias      int,      -- dias mantidos no volume do servidor
   b2_origem text check (b2_origem in ('console', 'variaveis', 'desligado')),
   b2_destino text     -- bucket/pasta em uso
@@ -77,6 +77,11 @@ create table if not exists public.sistema_backup_servico (
 alter table public.sistema_backup_servico enable row level security;
 revoke all on public.sistema_backup_servico from public, anon, authenticated;
 grant select, insert, update on public.sistema_backup_servico to service_role;
+
+-- Backup a cada N dias e modo do B2 (pedido do dono em 24/11/2026): o serviço
+-- conta o que está valendo, para o console mostrar o próximo automático.
+alter table public.sistema_backup_servico add column if not exists cada_dias int;
+alter table public.sistema_backup_servico add column if not exists b2_modo text;
 
 -- Histórico enxuto: as rodadas com mais de 180 dias não ajudam ninguém.
 delete from public.sistema_backups where criado_em < now() - interval '180 days';

@@ -372,6 +372,14 @@ Variável nova de ambiente ⇒ atualize **todos** estes lugares no mesmo commit:
   credenciais do B2 vêm do console (`sistema_credenciais`, relidas a cada
   rodada) e, com ele vazio, das variáveis `B2_*` da stack. No B2:
   `<pasta>/banco/AAAA/MM/`, `<pasta>/arquivos/`, `<pasta>/arquivos-removidos/<carimbo>/`.
+  Pedido do dono (24/11/2026): automático **a cada N dias** (`backup_cada_dias`
+  no console ou `BACKUP_CADA_DIAS`, padrão 15, contado do último backup bom em
+  `sistema_backups`: `backup_vencido` no script e `proximoBackup` em
+  `lib/backup-regras.ts` seguem a mesma regra) e modo **espelho** por padrão
+  (`b2_modo`/`B2_MODO`: só o dump mais novo, `sync` sem `--backup-dir`,
+  `arquivos-removidos/` apagada); `historico` mantém o jeito antigo com
+  `b2_dias`. Senha de criptografia **opcional** e fora da tela (o dono quer
+  simples); uma já salva continua valendo.
   O serviço olha `sistema_backups` a cada 15 s (botão "Fazer backup agora"),
   registra cada rodada lá e manda sinal de vida em `sistema_backup_servico`. O dump só
   conta se o `pg_restore --list` o lê; a retenção só apaga cópias antigas
