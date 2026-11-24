@@ -315,7 +315,13 @@ vX**. O clique só grava o pedido no banco (`sistema_atualizacoes`); o serviço
    nenhum contêiner usa. Contêiner que quebrou com erro fica 24 h para os logs
    mostrarem o motivo. Volumes e outras stacks não são tocados. A mesma
    limpeza roda quando o atualizador sobe (também depois de atualizar a stack
-   pelo Portainer) e de hora em hora.
+   pelo Portainer) e de hora em hora;
+6. faz a faxina do servidor: toda imagem sem contêiner, cache de build,
+   volumes anônimos sem uso e volumes com nome **sem uso e vazios** (volume
+   com dado nunca sai). A mensagem final diz quanto foi liberado.
+
+O repositório pode ser privado: basta os pacotes `app`, `whatsapp` e `ops` do
+ghcr.io continuarem públicos (veja INSTALACAO.md, "Repositório privado").
 
 O andamento aparece na tela. Só as imagens mudam: variável nova ou serviço
 novo na stack ainda pedem um deploy pela stack (`deploy.sh` ou Portainer).

@@ -280,7 +280,9 @@ networks:
 # -----------------------------------------------------------------------------
 # ACESSO ÀS IMAGENS (ghcr.io/dhqdev/manutencao-ativos/...): escolha um
 #  a) GitHub → seu perfil → Packages → app, whatsapp, ops → Package settings →
-#     Change visibility → Public  (as imagens não têm nenhuma chave dentro)
+#     Change visibility → Public  (as imagens não têm nenhuma chave dentro).
+#     Vale mesmo com o repositório privado, e é o que o botão Atualizar do
+#     console precisa (ele lê as versões e baixa as imagens sem login).
 #  b) Portainer → Registries → Add registry → Custom: URL ghcr.io, usuário dhqdev,
 #     senha = token do GitHub com o escopo read:packages
 #

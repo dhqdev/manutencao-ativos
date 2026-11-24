@@ -195,9 +195,28 @@ stack uma vez com o arquivo novo e o botão passa a funcionar.
 (substituídos numa atualização, migrador que terminou) e as imagens antigas
 `app`/`whatsapp`/`ops` que nenhum contêiner usa: no fim de cada atualização, ao
 subir e de hora em hora. Contêiner que saiu com erro fica 24 h (para o
-`docker service logs` mostrar o motivo). Não mexe em volumes nem em outras
-stacks. A lista de tarefas antigas em `docker service ps` continua aparecendo:
-é só o histórico do Swarm, sem contêiner nem disco.
+`docker service logs` mostrar o motivo). A lista de tarefas antigas em
+`docker service ps` continua aparecendo: é só o histórico do Swarm, sem
+contêiner nem disco.
+
+**Faxina do servidor** (só na atualização pelo console, no fim dela e de novo
+quando o atualizador novo sobe): apaga **toda** imagem que nenhum contêiner
+usa (de qualquer stack; se precisar de novo, o Swarm baixa), o cache de build,
+volumes anônimos sem uso e volumes com nome que estão **sem uso e vazios**.
+Volume com qualquer dado dentro nunca é apagado, mesmo com o serviço parado
+(o banco, os arquivos e os backups desta stack, o banco de outra stack). Volume
+de outro driver (NFS, plugin) não é tocado. O console mostra quanto foi
+liberado na mensagem final.
+
+**Repositório privado:** dá para deixar o repositório do GitHub privado e
+continuar atualizando pelo console, desde que os 3 pacotes do ghcr.io (`app`,
+`whatsapp`, `ops`) fiquem **públicos**: o console lê as versões e o
+atualizador baixa as imagens sem login. Depois de mudar o repositório, confira
+em github.com → seu perfil → **Packages** → cada pacote → **Package settings**
+→ **Change visibility** → **Public**. Com o repositório privado: o link "ver
+releases" do console só abre logado no GitHub; o `git clone` da seção 3 pede
+um token (ou use só o `portainer.yml`); e o Actions passa a gastar os minutos
+do plano do GitHub (no plano grátis, 2.000 por mês; cada push gasta uns 10).
 
 O banco acompanha sozinho: além do migrador, os serviços **backup** e
 **atualizador** comparam, ao subir, a versão da imagem deles com a gravada em

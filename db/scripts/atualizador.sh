@@ -10,6 +10,9 @@
 #   4. por último troca a própria imagem
 #   5. limpa as sobras (limpar_sobras): contêineres parados desta stack e
 #      imagens nossas que nenhum contêiner usa mais
+#   6. faxina do servidor (faxina_geral, só depois de uma atualização pelo
+#      console): toda imagem sem contêiner, cache de build, volume anônimo
+#      sem uso e volume com nome que está sem uso E vazio
 #
 # Precisa do socket do Docker (/var/run/docker.sock) e roda num manager.
 # Só troca a imagem dos serviços da PRÓPRIA stack cujas imagens vêm da mesma
@@ -180,6 +183,37 @@ limpar_sobras() {
   ultima_limpeza=$(date +%s)
 }
 
+# Faxina do servidor inteiro, pedida pelo dono (24/11/2026) para toda
+# atualização feita pelo console. Diferente de limpar_sobras, vale para
+# qualquer stack, então a regra dos volumes é dura: volume com nome só sai se
+# nenhum contêiner usa E ele está vazio. Volume com dado (o banco, os arquivos,
+# os backups, o banco de outra stack com o serviço parado) nunca sai. Nada de
+# -f: o Docker recusa apagar imagem ou volume que um contêiner esteja usando.
+faxina_geral() {
+  liberado=$(docker image prune -a -f 2>/dev/null | sed -n 's/^Total reclaimed space: //p')
+  docker builder prune -a -f >/dev/null 2>&1 || true
+
+  minha_ref=$(docker inspect --format '{{.Config.Image}}' "$(hostname)" 2>/dev/null || true)
+  volumes=0
+  for v in $(docker volume ls -q --filter dangling=true 2>/dev/null); do
+    info=$(docker volume inspect --format '{{.Driver}} {{index .Labels "com.docker.volume.anonymous"}}' "$v" 2>/dev/null) || continue
+    driver=${info%% *}; anonimo=${info#* }
+    [ "$driver" = "local" ] || continue   # NFS, plugin etc.: não é nosso para julgar
+    if [ -z "$anonimo" ]; then
+      # Volume com nome: olha por dentro, só leitura e sem rede, com a minha
+      # própria imagem (já está no disco). Pasta /vazio não existe na imagem,
+      # então o Docker não copia nada para dentro do volume.
+      [ -n "$minha_ref" ] || continue
+      docker run --rm --network none --entrypoint sh -v "$v:/vazio:ro" "$minha_ref" \
+        -c '[ -z "$(ls -A /vazio)" ]' >/dev/null 2>&1 || continue
+    fi
+    docker volume rm "$v" >/dev/null 2>&1 && volumes=$((volumes + 1))
+  done
+
+  FAXINA="${liberado:-0B} liberados em imagens; $volumes volume(s) sem uso apagados"
+  log "faxina: $FAXINA"
+}
+
 atualizar() { # id versão
   id="$1"; versao="$2"
   if ! printf '%s' "$versao" | grep -Eq "$VERSAO_VALIDA"; then
@@ -237,12 +271,15 @@ atualizar() { # id versão
     docker service update --quiet --detach --force "$s" >/dev/null 2>&1 || log "não consegui reiniciar $s"
   done
 
-  terminar "$id" concluida "Sistema atualizado para $versao."
-  log "pedido $id: concluído"
-
   # Contêineres da versão anterior já pararam: limpa agora. O meu antigo (e a
-  # imagem ops antiga, que ele usa) sai na limpeza do novo atualizador ao subir.
+  # imagem ops antiga, que ele usa) sai na faxina do novo atualizador ao subir.
+  andamento "$id" "Limpando contêineres, imagens e volumes sem uso..."
   limpar_sobras
+  FAXINA=""
+  faxina_geral
+
+  terminar "$id" concluida "Sistema atualizado para $versao. Limpeza: $FAXINA."
+  log "pedido $id: concluído"
 
   # Por último, eu mesmo (o Swarm troca este contêiner e o loop recomeça).
   docker service update --quiet --detach --image "$(imagem_nova "$EU" "$versao")" "$EU" >/dev/null 2>&1 || true
@@ -262,6 +299,16 @@ SQL
 # Ao subir (inclusive logo depois de uma atualização ou de um deploy pela
 # stack no Portainer) e depois de hora em hora.
 limpar_sobras
+
+# Acabei de ser trocado por uma atualização do console: o contêiner antigo do
+# atualizador e a imagem ops anterior só ficam livres agora. Faxina de novo.
+recente=$(sql <<'SQL' || true
+select 1 from public.sistema_atualizacoes
+ where estado = 'concluida' and concluido_em > now() - interval '15 minutes'
+ limit 1;
+SQL
+)
+[ "$recente" = "1" ] && faxina_geral
 
 while true; do
   [ $(( $(date +%s) - ultima_limpeza )) -ge "$LIMPEZA_INTERVALO" ] && limpar_sobras

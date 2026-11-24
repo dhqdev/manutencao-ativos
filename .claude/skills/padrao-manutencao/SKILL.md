@@ -409,8 +409,14 @@ Variável nova de ambiente ⇒ atualize **todos** estes lugares no mesmo commit:
   Sobras (pedido de 24/11/2026): `limpar_sobras` no atualizador apaga
   contêineres parados com a etiqueta da stack (saída 0/137/143 na hora, outro
   código depois de 24 h) e imagens da `BASE` sem contêiner usando, menos a tag
-  dele. Roda no fim da atualização, ao subir e de hora em hora. Nunca `-f`,
-  nunca `volume`/`system prune`, nada fora da stack.
+  dele. Roda no fim da atualização, ao subir e de hora em hora. Nunca `-f`.
+  `faxina_geral` (também pedido do dono, só em atualização pelo console e ao
+  subir até 15 min depois de uma): `image prune -a`, `builder prune` e
+  volumes sem uso que são anônimos ou, com nome, **vazios** (olhados por um
+  `docker run` só leitura). Nunca `volume prune -a`/`system prune`: volume
+  com dado (banco de qualquer stack com o serviço parado) não pode sair.
+  Repositório pode ficar privado: console e atualizador só dependem dos
+  pacotes do ghcr.io serem públicos (token anônimo).
 
 ## 6. Testes e CI
 
