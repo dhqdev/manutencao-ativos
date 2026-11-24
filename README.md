@@ -9,6 +9,26 @@ inteiro em servidor próprio: **PostgreSQL 17 + PostgREST + Traefik + Docker
 Swarm**, com autenticação, arquivos, backup e WhatsApp (Baileys) próprios —
 sem depender de Supabase, Vercel ou outro serviço externo.
 
+### Novidades (24/11/2026)
+
+- **Mais rápido e com cara de ERP**: tabelas densas com cabeçalho fixo e
+  ordenação, filtros e página no link, totais calculados no banco, PDF só
+  carregado na hora e busca global com **Ctrl+K** ([detalhes](#busca-e-atalhos-de-teclado)).
+- **Periódicas em quadro (kanban)**: colunas Atrasadas, Vencendo em breve, Em
+  dia e Pausadas ([detalhes](#manutenções-periódicas)).
+- **Assinatura mensal por Pix**: QR e copia e cola no sistema, comprovante que
+  chega no WhatsApp do dono, aprovação no console e bloqueio depois da
+  tolerância ([detalhes](#assinatura-por-pix)).
+- **Backup a cada 15 dias** com o Backblaze B2 espelhado com o app, sem senha
+  de criptografia obrigatória ([detalhes](#backup-no-backblaze-b2)).
+- **"Entrar como" sem limite de 1 hora**: vale até voltar ao console ou sair.
+- **Atualizador faz a faxina**: apaga contêineres parados da stack, imagens sem
+  uso, cache de build e volumes vazios sem uso (volume com dado nunca sai)
+  ([detalhes](#atualizar-pelo-console)).
+- **Repositório pode ser privado**, com os pacotes do ghcr.io públicos.
+- **Assistente de IA** com o Groq no modelo `openai/gpt-oss-120b`, trocando
+  sozinho de modelo quando o Groq desliga o salvo ([detalhes](#assistente-de-ia)).
+
 ---
 
 ## 1. Arquitetura
@@ -20,7 +40,7 @@ internet ─► Traefik (HTTPS, Let's Encrypt)
                     │   └ arquivos (volume) │
                     └──► whatsapp (Baileys) ┘
 
-migrador · cron (resumo do WhatsApp) · backup diário · atualizador
+migrador · cron (resumo do WhatsApp) · backup (a cada 15 dias) · atualizador
 ```
 
 | Peça | O que faz |
@@ -29,15 +49,32 @@ migrador · cron (resumo do WhatsApp) · backup diário · atualizador
 | **rest** | PostgREST: API do banco, **só na rede interna**. O app chama com um JWT curto do usuário; o RLS do Postgres filtra cada linha pela empresa |
 | **db** | PostgreSQL 17 com RLS em todas as tabelas e autenticação própria (schema `auth`) |
 | **whatsapp** | Servidor Baileys sempre ligado (QR, "digitando", reconexão) |
-| **migrador** | Aplica `db/sql/*.sql` a cada deploy (idempotente) e cria/atualiza o superadmin |
+| **migrador** | Aplica `db/sql/*.sql` a cada deploy (idempotente) e cria/atualiza o superadmin. Backup e atualizador também conferem a versão do banco ao subir e aplicam o SQL que faltar |
 | **cron** | Chama a rotina do resumo diário do WhatsApp de hora em hora |
-| **backup** | `pg_dump` + arquivos a cada 15 dias, com retenção, e cópia no Backblaze B2 (credenciais no console do superadmin, aba Integrações) |
-| **atualizador** | Aplica a release nova quando o superadmin clica em **Atualizar** no console (tem o socket do Docker; não abre porta) |
+| **backup** | `pg_dump` + arquivos a cada 15 dias (configurável), com cópia no Backblaze B2 espelhada com o app (credenciais no console do superadmin, aba Integrações) |
+| **atualizador** | Aplica a release nova quando o superadmin clica em **Atualizar** no console e apaga as sobras da stack (tem o socket do Docker; não abre porta) |
 | **traefik** | Porta de entrada, HTTPS automático, painel protegido por senha |
 
-Instalação no servidor (Oracle Cloud ARM64): **[INSTALACAO.md](INSTALACAO.md)**.
-Build, testes e releases: GitHub Actions na `main` (`.github/workflows/principal.yml`) —
-cada push verde gera uma release `vAAAA.MM.DD-N` com as imagens e o pacote de instalação.
+### Deploy (Docker Swarm ou Portainer)
+
+Build, testes e releases: GitHub Actions na `main` (`.github/workflows/principal.yml`).
+Cada push verde publica as imagens `app`, `whatsapp` e `ops` (linux/arm64) no
+ghcr.io e gera uma release `vAAAA.MM.DD-N` com as notas e o pacote `infra/`.
+
+Dois jeitos de subir a stack no Swarm (passo a passo em
+**[INSTALACAO.md](INSTALACAO.md)**, Oracle Cloud ARM64):
+
+- **Na VM, com o Traefik da própria stack**: `infra/stack.yml` + `infra/.env`
+  (copiado de `.env.exemplo`) e `./deploy.sh`. Com os segredos de deploy no
+  GitHub, o Actions roda isso sozinho a cada push na `main`.
+- **No Portainer, com um Traefik que já existe**: cole `infra/portainer.yml`
+  em *Stacks → Add stack*, troque os valores `TROQUE-...` e faça o Deploy.
+
+Depois de instalado, a atualização é pelo **console do superadmin**
+(bloco **Versão do sistema** → **Atualizar para vX**, veja
+[Atualizar pelo console](#atualizar-pelo-console)). Variável ou serviço novo
+na stack ainda pedem *Update the stack* no Portainer ou `./deploy.sh`; o banco
+se acerta sozinho nos dois casos.
 
 ### O banco
 
@@ -49,9 +86,17 @@ Todo o SQL fica em [`db/sql/`](db/sql/) e é aplicado pelo migrador:
 | `10-schema.sql` | Tabelas, RLS, views, funções e triggers do sistema |
 | `20-auth.sql` | Funções de login, sessão, senha e recuperação (só o servidor chama) |
 | `30-superadmin.sql` | Login do superadmin (vindo da stack) e funções `admin_*` do painel de administração |
-| `70-integracoes.sql` | `sistema_credenciais`: chaves de serviços externos (Groq...) salvas pelo console |
+| `40-atualizacoes.sql` | `sistema_atualizacoes`: pedidos do botão **Atualizar** que o atualizador aplica |
+| `45-desempenho.sql` | Índices compostos e totais calculados no banco (dashboard, histórico paginado, busca global) |
+| `50-validacoes.sql` | Travas de valores (negativos, cores) que valem para qualquer caminho de escrita |
+| `60-equipe.sql` | Último acesso e sessões abertas para a tela Equipe |
+| `70-integracoes.sql` | `sistema_credenciais`: chaves de serviços externos (Groq, B2, Pix...) salvas pelo console |
 | `71-backup.sql` | Rodadas do backup (histórico e "backup agora") e sinal de vida do serviço backup |
-| `72-entrar-como.sql` | "Entrar como" do superadmin: sessão curta na conta da pessoa e registro de cada entrada |
+| `72-entrar-como.sql` | "Entrar como" do superadmin: sessão na conta da pessoa e registro de cada entrada |
+| `73-convites.sql` | Convite com aceite para pôr na equipe quem já tem conta (só com e-mail confirmado) |
+| `74-assinaturas.sql` | Assinatura por Pix: vencimento por empresa, comprovantes e bloqueio |
+| `79-entrar-como-auditoria.sql` | O que o superadmin alterou numa conta pelo "Entrar como" (a empresa vê em Equipe) |
+| `80-esquema.sql` | `sistema_esquema`: versão do SQL aplicado, para o banco se atualizar sozinho |
 
 Cadastro automático: ao criar conta, o usuário ganha empresa, perfil e as 6
 categorias padrão.
@@ -81,10 +126,12 @@ com as variáveis de `whatsapp/src/config.js`).
 | **Dashboard** | Ativos cadastrados, manutenções vencendo, atrasadas, gasto do mês, gasto dos últimos 6 meses, gasto por categoria e últimas manutenções |
 | **Ativos** | Categorias funcionam como pastas. Entrando na pasta, a lista de ativos com busca e filtro de situação |
 | Ativo (detalhe) | Abas de **Histórico** (com fotos/anexos, peças, custo, garantia), **Manutenções periódicas** e **Dados do ativo** |
-| **Manutenções** | Todas as preventivas com alertas de atraso/vencimento + histórico geral em tabela, com busca, filtros (tipo, categoria, ativo, período) e ordem que ficam no link, paginação e **Exportar CSV** (abre no Excel) |
+| **Manutenções** | Periódicas em **quadro (kanban)** ou lista, com alertas de atraso/vencimento + histórico geral em tabela, com busca, filtros (tipo, categoria, ativo, período) e ordem que ficam no link, paginação e **Exportar CSV** (abre no Excel) |
 | **Calendário** | Mês a mês, com realizadas (verde), programadas (azul) e atrasadas (vermelho). Filtra por categoria e por situação |
 | **Estoque** | Pneus com número de fogo, medida, DOT, sulco, valor e situação (estoque, em uso, recapagem, descarte). Movimentações com veículo, posição e KM, e histórico de cada pneu |
 | **Relatórios** | Filtra por período, uma ou mais categorias, ativo e tipo. Histórico com horímetro/KM e seção de pneus (gastos, movimentações, sulco baixo). Gera PDF e compartilha no WhatsApp |
+| **Assistente** | Chat com IA que responde em português sobre os dados da empresa ([detalhes](#assistente-de-ia)) |
+| **Assinatura** | Situação da mensalidade, QR do Pix, copia e cola e envio do comprovante ([detalhes](#assinatura-por-pix)) |
 | **Equipe** | Quem tem acesso, com que papel, último acesso e quem está conectado. Busca, filtro por papel, criar acesso, trocar papel, editar dados, gerar senha nova, desconectar e remover |
 | **Configurações** | Dados da empresa, perfil, senha, aparência (tema, densidade das tabelas e decoração de Natal), **WhatsApp** (com horário do envio), empresa ativa |
 
@@ -149,6 +196,13 @@ Podem ser por **dias**, **meses** ou **horas de uso** (horímetro/km):
 
 Ao registrar uma manutenção vinculada a um plano, o sistema **avança sozinho** a
 próxima data (ou o próximo horímetro) e atualiza o horímetro do ativo.
+
+Em **Manutenções → Periódicas** e na aba do ativo elas abrem em **Quadro**:
+uma coluna por situação (**Atrasadas**, **Vencendo em breve**, **Em dia** e,
+quando houver, **Pausadas**), com cards de borda colorida, próxima data, prazo,
+responsável e o botão **Dar baixa**. No celular as colunas ficam empilhadas,
+Atrasadas primeiro; em tablet ou com o menu aberto, o quadro rola para o lado.
+O alternador **Quadro/Lista** fica lembrado no aparelho.
 
 ### Assistente de IA
 
@@ -229,8 +283,10 @@ ao console** (sair pelo menu também volta). Cada entrada fica registrada em
 `sistema_entradas_como` (quem, na conta de quem, quando, IP e quando saiu).
 Não vale para usuário bloqueado, sem empresa ou outro superadmin.
 
-O console tem **uma tela só, a gerência dos usuários** (todos, de todas as
-empresas):
+O console tem quatro abas: **Usuários**, **Clientes e uso**, **Assinaturas**
+e **Integrações**, com o bloco **Versão do sistema** embaixo.
+
+Na aba **Usuários** fica a gerência de todos, de todas as empresas:
 
 - **Cartões no topo** que também filtram: usuários no sistema, entraram em 7
   dias, nunca entraram, sem empresa e bloqueados.
@@ -253,17 +309,25 @@ quanto é arquivo e quanto é banco, e quantos estão com WhatsApp.
 Na aba **Integrações** ficam as chaves de serviços externos, guardadas no
 banco (`sistema_credenciais`) e nunca devolvidas à tela (só o final aparece):
 o **Groq** do assistente de IA (chave, lista de modelos e **Testar conexão**,
-que também roda sozinho depois de salvar) e o
-backup.
+que também roda sozinho depois de salvar) e o backup.
 
-Na aba **Integrações** ficam as credenciais dos serviços de fora. O cartão
-**Backup no Backblaze B2** recebe keyID, applicationKey, bucket, pasta, de
+#### Backup no Backblaze B2
+
+O cartão **Backup no Backblaze B2** recebe keyID, applicationKey, bucket, pasta, de
 quantos em quantos dias roda o automático (padrão 15) e como o B2 guarda
 (espelho do app, o padrão, ou com histórico pelos dias de retenção); **Testar conexão** confere a
 chave na API do Backblaze, e **Salvar** só grava se o teste passar. Os segredos
 não voltam para a tela (só os 4 últimos caracteres). O cartão mostra se o
 serviço backup está no ar, para onde ele está mandando, as pastas no bucket, o
 botão **Fazer backup agora** e as últimas 10 rodadas (automáticas e manuais).
+
+O backup automático roda **a cada 15 dias** (contados do último backup bom,
+então **Fazer backup agora** adia o próximo). No modo **espelho**, o padrão, o
+bucket fica igual ao app: só o dump mais novo do banco e as fotos/anexos
+arquivo por arquivo; o que foi apagado no app some do B2. A senha de
+criptografia não é pedida (uma já salva continua valendo).
+
+#### Assinatura por Pix
 
 Na aba **Assinaturas** fica a cobrança mensal por **Pix** (sem gateway: o
 sistema monta o Pix copia e cola e o QR code no padrão BR Code do Banco
@@ -313,9 +377,10 @@ vX**. O clique só grava o pedido no banco (`sistema_atualizacoes`); o serviço
 5. apaga as sobras: contêineres parados desta stack (os substituídos e o
    migrador que já terminou) e as imagens `app`/`whatsapp`/`ops` antigas que
    nenhum contêiner usa. Contêiner que quebrou com erro fica 24 h para os logs
-   mostrarem o motivo. Volumes e outras stacks não são tocados. A mesma
+   mostrarem o motivo. Neste passo, volumes e outras stacks não são tocados. A mesma
    limpeza roda quando o atualizador sobe (também depois de atualizar a stack
-   pelo Portainer) e de hora em hora;
+   pelo Portainer) e de hora em hora. A lista de tarefas antigas em
+   `docker service ps` continua aparecendo: é só o histórico do Swarm;
 6. faz a faxina do servidor: toda imagem sem contêiner, cache de build,
    volumes anônimos sem uso e volumes com nome **sem uso e vazios** (volume
    com dado nunca sai). A mensagem final diz quanto foi liberado.
@@ -349,10 +414,14 @@ quantos registros vão sair e pede para digitar APAGAR.
 
 ```
 app/
-  (app)/            telas internas (dashboard, ativos, manutenções, calendário, relatórios, configurações)
-  admin/            console do superadmin (uma tela: usuários, clientes e uso, integrações e versão)
+  (app)/            telas internas (dashboard, ativos, manutenções, calendário, estoque, relatórios,
+                    assistente, assinatura, equipe, configurações)
+  admin/            console do superadmin (usuários, clientes e uso, assinaturas, integrações e versão)
   api/arquivos/     envio e leitura de fotos/anexos (links assinados)
+  api/exportar/     CSV do histórico de manutenções
   api/notificacoes/ rotina diária do WhatsApp (chamada pelo serviço cron)
+  api/rotinas/      limpeza de arquivos órfãos
+  api/saude/        checagem de saúde da stack
   auth/             login, cadastro, recuperação de senha e logout
 components/         UI, modais, formulários e listas
 lib/
@@ -360,6 +429,8 @@ lib/
   auth/             sessões, senhas (bcrypt), JWT, limite de tentativas
   db/               cliente do PostgREST (usuário e servidor)
   arquivos.ts       armazenamento em volume + links assinados
+  pix.ts            Pix copia e cola e QR (BR Code) da assinatura
+  modelos-groq.ts   modelos do assistente (padrão e desligados)
   session.ts        usuário + empresa atual
 proxy.ts            protege as rotas e renova o cookie de sessão
 db/                 SQL + imagem "ops" (migrador, cron, backup + Backblaze B2, importação do Supabase)
@@ -373,6 +444,8 @@ testes/             verificação da stack e teste ponta a ponta (Playwright)
 
 ```bash
 npm run dev        # desenvolvimento
+npm run verificar  # o mesmo do Actions: lock, tipos, unidade, build, WhatsApp, shell (~30 s; roda no git push)
+npm run testar     # só os testes de unidade (testes/unidade)
 npm run build      # build de produção
 npm run typecheck  # checagem de tipos
 cd whatsapp && npm test   # testes do serviço de WhatsApp
