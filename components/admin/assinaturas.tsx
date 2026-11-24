@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   CalendarClock,
-  Check,
   CircleCheck,
   Clock,
   ExternalLink,
@@ -17,6 +16,7 @@ import {
   QrCode,
   RefreshCw,
   Send,
+  ShieldAlert,
   Smartphone,
   Unplug,
   Wallet,
@@ -52,18 +52,31 @@ const mesDe = (iso: string) =>
     .format(new Date(iso))
     .slice(0, 7);
 
+const DIA = 864e5;
+
 /**
- * Seção "Assinaturas" do console: comprovantes para conferir (cada um já
- * liberou o mês ao chegar), situação e bloqueio de cada empresa, a
- * configuração do Pix e o WhatsApp que recebe os avisos.
+ * Seção "Assinaturas" do console. Comprovante não tem aprovação (pedido do
+ * dono em 24/11/2026): vale ao chegar e o superadmin só olha depois, com o
+ * botão "Comprovante falso" (desfaz o mês e bloqueia). Também: situação e
+ * bloqueio de cada empresa, a configuração do Pix e o WhatsApp dos avisos.
  */
-export function AssinaturasAdmin({ dados, mesAtual }: { dados: DadosAssinaturas; mesAtual: string }) {
-  const conferir = dados.pagamentos.filter((p) => p.situacao === "pendente");
-  const historico = dados.pagamentos.filter((p) => p.situacao !== "pendente");
+export function AssinaturasAdmin({
+  dados,
+  mesAtual,
+  agora,
+}: {
+  dados: DadosAssinaturas;
+  mesAtual: string;
+  /** Instante do servidor ("novo" igual no servidor e no navegador). */
+  agora: number;
+}) {
+  const esperando = dados.pagamentos.filter((p) => p.situacao === "pendente");
+  const recebidos = dados.pagamentos.filter((p) => p.situacao !== "pendente");
   const [filtro, setFiltro] = useState<FiltroEmpresa>("todas");
   const conta = (f: FiltroEmpresa) => dados.empresas.filter((e) => passaFiltro(e, f)).length;
-  const recebidos = dados.pagamentos.filter((p) => p.situacao !== "recusado" && mesDe(p.enviado_em) === mesAtual);
-  const recebido = recebidos.reduce((s, p) => s + Number(p.valor), 0);
+  const semana = dados.pagamentos.filter((p) => agora - new Date(p.enviado_em).getTime() < 7 * DIA);
+  const doMes = dados.pagamentos.filter((p) => p.situacao === "aprovado" && mesDe(p.enviado_em) === mesAtual);
+  const recebido = doMes.reduce((s, p) => s + Number(p.valor), 0);
   const alternar = (f: FiltroEmpresa) => setFiltro((atual) => (atual === f ? "todas" : f));
 
   return (
@@ -78,19 +91,18 @@ export function AssinaturasAdmin({ dados, mesAtual }: { dados: DadosAssinaturas;
       <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-3 2xl:grid-cols-5">
         <Indicador
           Icone={Inbox}
-          tom={conferir.length ? "ambar" : "neutro"}
-          valor={conferir.length}
-          rotulo="Comprovantes para conferir"
-          detalhe={conferir.length ? "o acesso já foi liberado" : "nada esperando"}
-          alerta={conferir.length > 0}
+          tom="azul"
+          valor={semana.length}
+          rotulo="Comprovantes em 7 dias"
+          detalhe="valem na hora, sem aprovação"
           className="col-span-2 lg:col-span-1"
         />
         <Indicador
           Icone={Wallet}
-          tom="azul"
+          tom="verde"
           valor={moeda(recebido)}
           rotulo="Recebido neste mês"
-          detalhe={`${recebidos.length} comprovante(s) · ${moeda(dados.config.valor)}/mês`}
+          detalhe={`${doMes.length} comprovante(s) · ${moeda(dados.config.valor)}/mês`}
         />
         <Indicador
           Icone={CircleCheck}
@@ -121,16 +133,28 @@ export function AssinaturasAdmin({ dados, mesAtual }: { dados: DadosAssinaturas;
         />
       </div>
 
-      <Secao
-        titulo="Comprovantes para conferir"
-        acoes={<Badge className={conferir.length ? "bg-amber-100 text-amber-800 ring-amber-600/20" : undefined}>{conferir.length}</Badge>}
-      >
+      {esperando.length > 0 && (
+        <Secao
+          titulo="Esperando você"
+          className="border-amber-300"
+          acoes={<Badge className="bg-amber-100 text-amber-800 ring-amber-600/20">{esperando.length}</Badge>}
+        >
+          <p className="border-b border-amber-100 bg-amber-50/70 px-4 py-2.5 text-xs text-amber-900 sm:px-5">
+            Empresas que <strong>você bloqueou</strong> mandaram comprovante, então ele não liberou sozinho.{" "}
+            <strong>Liberar</strong> dá +1 mês e tira o bloqueio; <strong>Recusar</strong> mantém bloqueada.
+          </p>
+          <ListaComprovantes pagamentos={esperando} grupo="Esperando você" agora={agora} />
+        </Secao>
+      )}
+
+      <Secao titulo="Comprovantes recebidos" acoes={<Badge>{recebidos.length}</Badge>}>
         <p className="border-b border-slate-100 bg-slate-50/70 px-4 py-2.5 text-xs text-slate-600 sm:px-5">
-          Quando o cliente anexa o comprovante, o acesso do mês seguinte é <strong>liberado na hora</strong> (e o arquivo
-          chega no seu WhatsApp). Abra o comprovante e <strong>confirme</strong> se o Pix caiu, ou{" "}
-          <strong>recuse</strong>: o mês dado é desfeito e dá para bloquear a empresa junto.
+          Cada comprovante <strong>já vale</strong> quando o cliente anexa (o arquivo também chega no seu WhatsApp). Pagou
+          no dia ou adiantado, o vencimento anda 1 mês e o dia não muda; pagou atrasado, conta 1 mês a partir do dia do
+          pagamento. Se algum for falso, clique em <strong>Comprovante falso</strong>: o mês é desfeito e a empresa pode
+          ser bloqueada na hora.
         </p>
-        <ListaComprovantes pagamentos={conferir} vazio="Nenhum comprovante esperando conferência." />
+        <ListaComprovantes pagamentos={recebidos} grupo="Recebidos" agora={agora} paginar />
       </Secao>
 
       <EmpresasAssinatura empresas={dados.empresas} filtro={filtro} aoFiltrar={setFiltro} />
@@ -139,10 +163,6 @@ export function AssinaturasAdmin({ dados, mesAtual }: { dados: DadosAssinaturas;
         <CartaoCobranca dados={dados} />
         <CartaoWhatsappCobranca numeroAvisos={dados.config.whatsapp} />
       </div>
-
-      <Secao titulo="Histórico de pagamentos" acoes={<Badge>{historico.length}</Badge>}>
-        <ListaComprovantes pagamentos={historico} vazio="Nenhum comprovante conferido ainda." historico />
-      </Secao>
     </div>
   );
 }
@@ -151,20 +171,39 @@ export function AssinaturasAdmin({ dados, mesAtual }: { dados: DadosAssinaturas;
 
 function ListaComprovantes({
   pagamentos,
-  vazio,
-  historico,
+  grupo,
+  agora,
+  paginar,
 }: {
   pagamentos: PagamentoAdmin[];
-  vazio: string;
-  historico?: boolean;
+  grupo: string;
+  agora: number;
+  paginar?: boolean;
 }) {
-  if (pagamentos.length === 0) return <p className="px-5 py-8 text-center text-sm text-slate-500">{vazio}</p>;
+  const [limite, setLimite] = useState(15);
+  if (pagamentos.length === 0) {
+    return <p className="px-5 py-8 text-center text-sm text-slate-500">Nenhum comprovante enviado ainda.</p>;
+  }
+  const visiveis = paginar ? pagamentos.slice(0, limite) : pagamentos;
   return (
-    <ul className="divide-y divide-slate-100" data-comprovantes={historico ? "Histórico de pagamentos" : "Para conferir"}>
-      {pagamentos.map((p) => (
-        <LinhaComprovante key={p.id} p={p} />
-      ))}
-    </ul>
+    <>
+      <ul className="divide-y divide-slate-100" data-comprovantes={grupo}>
+        {visiveis.map((p) => (
+          <LinhaComprovante key={p.id} p={p} novo={agora - new Date(p.enviado_em).getTime() < 2 * DIA} />
+        ))}
+      </ul>
+      {visiveis.length < pagamentos.length && (
+        <div className="border-t border-slate-100 px-4 py-2.5 text-center sm:px-5">
+          <button
+            type="button"
+            onClick={() => setLimite((l) => l + 30)}
+            className="text-sm font-medium text-slate-700 hover:text-slate-900"
+          >
+            Mostrar mais ({pagamentos.length - visiveis.length})
+          </button>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -176,13 +215,19 @@ function tipoVisual(p: PagamentoAdmin): "pdf" | "imagem" | "outro" {
   return "outro";
 }
 
-function LinhaComprovante({ p }: { p: PagamentoAdmin }) {
+function LinhaComprovante({ p, novo }: { p: PagamentoAdmin; novo: boolean }) {
   const { erro, ocupado, rodar } = useAcao();
   const [vendo, setVendo] = useState(false);
   const [recusando, setRecusando] = useState(false);
   const sit = SITUACOES_PAGAMENTO[p.situacao];
-  const pendente = p.situacao === "pendente";
-  const confirmar = () => rodar(() => chamarAcao(() => adminAvaliarPagamento(p.id, true)), () => setVendo(false));
+  const esperando = p.situacao === "pendente";
+  // Só o que liberou sozinho pode ser desfeito como falso (o aprovado à mão já foi visto).
+  const podeFalso = p.situacao === "aprovado" && Boolean(p.liberado_em);
+  const liberar = () => rodar(() => chamarAcao(() => adminAvaliarPagamento(p.id, true)), () => setVendo(false));
+  const abrirRecusa = () => {
+    setVendo(false);
+    setRecusando(true);
+  };
 
   return (
     <li className="px-4 py-3 sm:px-5" data-comprovante={p.empresa}>
@@ -193,8 +238,11 @@ function LinhaComprovante({ p }: { p: PagamentoAdmin }) {
           className="flex min-w-0 flex-1 items-start gap-3 text-left"
           title="Ver comprovante"
         >
-          <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
+          <span className="relative mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
             <FileText className="h-5 w-5" aria-hidden />
+            {novo && (
+              <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-superficie bg-marca-500" title="Chegou há menos de 2 dias" />
+            )}
           </span>
           <span className="min-w-0">
             <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -216,16 +264,21 @@ function LinhaComprovante({ p }: { p: PagamentoAdmin }) {
           <Botao tamanho="sm" variante="secundario" onClick={() => setVendo(true)}>
             <FileText className="h-3.5 w-3.5" /> Ver comprovante
           </Botao>
-          {pendente && (
+          {esperando && (
             <>
-              <Botao tamanho="sm" disabled={ocupado} onClick={confirmar}>
-                {ocupado ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                Confirmar
+              <Botao tamanho="sm" disabled={ocupado} onClick={liberar}>
+                {ocupado ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <LockOpen className="h-3.5 w-3.5" />}
+                Liberar
               </Botao>
-              <Botao tamanho="sm" variante="secundario" disabled={ocupado} onClick={() => setRecusando(true)}>
+              <Botao tamanho="sm" variante="secundario" disabled={ocupado} onClick={abrirRecusa}>
                 <X className="h-3.5 w-3.5" /> Recusar
               </Botao>
             </>
+          )}
+          {podeFalso && (
+            <Botao tamanho="sm" variante="secundario" disabled={ocupado} onClick={abrirRecusa} className="text-red-700">
+              <ShieldAlert className="h-3.5 w-3.5" /> Comprovante falso
+            </Botao>
           )}
         </div>
       </div>
@@ -256,20 +309,27 @@ function LinhaComprovante({ p }: { p: PagamentoAdmin }) {
           >
             <ExternalLink className="h-4 w-4" aria-hidden /> Abrir em outra aba
           </a>
-          {pendente ? (
+          {esperando ? (
             <>
-              <Botao variante="secundario" disabled={ocupado} onClick={() => (setVendo(false), setRecusando(true))}>
+              <Botao variante="secundario" disabled={ocupado} onClick={abrirRecusa}>
                 <X className="h-4 w-4" /> Recusar
               </Botao>
-              <Botao disabled={ocupado} onClick={confirmar}>
-                {ocupado ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                Confirmar pagamento
+              <Botao disabled={ocupado} onClick={liberar}>
+                {ocupado ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <LockOpen className="h-4 w-4" />}
+                Liberar acesso
               </Botao>
             </>
           ) : (
-            <Botao variante="secundario" onClick={() => setVendo(false)}>
-              Fechar
-            </Botao>
+            <>
+              {podeFalso && (
+                <Botao variante="secundario" onClick={abrirRecusa} className="text-red-700">
+                  <ShieldAlert className="h-4 w-4" /> Comprovante falso
+                </Botao>
+              )}
+              <Botao variante="secundario" onClick={() => setVendo(false)}>
+                Fechar
+              </Botao>
+            </>
           )}
         </RodapeModal>
       </Modal>
@@ -282,24 +342,26 @@ function LinhaComprovante({ p }: { p: PagamentoAdmin }) {
 /** O que aquele comprovante fez com o vencimento (ou por que não fez). */
 function DestinoDoComprovante({ p }: { p: PagamentoAdmin }) {
   if (p.situacao === "pendente") {
-    return p.liberado_em && p.vencimento_novo ? (
-      <span className="mt-1 flex items-center gap-1 text-xs text-emerald-700">
-        <LockOpen className="h-3.5 w-3.5 shrink-0" aria-hidden />
-        Acesso liberado na hora: vencimento {p.vencimento_anterior ? `${dataBR(p.vencimento_anterior)} → ` : ""}
-        {dataBR(p.vencimento_novo)}
-      </span>
-    ) : (
+    return (
       <span className="mt-1 flex items-center gap-1 text-xs text-amber-700">
-        <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden />
-        Não liberou sozinho (empresa bloqueada por você, outro comprovante na fila ou recusa anterior). Confirmar dá +1 mês.
+        <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden />
+        Empresa bloqueada por você: não liberou sozinho.
       </span>
     );
   }
   if (p.situacao === "aprovado") {
-    return (
+    const venc = p.vencimento_novo
+      ? `vencimento ${p.vencimento_anterior ? `${dataBR(p.vencimento_anterior)} → ` : ""}${dataBR(p.vencimento_novo)}`
+      : "";
+    return p.liberado_em ? (
+      <span className="mt-1 flex items-center gap-1 text-xs text-emerald-700">
+        <LockOpen className="h-3.5 w-3.5 shrink-0" aria-hidden />
+        Liberou na hora{venc ? `: ${venc}` : ""}
+      </span>
+    ) : (
       <span className="mt-1 block text-xs text-emerald-700">
-        Confirmado em {dataHoraBR(p.avaliado_em)}
-        {p.vencimento_novo ? ` · pago até ${dataBR(p.vencimento_novo)}` : ""}
+        Liberado por você em {dataHoraBR(p.avaliado_em)}
+        {venc ? ` · ${venc}` : ""}
       </span>
     );
   }
@@ -357,43 +419,59 @@ function VisualizadorComprovante({ p }: { p: PagamentoAdmin }) {
   );
 }
 
+/**
+ * "Comprovante falso" (o que liberou sozinho) ou "Recusar" (o que esperava
+ * porque a empresa está bloqueada). Motivo obrigatório: a empresa vê.
+ */
 function ModalRecusar({ p, aberto, aoFechar }: { p: PagamentoAdmin; aberto: boolean; aoFechar: () => void }) {
   const { erro, ocupado, rodar } = useAcao();
-  const [motivo, setMotivo] = useState("");
-  const [bloquear, setBloquear] = useState(false);
-  const desfaz = Boolean(p.liberado_em);
+  const falso = p.situacao === "aprovado";
+  const [motivo, setMotivo] = useState(falso ? "Comprovante falso" : "");
+  // Falso: bloquear vem marcado. Esperando: a empresa já está bloqueada.
+  const [bloquear, setBloquear] = useState(falso);
 
   return (
-    <Modal aberto={aberto} aoFechar={() => !ocupado && aoFechar()} titulo="Recusar comprovante" largura="max-w-md">
+    <Modal
+      aberto={aberto}
+      aoFechar={() => !ocupado && aoFechar()}
+      titulo={falso ? "Comprovante falso" : "Recusar comprovante"}
+      largura="max-w-md"
+    >
       <div className="space-y-4 px-5 py-5">
         <p className="text-sm text-slate-600">
-          A empresa <strong>{p.empresa}</strong> vê o motivo na tela de Assinatura e pode enviar outro comprovante.
-          {desfaz && p.vencimento_anterior !== undefined && (
+          {falso ? (
             <>
-              {" "}
-              O vencimento volta para <strong>{p.vencimento_anterior ? dataBR(p.vencimento_anterior) : "sem data"}</strong>.
+              O mês que este comprovante liberou é desfeito: o vencimento de <strong>{p.empresa}</strong> volta para{" "}
+              <strong>{p.vencimento_anterior ? dataBR(p.vencimento_anterior) : "sem data"}</strong> (se outro
+              comprovante dela chegou depois, confira a data na lista de empresas).
+            </>
+          ) : (
+            <>
+              <strong>{p.empresa}</strong> continua bloqueada e vê o motivo na tela de Assinatura.
             </>
           )}
         </p>
-        <Campo label="Motivo">
+        <Campo label="Motivo (a empresa vê)">
           <input
             className="campo"
             name="motivo_recusa"
             value={motivo}
             onChange={(e) => setMotivo(e.target.value)}
-            placeholder="Ex.: Pix não caiu, valor diferente, comprovante ilegível"
+            placeholder="Ex.: Pix não caiu, valor diferente"
             maxLength={500}
           />
         </Campo>
-        <label className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50/60 px-3 py-2.5 text-sm text-red-900">
-          <input type="checkbox" className="mt-0.5" checked={bloquear} onChange={(e) => setBloquear(e.target.checked)} />
-          <span>
-            <strong>Bloquear o acesso da empresa agora</strong>
-            <span className="block text-xs text-red-800/80">
-              Só a tela de Assinatura abre até você desbloquear ou confirmar um comprovante.
+        {falso && (
+          <label className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50/60 px-3 py-2.5 text-sm text-red-900">
+            <input type="checkbox" className="mt-0.5" checked={bloquear} onChange={(e) => setBloquear(e.target.checked)} />
+            <span>
+              <strong>Bloquear o acesso da empresa agora</strong>
+              <span className="block text-xs text-red-800/80">
+                Só a tela de Assinatura abre. Comprovante novo dela fica esperando você até desbloquear.
+              </span>
             </span>
-          </span>
-        </label>
+          </label>
+        )}
         {erro && <Erro>{erro}</Erro>}
       </div>
       <RodapeModal>
@@ -406,7 +484,7 @@ function ModalRecusar({ p, aberto, aoFechar }: { p: PagamentoAdmin; aberto: bool
           onClick={() => rodar(() => chamarAcao(() => adminAvaliarPagamento(p.id, false, motivo, bloquear)), aoFechar)}
         >
           {ocupado && <LoaderCircle className="h-4 w-4 animate-spin" />}
-          {bloquear ? "Recusar e bloquear" : "Recusar"}
+          {falso ? (bloquear ? "Desfazer e bloquear" : "Desfazer o mês") : "Recusar"}
         </Botao>
       </RodapeModal>
     </Modal>
@@ -490,8 +568,8 @@ function EmpresasAssinatura({
         </>
       )}
       <p className="border-t border-slate-100 px-4 py-2 text-xs text-slate-500 sm:px-5">
-        Cada comprovante empurra o vencimento 1 mês. Aqui dá para mudar a data à mão, deixar a empresa isenta ou bloquear
-        o acesso na hora, por qualquer motivo.
+        Cada comprovante empurra o vencimento 1 mês sozinho. Aqui dá para mudar a data à mão, deixar a empresa isenta ou
+        bloquear o acesso na hora, por qualquer motivo.
       </p>
     </Secao>
   );
@@ -596,7 +674,8 @@ function LinhaEmpresa({ e }: { e: EmpresaAssinatura }) {
         <div className="space-y-4 px-5 py-5">
           <p className="text-sm text-slate-600">
             Na hora, ninguém da empresa abre o sistema: só a tela de Assinatura, com o aviso. Vale por cima do
-            vencimento. Para liberar, clique em <strong>Desbloquear</strong> ou confirme um comprovante dela.
+            vencimento, e comprovante novo dela fica esperando você. Para liberar, clique em{" "}
+            <strong>Desbloquear</strong> ou em <strong>Liberar</strong> num comprovante dela.
           </p>
           <Campo label="Motivo (a empresa vê)" hint="Opcional.">
             <input

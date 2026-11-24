@@ -24,8 +24,8 @@ import {
 
 /**
  * Assinatura mensal por Pix. A empresa (proprietário/gestor) envia o
- * comprovante (que libera o mês na hora); o superadmin configura a cobrança,
- * define vencimentos, confere os comprovantes e bloqueia quem quiser. As ações da empresa usam o contexto SEM bloqueio: com a assinatura
+ * comprovante (vale na hora, sem aprovação); o superadmin configura a
+ * cobrança, define vencimentos, marca comprovante falso e bloqueia quem quiser. As ações da empresa usam o contexto SEM bloqueio: com a assinatura
  * vencida, pagar é justamente o que precisa continuar funcionando.
  */
 
@@ -190,9 +190,11 @@ export async function adminDefinirAssinatura(fd: FormData): Promise<Resultado> {
 }
 
 /**
- * Confirma ou recusa um comprovante. O que chegou já tinha liberado o mês:
- * confirmar só marca como conferido; recusar desfaz o mês dado e, com
- * `bloquear`, ainda tranca o acesso da empresa na hora.
+ * O que o superadmin faz com um comprovante. O comprovante já vale ao chegar
+ * (sem aprovação): `aprovar` só existe para o que ficou esperando porque a
+ * empresa estava bloqueada à mão (libera +1 mês e desbloqueia). Recusar
+ * ("comprovante falso") desfaz o mês dado e, com `bloquear`, ainda tranca o
+ * acesso da empresa na hora.
  */
 export async function adminAvaliarPagamento(
   id: string,

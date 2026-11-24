@@ -141,15 +141,16 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   (`after()`), segue para o WhatsApp do dono pela sessão `sistema_cobranca`
   do serviço de WhatsApp (`INSTANCIA_COBRANCA`, rota `/arquivos` para
   imagem/PDF); o resultado fica em `whatsapp_em`/`whatsapp_erro`.
-  **Comprovante libera na hora** (pedido do dono em 24/11/2026):
-  `assinatura_enviar_comprovante` já empurra o vencimento 1 mês
-  (`assinatura_proximo_vencimento`: atrasado mais de 1 mês conta de hoje) e
-  marca `liberado_em`; o comprovante fica `pendente` ("A conferir" no
-  console, "Em análise" para a empresa). Não libera sozinho com bloqueio à
-  mão, com outro liberado ainda na fila ou se o último avaliado foi
-  recusado. Confirmar (`admin_avaliar_pagamento`) só marca o que já liberou
-  e tira o bloqueio à mão; recusar desfaz o mês se ninguém mexeu no
-  vencimento depois. **Bloqueio à mão**: `assinaturas.bloqueio_manual`
+  **Comprovante sem aprovação** (pedido do dono em 24/11/2026: "anexou, já
+  vale"): `assinatura_enviar_comprovante` já grava `aprovado` com
+  `liberado_em` e empurra o vencimento (`assinatura_proximo_vencimento`: no
+  dia ou adiantado, +1 mês do vencimento; atrasado, +1 mês do dia do
+  pagamento). O dono só olha depois: **Comprovante falso**
+  (`admin_avaliar_pagamento` recusando um liberado) desfaz o mês se ninguém
+  mexeu no vencimento depois, e a tela já marca bloquear junto. `pendente`
+  só existe com bloqueio à mão (o comprovante espera; Liberar = +1 mês e
+  desbloqueia; é o contador amarelo do menu). Não volte a criar fila de
+  aprovação. **Bloqueio à mão**: `assinaturas.bloqueio_manual`
   (`admin_bloquear_empresa`, `adminBloquearEmpresa`) vira estado
   `bloqueada` por cima de tudo (até isenta/sem cobrança). O console mostra o
   comprovante ali mesmo (modal com `iframe` para PDF, `img` para imagem):

@@ -5,7 +5,13 @@ import { FormularioSalvar } from "@/components/configuracoes/formulario-salvar";
 import { Badge, Cabecalho, Campo, Secao, cn } from "@/components/ui";
 import { trocarEmpresa } from "@/lib/actions/configuracoes";
 import { urlsAssinadas } from "@/lib/arquivos";
-import { ESTADOS_ASSINATURA, SITUACOES_PAGAMENTO, avisoAssinatura, type PagamentoAssinatura } from "@/lib/assinatura";
+import {
+  ESTADOS_ASSINATURA,
+  PARA_EMPRESA,
+  SITUACOES_PAGAMENTO,
+  avisoAssinatura,
+  type PagamentoAssinatura,
+} from "@/lib/assinatura";
 import { pixDaEmpresa } from "@/lib/assinatura-servidor";
 import { createClient } from "@/lib/db/server";
 import { dataBR, dataHoraBR, moeda } from "@/lib/format";
@@ -145,11 +151,8 @@ export default async function AssinaturaPage() {
                         <p className="font-medium text-slate-900">
                           {moeda(Number(p.valor))} · enviado em {dataHoraBR(p.enviado_em)}
                         </p>
-                        {p.situacao === "pendente" && p.liberado_em && p.vencimento_novo && (
-                          <p className="text-xs text-emerald-700">Acesso liberado até {dataBR(p.vencimento_novo)}</p>
-                        )}
-                        {p.situacao === "pendente" && !p.liberado_em && (
-                          <p className="text-xs text-amber-700">Esperando a conferência do administrador.</p>
+                        {p.situacao === "pendente" && (
+                          <p className="text-xs text-amber-700">Esperando o administrador liberar o acesso.</p>
                         )}
                         {p.situacao === "aprovado" && p.vencimento_novo && (
                           <p className="text-xs text-emerald-700">Pago até {dataBR(p.vencimento_novo)}</p>
@@ -164,8 +167,7 @@ export default async function AssinaturaPage() {
                         )}
                       </div>
                       <Badge className={cn(SITUACOES_PAGAMENTO[p.situacao].classe)}>
-                        {/* Para quem pagou, "a conferir" é "em análise". */}
-                        {p.situacao === "pendente" ? "Em análise" : SITUACOES_PAGAMENTO[p.situacao].label}
+                        {PARA_EMPRESA[p.situacao]}
                       </Badge>
                     </li>
                   ))}

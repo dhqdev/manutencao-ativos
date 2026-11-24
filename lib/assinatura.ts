@@ -49,13 +49,26 @@ export const ESTADOS_ASSINATURA: Record<EstadoAssinatura, { label: string; class
   bloqueada: { label: "Bloqueada", classe: "bg-red-50 text-red-700 ring-red-600/20" },
 };
 
+/**
+ * Comprovante sem aprovação (pedido do dono em 24/11/2026): já nasce
+ * "aprovado" e vale na hora. "pendente" só quando a empresa está bloqueada à
+ * mão; "recusado" quando o superadmin marca como falso.
+ */
 export const SITUACOES_PAGAMENTO: Record<SituacaoPagamento, { label: string; classe: string }> = {
-  pendente: { label: "A conferir", classe: "bg-amber-50 text-amber-700 ring-amber-600/20" },
-  aprovado: { label: "Aprovado", classe: "bg-emerald-50 text-emerald-700 ring-emerald-600/20" },
+  // Rótulos do console. Para a empresa a tela de Assinatura usa os de PARA_EMPRESA.
+  pendente: { label: "Esperando você", classe: "bg-amber-50 text-amber-700 ring-amber-600/20" },
+  aprovado: { label: "Liberado", classe: "bg-emerald-50 text-emerald-700 ring-emerald-600/20" },
   recusado: { label: "Recusado", classe: "bg-red-50 text-red-700 ring-red-600/20" },
 };
 
-/** Chaves em sistema_credenciais (aba Assinaturas do console). */
+/** Como a empresa vê cada comprovante na tela de Assinatura. */
+export const PARA_EMPRESA: Record<SituacaoPagamento, string> = {
+  pendente: "Em análise",
+  aprovado: "Pago",
+  recusado: "Recusado",
+};
+
+/** Chaves em sistema_credenciais (seção Assinaturas do console). */
 export const CFG = {
   chave: "pix_chave",
   nome: "pix_nome",

@@ -17,10 +17,10 @@ export default async function AssinaturasPagina() {
     <>
       <Cabecalho
         titulo="Assinaturas"
-        descricao="Comprovante anexado libera o acesso na hora. Aqui você confere os comprovantes, acompanha o vencimento de cada empresa e bloqueia o acesso quando quiser."
+        descricao="O comprovante que o cliente anexa já vale, sem aprovação. Aqui você vê os comprovantes, marca algum como falso, acompanha o vencimento de cada empresa e bloqueia o acesso quando quiser."
       />
       {assinaturas.dados ? (
-        <AssinaturasAdmin dados={assinaturas.dados} mesAtual={hoje().slice(0, 7)} />
+        <AssinaturasAdmin dados={assinaturas.dados} mesAtual={hoje().slice(0, 7)} agora={Date.now()} />
       ) : (
         <p className="card px-5 py-4 text-sm text-red-700">
           Não foi possível carregar as assinaturas: {assinaturas.erro}. Confira se o migrador da versão nova rodou.

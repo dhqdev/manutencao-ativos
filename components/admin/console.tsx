@@ -23,7 +23,7 @@ type Item = {
 export type Contadores = {
   usuarios: number | null;
   clientes: number | null;
-  /** Comprovantes que chegaram e ainda não foram conferidos. */
+  /** Comprovantes de empresa bloqueada à mão, esperando o superadmin liberar ou recusar. */
   conferir: number | null;
 };
 
@@ -107,7 +107,7 @@ export function ConsoleAdmin({
                           "rounded-full px-1.5 py-px text-[11px] font-semibold tabular-nums",
                           alerta ? "bg-amber-400 text-slate-900" : "bg-white/10 text-slate-300",
                         )}
-                        title={alerta ? `${n} comprovante(s) para conferir` : undefined}
+                        title={alerta ? `${n} comprovante(s) de empresa bloqueada esperando você` : undefined}
                         data-contador-menu={i.contador}
                       >
                         {n}

@@ -99,7 +99,6 @@ export async function avisarComprovante(pagamentoId: string) {
       .maybeSingle();
     if (error || !pag) throw new Error(error?.message ?? "Comprovante não encontrado.");
 
-    const { data: assinatura } = await admin.from("assinaturas").select("vencimento").eq("org_id", pag.org_id).maybeSingle();
     const empresa = (pag.organizacoes as unknown as { nome: string } | null)?.nome ?? "Empresa";
     const site = urlSite();
 
@@ -109,13 +108,11 @@ export async function avisarComprovante(pagamentoId: string) {
       `Valor da assinatura: ${moeda(Number(pag.valor))}`,
       pag.liberado_em && pag.vencimento_novo
         ? `✅ Acesso liberado automaticamente até ${dataBR(pag.vencimento_novo)}.`
-        : assinatura?.vencimento
-          ? `Vencimento atual: ${dataBR(assinatura.vencimento)} (não liberado sozinho: confira e confirme).`
-          : null,
+        : "⛔ Empresa bloqueada por você: o acesso NÃO foi liberado. Libere ou recuse no console.",
       pag.observacao ? `Observação: ${pag.observacao}` : null,
       site
-        ? `\nConfirmar, recusar ou bloquear o acesso: ${site}/admin/assinaturas`
-        : "\nConfirme, recuse ou bloqueie no console do sistema, em Assinaturas.",
+        ? `\nSe for falso, marque como falso e bloqueie: ${site}/admin/assinaturas`
+        : "\nSe for falso, marque como falso e bloqueie no console do sistema, em Assinaturas.",
     ]
       .filter(Boolean)
       .join("\n");

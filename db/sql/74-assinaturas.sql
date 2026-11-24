@@ -9,9 +9,9 @@
 --      "Pix copia e cola" e o QR (BR Code estático) a partir disso.
 --    * Cada empresa tem um vencimento (assinaturas.vencimento), que o
 --      superadmin pode mudar à mão. A empresa paga e anexa o comprovante
---      (assinatura_pagamentos): o vencimento anda 1 mês NA HORA e o
---      comprovante fica "a conferir". O superadmin confere (WhatsApp/console)
---      e confirma, ou recusa (desfaz o mês dado).
+--      (assinatura_pagamentos): ele JÁ VALE, sem aprovação (o vencimento anda
+--      1 mês na hora). O superadmin olha quando quiser (WhatsApp/console) e,
+--      se for falso, marca como falso: desfaz o mês e pode bloquear junto.
 --    * O superadmin bloqueia o acesso de uma empresa à mão quando quiser
 --      (assinaturas.bloqueio_manual), por cima de qualquer vencimento.
 --    * Passou do vencimento + tolerância (padrão 3 dias), a empresa fica
@@ -69,10 +69,15 @@ create table if not exists public.assinatura_pagamentos (
   whatsapp_erro       text
 );
 
--- Liberação automática (pedido do dono em 24/11/2026): o comprovante já
--- empurra o vencimento ao chegar e fica "a conferir" (situacao pendente) até
--- o superadmin confirmar ou recusar. liberado_em marca que o mês já foi dado.
+-- Sem aprovação (pedido do dono em 24/11/2026): o comprovante já nasce
+-- 'aprovado' e empurra o vencimento ao chegar; liberado_em marca que foi
+-- sozinho (avaliado_em fica vazio: ninguém conferiu). Só fica 'pendente'
+-- quando a empresa está bloqueada à mão pelo superadmin.
 alter table public.assinatura_pagamentos add column if not exists liberado_em timestamptz;
+-- A primeira versão da liberação automática deixava o liberado como
+-- 'pendente' ("a conferir"); o dono não quer conferir nada.
+update public.assinatura_pagamentos set situacao = 'aprovado'
+ where situacao = 'pendente' and liberado_em is not null;
 
 create index if not exists assinatura_pagamentos_org on public.assinatura_pagamentos (org_id, enviado_em desc);
 create index if not exists assinatura_pagamentos_pendentes on public.assinatura_pagamentos (enviado_em)
@@ -218,10 +223,10 @@ insert into public.assinaturas (org_id, vencimento)
 select o.id, public.assinatura_hoje() + 30 from public.organizacoes o
 on conflict (org_id) do nothing;
 
--- Próximo vencimento depois de um pagamento: 1 mês a partir do vencimento
--- atual (paga o mês que venceu e o dia não muda). Sem vencimento, ou atrasado
--- mais de um mês (1 mês a partir dele ainda ficaria no passado e a empresa
--- continuaria bloqueada depois de pagar), conta 1 mês a partir de hoje.
+-- Próximo vencimento depois de um pagamento (pedido do dono em 24/11/2026:
+-- vale o dia em que ele paga). Pagou no dia ou adiantado: 1 mês a partir do
+-- vencimento atual (adiantado não perde dias e o dia do mês não muda).
+-- Pagou atrasado (ou sem vencimento): 1 mês a partir do dia do pagamento.
 create or replace function public.assinatura_proximo_vencimento(p_atual date)
 returns date
 language sql
@@ -229,7 +234,7 @@ stable
 set search_path = public
 as $$
   select case
-    when p_atual is null or (p_atual + interval '1 month')::date < public.assinatura_hoje()
+    when p_atual is null or p_atual < public.assinatura_hoje()
       then (public.assinatura_hoje() + interval '1 month')::date
     else (p_atual + interval '1 month')::date
   end
@@ -264,7 +269,7 @@ begin
   end if;
   if (select count(*) from public.assinatura_pagamentos
        where org_id = p_org and situacao = 'pendente') >= 3 then
-    raise exception 'Já há 3 comprovantes esperando a conferência. Aguarde antes de enviar outro.';
+    raise exception 'Já há 3 comprovantes esperando o administrador. Aguarde antes de enviar outro.';
   end if;
 
   insert into public.assinatura_pagamentos (org_id, valor, comprovante, nome_arquivo, observacao, enviado_por)
@@ -272,29 +277,19 @@ begin
           nullif(left(trim(coalesce(p_observacao, '')), 500), ''), auth.uid())
   returning id into v_id;
 
-  -- Libera na hora (o dono confere depois pelo WhatsApp/console e pode
-  -- recusar, o que desfaz). Fica só "em análise", sem liberar, quando:
-  --   * o superadmin bloqueou a empresa à mão (só ele tira);
-  --   * já há outro comprovante liberado esperando a conferência (vários
-  --     arquivos seguidos não viram vários meses de graça);
-  --   * o último comprovante avaliado foi recusado (quem mandou um falso
-  --     espera a conferência da próxima vez).
+  -- Vale na hora, sem aprovação: o dono olha depois e marca como falso se
+  -- precisar. A única exceção é a empresa bloqueada à mão pelo superadmin:
+  -- aí o comprovante espera por ele (senão bloquear não adiantaria nada).
   insert into public.assinaturas (org_id, vencimento) values (p_org, null)
   on conflict (org_id) do nothing;
   select * into v_ass from public.assinaturas where org_id = p_org for update;
 
-  if not v_ass.bloqueio_manual
-     and not exists (select 1 from public.assinatura_pagamentos
-                      where org_id = p_org and situacao = 'pendente'
-                        and liberado_em is not null and id <> v_id)
-     and coalesce((select g.situacao <> 'recusado' from public.assinatura_pagamentos g
-                     where g.org_id = p_org and g.avaliado_em is not null
-                     order by g.avaliado_em desc limit 1), true)
-  then
+  if not v_ass.bloqueio_manual then
     v_novo := public.assinatura_proximo_vencimento(v_ass.vencimento);
     update public.assinaturas set vencimento = v_novo, atualizado_em = now() where org_id = p_org;
     update public.assinatura_pagamentos
-       set liberado_em = now(), vencimento_anterior = v_ass.vencimento, vencimento_novo = v_novo
+       set situacao = 'aprovado', liberado_em = now(),
+           vencimento_anterior = v_ass.vencimento, vencimento_novo = v_novo
      where id = v_id;
   end if;
   return v_id;
@@ -328,7 +323,7 @@ as $$
                           left join public.profiles p on p.id = m.user_id
                          where m.org_id = o.id and m.papel = 'proprietario'
                          order by m.created_at limit 1),
-               'ultimo_pagamento', (select max(g.avaliado_em) from public.assinatura_pagamentos g
+               'ultimo_pagamento', (select max(coalesce(g.liberado_em, g.avaliado_em)) from public.assinatura_pagamentos g
                                      where g.org_id = o.id and g.situacao = 'aprovado')
              ) order by a.vencimento nulls last, o.nome)
         from public.organizacoes o
@@ -369,11 +364,13 @@ begin
 end;
 $$;
 
--- Confirmar: se o comprovante já liberou o mês ao chegar (liberado_em), só
--- marca como conferido; senão estende 1 mês (assinatura_proximo_vencimento).
--- Também tira o bloqueio à mão: pagamento confirmado devolve o acesso.
--- Recusar um comprovante que já tinha liberado desfaz o mês dado, se ninguém
--- mexeu no vencimento depois (mudança à mão do superadmin vale mais).
+-- O que o superadmin faz com um comprovante:
+--   * aprovar um 'pendente' (empresa que ele bloqueou mandou comprovante):
+--     estende 1 mês e tira o bloqueio à mão;
+--   * recusar (marcar como falso) um 'pendente' ou um que liberou sozinho
+--     (liberado_em): desfaz o mês dado, se ninguém mexeu no vencimento
+--     depois (mudança à mão ou outro comprovante valem mais). Devolve
+--     { desfeito } para a tela avisar quando a data não voltou sozinha.
 create or replace function public.admin_avaliar_pagamento(
   p_id uuid, p_aprovar boolean, p_motivo text, p_admin uuid
 )
@@ -386,13 +383,17 @@ declare
   v_pag  public.assinatura_pagamentos;
   v_ant  date;
   v_novo date;
+  v_desfeito boolean := false;
 begin
   select * into v_pag from public.assinatura_pagamentos where id = p_id for update;
   if not found then
     raise exception 'Comprovante não encontrado.' using errcode = 'P0002';
   end if;
-  if v_pag.situacao <> 'pendente' then
-    raise exception 'Este comprovante já foi avaliado.';
+  if v_pag.situacao = 'recusado' then
+    raise exception 'Este comprovante já foi marcado como recusado.';
+  end if;
+  if v_pag.situacao = 'aprovado' and (p_aprovar or v_pag.liberado_em is null) then
+    raise exception 'Este comprovante já foi aprovado.';
   end if;
 
   insert into public.assinaturas (org_id, vencimento) values (v_pag.org_id, null)
@@ -403,24 +404,22 @@ begin
     if v_pag.liberado_em is not null and v_ant is not distinct from v_pag.vencimento_novo then
       update public.assinaturas set vencimento = v_pag.vencimento_anterior, atualizado_em = now()
        where org_id = v_pag.org_id;
+      v_desfeito := true;
     end if;
     update public.assinatura_pagamentos
        set situacao = 'recusado', avaliado_em = now(), avaliado_por = p_admin,
            motivo = nullif(left(trim(coalesce(p_motivo, '')), 500), '')
      where id = p_id;
-    return json_build_object('situacao', 'recusado');
+    return json_build_object('situacao', 'recusado',
+                             'desfeito', v_desfeito or v_pag.liberado_em is null,
+                             'vencimento', (select vencimento from public.assinaturas where org_id = v_pag.org_id));
   end if;
 
-  if v_pag.liberado_em is not null then
-    v_novo := v_pag.vencimento_novo;
-    v_ant  := v_pag.vencimento_anterior;
-  else
-    v_novo := public.assinatura_proximo_vencimento(v_ant);
-    update public.assinaturas set vencimento = v_novo, atualizado_em = now() where org_id = v_pag.org_id;
-  end if;
+  v_novo := public.assinatura_proximo_vencimento(v_ant);
   update public.assinaturas
-     set bloqueio_manual = false, bloqueio_motivo = null, bloqueado_em = null, atualizado_em = now()
-   where org_id = v_pag.org_id and bloqueio_manual;
+     set vencimento = v_novo, bloqueio_manual = false, bloqueio_motivo = null, bloqueado_em = null,
+         atualizado_em = now()
+   where org_id = v_pag.org_id;
   update public.assinatura_pagamentos
      set situacao = 'aprovado', avaliado_em = now(), avaliado_por = p_admin,
          vencimento_anterior = v_ant, vencimento_novo = v_novo,

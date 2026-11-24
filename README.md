@@ -17,9 +17,9 @@ sem depender de Supabase, Vercel ou outro serviço externo.
 - **Periódicas em quadro (kanban)**: colunas Atrasadas, Vencendo em breve, Em
   dia e Pausadas ([detalhes](#manutenções-periódicas)).
 - **Assinatura mensal por Pix**: QR e copia e cola no sistema; o comprovante
-  anexado **libera o acesso na hora** e chega no WhatsApp do dono, que confere
-  no console (vê o PDF ali mesmo), recusa ou **bloqueia a empresa quando
-  quiser** ([detalhes](#assinatura-por-pix)).
+  anexado **vale na hora, sem aprovação**, e chega no WhatsApp do dono, que
+  olha quando quiser no console (vê o PDF ali mesmo), marca **comprovante
+  falso** ou **bloqueia a empresa** ([detalhes](#assinatura-por-pix)).
 - **Console do superadmin com menu lateral**: Usuários, Clientes e uso,
   Assinaturas, Integrações e backup e Versão, cada um na sua página.
 - **Backup a cada 15 dias** com o Backblaze B2 espelhado com o app, sem senha
@@ -305,9 +305,9 @@ ao console** (sair pelo menu também volta). Cada entrada fica registrada em
 Não vale para usuário bloqueado, sem empresa ou outro superadmin.
 
 O console tem um **menu lateral** (no celular, a barra de baixo) com as
-seções **Usuários**, **Clientes e uso**, **Assinaturas** (com o número de
-comprovantes para conferir), **Integrações e backup** e **Versão e
-atualização**. Links antigos com `?aba=` continuam abrindo a seção certa.
+seções **Usuários**, **Clientes e uso**, **Assinaturas** (com um número em
+amarelo quando empresa bloqueada por você mandou comprovante), **Integrações
+e backup** e **Versão e atualização**. Links antigos com `?aba=` continuam abrindo a seção certa.
 
 Em **Usuários** fica a gerência de todos, de todas as empresas:
 
@@ -367,24 +367,25 @@ Central, `lib/pix.ts`):
   ninguém é bloqueado (botão **Desligar cobrança**).
 - **WhatsApp dos avisos**: conecte um WhatsApp seu (QR ou código). Quando um
   cliente anexa o comprovante, a imagem/PDF chega no número cadastrado, com a
-  empresa, o valor, até quando o acesso foi liberado e o link do console.
+  empresa, o valor, até quando o acesso foi liberado e o link do console para
+  marcar como falso.
   **Enviar teste** confere.
-- **Cartões no topo**: comprovantes para conferir, recebido no mês, em dia,
-  vencendo ou vencidas e bloqueadas (os três últimos filtram a lista).
-- **Comprovantes para conferir**: o comprovante anexado **já liberou** o mês
-  seguinte (o vencimento anda 1 mês a partir do atual; atrasado mais de um
-  mês, a partir de hoje). **Ver comprovante** abre o PDF ou a imagem ali
-  mesmo; **Confirmar** marca como conferido; **Recusar** (com motivo, que a
-  empresa vê) desfaz o mês dado e pode **bloquear a empresa** junto. Não
-  libera sozinho quando a empresa está bloqueada por você, quando já há outro
-  comprovante liberado esperando conferência ou quando o último foi recusado:
-  aí Confirmar dá o mês.
+- **Cartões no topo**: comprovantes nos últimos 7 dias, recebido no mês, em
+  dia, vencendo ou vencidas e bloqueadas (os três últimos filtram a lista).
+- **Comprovantes recebidos**: o comprovante **já vale** quando o cliente anexa,
+  sem aprovação. Pagou no dia ou adiantado, o vencimento anda 1 mês e o dia
+  não muda; pagou atrasado, conta 1 mês a partir do dia do pagamento. **Ver
+  comprovante** abre o PDF ou a imagem ali mesmo; **Comprovante falso** (com
+  motivo, que a empresa vê) desfaz o mês e, marcado por padrão, **bloqueia a
+  empresa** na hora. Bolinha azul = chegou há menos de 2 dias.
+- **Esperando você** (só aparece quando tem): empresa que você bloqueou mandou
+  comprovante, então ele não liberou sozinho. **Liberar** dá +1 mês e tira o
+  bloqueio; **Recusar** mantém bloqueada.
 - **Empresas: vencimento e acesso**: situação (em dia, vence em breve,
   vencida, bloqueada), a **data de vencimento** editável, a opção **Isenta** e
   **Bloquear acesso** / **Desbloquear**, que vale na hora e por cima de
-  qualquer vencimento (o motivo aparece para a empresa). Confirmar um
-  comprovante também desbloqueia.
-- **Histórico de pagamentos**: confirmados (vencimento antes → depois) e recusados.
+  qualquer vencimento (o motivo aparece para a empresa). Liberar um
+  comprovante dela também desbloqueia.
 
 Do lado da empresa, o menu **Assinatura** mostra a situação, o QR, o copia e
 cola e o envio do comprovante (proprietário ou gestor), com o histórico; ao

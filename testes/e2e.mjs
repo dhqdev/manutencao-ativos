@@ -522,44 +522,60 @@ await passo("assinatura: Pix no console, empresa vencida bloqueia, comprovante l
   await page.getByRole("button", { name: "Enviar comprovante" }).click();
   await page.locator("[data-comprovante-enviado]").waitFor();
   const historico = page.locator("[data-historico-assinatura]");
-  await historico.getByText("Em análise", { exact: true }).waitFor();
-  // Comprovante anexado libera na hora (o superadmin confere depois).
-  await historico.getByText(/Acesso liberado até/).waitFor();
+  // Sem aprovação: anexou, já vale (pago na hora) e as telas voltam a abrir.
+  await historico.getByText("Pago", { exact: true }).waitFor();
+  await historico.getByText(/Pago até/).waitFor();
   await page.goto("/manutencoes");
   await page.waitForURL("**/manutencoes");
 
-  // O superadmin vê o comprovante ali mesmo e confirma.
+  // O superadmin vê o comprovante ali mesmo e marca como falso: desfaz o mês e bloqueia.
   await page.goto("/auth/sair");
   await entrar(SUPERADMIN, "**/admin");
-  // O menu avisa que há comprovante para conferir.
+  await page.goto("/admin/assinaturas");
+  await page.waitForLoadState("networkidle");
+  const recebido = page.locator('[data-comprovantes="Recebidos"] li[data-comprovante="Oficina E2E"]').first();
+  await recebido.getByText(/Liberou na hora/).waitFor();
+  await recebido.getByRole("button", { name: "Ver comprovante" }).click();
+  await page.locator("[data-visualizador-comprovante] img").waitFor();
+  // Do próprio visualizador já dá para marcar como falso.
+  await page.locator("[role=dialog]").getByRole("button", { name: "Comprovante falso" }).click();
+  // Motivo já vem preenchido e "bloquear" já vem marcado.
+  await page.getByRole("button", { name: "Desfazer e bloquear" }).click();
+  const empresa = page.locator('li[data-empresa-assinatura="Oficina E2E"]');
+  await empresa.getByText("Bloqueada por você").waitFor();
+  await recebido.getByText("Recusado", { exact: true }).waitFor();
+
+  // A empresa cai na tela de Assinatura com o aviso; comprovante novo espera o superadmin.
+  await page.goto("/auth/sair");
+  await entrar(GESTOR, "**/assinatura");
+  await page.locator("[data-bloqueio]").getByText(/bloqueado pelo administrador do sistema: Comprovante falso/).waitFor();
+  await page.waitForLoadState("networkidle");
+  await page.locator("[data-comprovante-arquivo]").setInputFiles({ name: "comprovante-2.png", mimeType: "image/png", buffer: PNG });
+  await page.getByRole("button", { name: "Enviar comprovante" }).click();
+  await page.locator("[data-comprovante-enviado]").waitFor();
+  await page.locator("[data-historico-assinatura]").getByText("Em análise", { exact: true }).waitFor();
+  await page.goto("/manutencoes");
+  await page.waitForURL("**/assinatura");
+
+  // O menu do console avisa; Liberar dá o mês e tira o bloqueio.
+  await page.goto("/auth/sair");
+  await entrar(SUPERADMIN, "**/admin");
   await page.locator('[data-contador-menu="conferir"]').first().waitFor();
   await page.goto("/admin/assinaturas");
   await page.waitForLoadState("networkidle");
-  const comprovante = page.locator('[data-comprovantes="Para conferir"] li[data-comprovante="Oficina E2E"]');
-  await comprovante.getByText(/Acesso liberado na hora/).waitFor();
-  await comprovante.getByRole("button", { name: "Ver comprovante" }).click();
-  await page.locator("[data-visualizador-comprovante] img").waitFor();
-  await page.getByRole("button", { name: "Confirmar pagamento" }).click();
-  await page.locator('[data-comprovantes="Histórico de pagamentos"] li[data-comprovante="Oficina E2E"]').getByText("Aprovado", { exact: true }).waitFor();
+  await page.locator('[data-comprovantes="Esperando você"] li[data-comprovante="Oficina E2E"]').getByRole("button", { name: "Liberar" }).click();
+  await empresa.getByRole("button", { name: "Bloquear acesso" }).waitFor();
 
-  // Bloqueio à mão: vale na hora, por cima do vencimento em dia.
-  const empresa = page.locator('li[data-empresa-assinatura="Oficina E2E"]');
+  // Bloqueio à mão direto na empresa (sem comprovante) e desbloqueio.
   await empresa.getByRole("button", { name: "Bloquear acesso" }).click();
   await page.locator('input[name="motivo_bloqueio"]').pressSequentially("Teste E2E de bloqueio");
   await page.getByRole("button", { name: "Bloquear agora" }).click();
   await empresa.getByText("Bloqueada por você").waitFor();
-  await page.goto("/auth/sair");
-  await entrar(GESTOR, "**/assinatura");
-  await page.locator("[data-bloqueio]").getByText(/bloqueado pelo administrador do sistema: Teste E2E de bloqueio/).waitFor();
-  await page.locator("[data-historico-assinatura]").getByText("Aprovado", { exact: true }).waitFor();
-
-  // Desbloquear devolve o acesso.
-  await page.goto("/auth/sair");
-  await entrar(SUPERADMIN, "**/admin");
-  await page.goto("/admin/assinaturas");
-  await page.waitForLoadState("networkidle");
   await empresa.getByRole("button", { name: "Desbloquear" }).click();
   await empresa.getByRole("button", { name: "Bloquear acesso" }).waitFor();
+  // Desbloqueada e com o mês liberado, a empresa volta a entrar normalmente.
+  await page.goto("/auth/sair");
+  await entrar(GESTOR);
 
   // Desliga a cobrança para o resto do teste.
   await page.goto("/auth/sair");
