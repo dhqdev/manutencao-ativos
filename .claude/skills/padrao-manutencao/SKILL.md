@@ -202,6 +202,9 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   No Postgres toda função nasce executável por PUBLIC: **revogue** de
   `public, anon, authenticated` e libere só quem precisa. `auth_*` e `admin_*`
   só para `service_role`.
+  Vale também para função auxiliar simples (`language sql`, sem definer): o
+  `verificar-stack.sh` do CI falha se QUALQUER função de `public` for
+  executável por `anon` (confira localmente com `has_function_privilege('anon', ...)`).
 - Variáveis do migrador chegam como variáveis do psql (`-v nome=valor`) em
   `db/scripts/migrar.sh`; use `\if :{?nome}` e `:'nome'` (nunca concatene SQL).
 - Senhas: bcrypt. O app gera com `bcryptjs` ($2b$), o banco com

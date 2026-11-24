@@ -162,6 +162,7 @@ begin
 end;
 $$;
 
+revoke execute on function public.assinatura_hoje() from public, anon, authenticated;
 revoke execute on function public.assinatura_cfg(text) from public, anon, authenticated;
 revoke execute on function public.assinatura_cfg_numero(text, numeric) from public, anon, authenticated;
 revoke execute on function public.assinatura_situacao(uuid) from public, anon;
