@@ -27,7 +27,7 @@ export function EnviarComprovante({ pendente, bloqueioManual }: { pendente: bool
     // tela hidratar também vale.
     const arquivo = entrada.current?.files?.[0] ?? null;
     if (!arquivo) {
-      setErro("Escolha a foto ou o PDF do comprovante.");
+      setErro("Escolha a foto ou o PDF do comprovante: ele é obrigatório para liberar o acesso.");
       return;
     }
     setErro(null);
@@ -47,19 +47,19 @@ export function EnviarComprovante({ pendente, bloqueioManual }: { pendente: bool
   }
 
   return (
-    <Secao titulo="Enviar comprovante">
+    <Secao titulo="Anexar comprovante (obrigatório)">
       <div className="space-y-4 px-4 py-4 sm:px-5">
         <p className="text-sm text-slate-600">
-          Depois de pagar, anexe o comprovante (print ou PDF do banco): o próximo mês é liberado{" "}
-          <strong>na hora</strong>. Pagou no dia ou adiantado, o dia do vencimento continua o mesmo; pagou atrasado,
-          o mês conta a partir do dia do pagamento.
+          Depois de pagar, <strong>anexe o comprovante</strong> (print ou PDF do banco). É obrigatório: só o Pix, sem o
+          comprovante aqui, não libera o acesso. Com ele anexado, o próximo período é liberado <strong>na hora</strong>{" "}
+          e quem paga adiantado não perde dias.
         </p>
         {(pendente || bloqueioManual) && !enviado && (
           <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
             O acesso desta empresa foi bloqueado pelo administrador: o comprovante fica em análise até ele liberar.
           </p>
         )}
-        <Campo label="Comprovante" hint="Imagem (JPG, PNG) ou PDF, até 25 MB.">
+        <Campo label="Comprovante" obrigatorio hint="Imagem (JPG, PNG) ou PDF, até 25 MB.">
           <input
             ref={entrada}
             type="file"

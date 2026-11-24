@@ -41,7 +41,15 @@ import {
   type StatusWhatsappCobranca,
 } from "@/lib/actions/assinatura";
 import type { DadosAssinaturas, EmpresaAssinatura, PagamentoAdmin } from "@/lib/admin-console";
-import { ESTADOS_ASSINATURA, SITUACOES_PAGAMENTO, type EstadoAssinatura } from "@/lib/assinatura";
+import {
+  CICLOS,
+  ESTADOS_ASSINATURA,
+  LISTA_CICLOS,
+  SITUACOES_PAGAMENTO,
+  dataNoDia,
+  descreverPlano,
+  type EstadoAssinatura,
+} from "@/lib/assinatura";
 import { dataBR, dataHoraBR, moeda } from "@/lib/format";
 import type { Resultado } from "@/lib/form";
 import { formatarTelefone } from "@/lib/telefone";
@@ -141,7 +149,7 @@ export function AssinaturasAdmin({
         >
           <p className="border-b border-amber-100 bg-amber-50/70 px-4 py-2.5 text-xs text-amber-900 sm:px-5">
             Empresas que <strong>você bloqueou</strong> mandaram comprovante, então ele não liberou sozinho.{" "}
-            <strong>Liberar</strong> dá +1 mês e tira o bloqueio; <strong>Recusar</strong> mantém bloqueada.
+            <strong>Liberar</strong> dá mais um período do plano e tira o bloqueio; <strong>Recusar</strong> mantém bloqueada.
           </p>
           <ListaComprovantes pagamentos={esperando} grupo="Esperando você" agora={agora} />
         </Secao>
@@ -149,10 +157,10 @@ export function AssinaturasAdmin({
 
       <Secao titulo="Comprovantes recebidos" acoes={<Badge>{recebidos.length}</Badge>}>
         <p className="border-b border-slate-100 bg-slate-50/70 px-4 py-2.5 text-xs text-slate-600 sm:px-5">
-          Cada comprovante <strong>já vale</strong> quando o cliente anexa (o arquivo também chega no seu WhatsApp). Pagou
-          no dia ou adiantado, o vencimento anda 1 mês e o dia não muda; pagou atrasado, conta 1 mês a partir do dia do
-          pagamento. Se algum for falso, clique em <strong>Comprovante falso</strong>: o mês é desfeito e a empresa pode
-          ser bloqueada na hora.
+          Cada comprovante <strong>já vale</strong> quando o cliente anexa (o arquivo também chega no seu WhatsApp): o
+          vencimento anda um período do plano da empresa, sempre no dia escolhido para ela, e quem paga adiantado não
+          perde dias. Se algum for falso, clique em <strong>Comprovante falso</strong>: o período é desfeito e a empresa
+          pode ser bloqueada na hora.
         </p>
         <ListaComprovantes pagamentos={recebidos} grupo="Recebidos" agora={agora} paginar />
       </Secao>
@@ -441,7 +449,7 @@ function ModalRecusar({ p, aberto, aoFechar }: { p: PagamentoAdmin; aberto: bool
         <p className="text-sm text-slate-600">
           {falso ? (
             <>
-              O mês que este comprovante liberou é desfeito: o vencimento de <strong>{p.empresa}</strong> volta para{" "}
+              O período que este comprovante liberou é desfeito: o vencimento de <strong>{p.empresa}</strong> volta para{" "}
               <strong>{p.vencimento_anterior ? dataBR(p.vencimento_anterior) : "sem data"}</strong> (se outro
               comprovante dela chegou depois, confira a data na lista de empresas).
             </>
@@ -554,10 +562,10 @@ function EmpresasAssinatura({
         <p className="px-5 py-8 text-center text-sm text-slate-500">Nenhuma empresa encontrada.</p>
       ) : (
         <>
-          <div className="hidden grid-cols-[minmax(0,1.6fr)_9rem_minmax(0,1.5fr)_10rem] gap-4 border-b border-slate-100 bg-slate-50/70 px-5 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 lg:grid">
+          <div className="hidden grid-cols-[minmax(0,1.3fr)_9rem_minmax(0,2.6fr)_10rem] gap-4 border-b border-slate-100 bg-slate-50/70 px-5 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 lg:grid">
             <span>Empresa</span>
             <span>Situação</span>
-            <span>Vencimento</span>
+            <span>Plano e vencimento</span>
             <span className="text-right">Acesso</span>
           </div>
           <ul className="divide-y divide-slate-100">
@@ -568,8 +576,9 @@ function EmpresasAssinatura({
         </>
       )}
       <p className="border-t border-slate-100 px-4 py-2 text-xs text-slate-500 sm:px-5">
-        Cada comprovante empurra o vencimento 1 mês sozinho. Aqui dá para mudar a data à mão, deixar a empresa isenta ou
-        bloquear o acesso na hora, por qualquer motivo.
+        Escolha o <strong>plano</strong> (mensal, trimestral, semestral ou anual: o Pix cobra o valor mensal × meses) e o{" "}
+        <strong>dia do vencimento</strong>. Cada comprovante empurra o vencimento um plano inteiro, sempre nesse dia. Dá
+        também para mudar a data à mão, deixar a empresa isenta ou bloquear o acesso na hora.
       </p>
     </Secao>
   );
@@ -579,9 +588,21 @@ function LinhaEmpresa({ e }: { e: EmpresaAssinatura }) {
   const { erro, ocupado, rodar } = useAcao();
   const [vencimento, setVencimento] = useState(e.situacao?.vencimento ?? "");
   const [isenta, setIsenta] = useState(e.isenta);
+  const [ciclo, setCiclo] = useState<number>(e.ciclo_meses ?? 1);
+  const [dia, setDia] = useState<number | null>(e.dia_vencimento ?? null);
   const [bloqueando, setBloqueando] = useState(false);
   const [motivo, setMotivo] = useState("");
-  const mudou = vencimento !== (e.situacao?.vencimento ?? "") || isenta !== e.isenta;
+  const mudou =
+    vencimento !== (e.situacao?.vencimento ?? "") ||
+    isenta !== e.isenta ||
+    ciclo !== (e.ciclo_meses ?? 1) ||
+    dia !== (e.dia_vencimento ?? null);
+
+  /** Escolheu o dia: a data já vai para esse dia (o banco grava igual, dataNoDia). */
+  function escolherDia(novo: number | null) {
+    setDia(novo);
+    if (novo && vencimento) setVencimento(dataNoDia(vencimento, novo));
+  }
   const est = ESTADOS_ASSINATURA[e.situacao?.estado ?? "sem_cobranca"];
   const dias = e.situacao?.dias;
 
@@ -589,6 +610,8 @@ function LinhaEmpresa({ e }: { e: EmpresaAssinatura }) {
     const fd = new FormData();
     fd.set("org_id", e.org_id);
     fd.set("vencimento", vencimento);
+    fd.set("ciclo", String(ciclo));
+    if (dia) fd.set("dia", String(dia));
     if (isenta) fd.set("isenta", "on");
     rodar(() => chamarAcao(() => adminDefinirAssinatura(fd)));
   }
@@ -596,7 +619,7 @@ function LinhaEmpresa({ e }: { e: EmpresaAssinatura }) {
   return (
     <li
       className={cn(
-        "grid gap-x-4 gap-y-2 px-4 py-3 sm:px-5 lg:grid-cols-[minmax(0,1.6fr)_9rem_minmax(0,1.5fr)_10rem] lg:items-center",
+        "grid gap-x-4 gap-y-2 px-4 py-3 sm:px-5 lg:grid-cols-[minmax(0,1.3fr)_9rem_minmax(0,2.6fr)_10rem] lg:items-center",
         e.bloqueio_manual && "bg-red-50/40",
       )}
       data-empresa-assinatura={e.nome}
@@ -605,7 +628,11 @@ function LinhaEmpresa({ e }: { e: EmpresaAssinatura }) {
         <p className="truncate text-sm font-medium text-slate-900">{e.nome}</p>
         <p className="truncate text-xs text-slate-500">
           {e.dono ?? "sem proprietário"}
-          {e.ultimo_pagamento ? ` · último pagamento confirmado ${dataBR(e.ultimo_pagamento)}` : ""}
+          {e.ultimo_pagamento ? ` · último pagamento ${dataBR(e.ultimo_pagamento)}` : ""}
+        </p>
+        <p className="truncate text-[11px] text-slate-500">
+          {descreverPlano(e.ciclo_meses, e.dia_vencimento)}
+          {e.situacao?.valor ? ` · ${moeda(e.situacao.valor)} por vez` : ""}
         </p>
       </div>
       <div className="min-w-0">
@@ -622,18 +649,49 @@ function LinhaEmpresa({ e }: { e: EmpresaAssinatura }) {
           )
         )}
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <label className="sr-only" htmlFor={`venc-${e.org_id}`}>
-          Vencimento de {e.nome}
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="flex flex-col gap-0.5 text-[11px] font-medium text-slate-500">
+          Plano
+          <select
+            value={ciclo}
+            onChange={(ev) => setCiclo(Number(ev.target.value))}
+            className="campo campo-compacto w-32"
+            aria-label={`Plano de ${e.nome}`}
+          >
+            {LISTA_CICLOS.map((c) => (
+              <option key={c} value={c}>
+                {CICLOS[c]}
+              </option>
+            ))}
+          </select>
         </label>
-        <input
-          id={`venc-${e.org_id}`}
-          type="date"
-          value={vencimento}
-          onChange={(ev) => setVencimento(ev.target.value)}
-          className="campo campo-compacto w-40"
-        />
-        <label className="flex items-center gap-1.5 text-xs text-slate-600">
+        <label className="flex flex-col gap-0.5 text-[11px] font-medium text-slate-500">
+          Vence todo dia
+          <select
+            value={dia ?? ""}
+            onChange={(ev) => escolherDia(ev.target.value ? Number(ev.target.value) : null)}
+            className="campo campo-compacto w-24"
+            aria-label={`Dia do vencimento de ${e.nome}`}
+          >
+            <option value="">—</option>
+            {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-0.5 text-[11px] font-medium text-slate-500">
+          Próximo vencimento
+          <input
+            type="date"
+            value={vencimento}
+            onChange={(ev) => setVencimento(dia && ev.target.value ? dataNoDia(ev.target.value, dia) : ev.target.value)}
+            className="campo campo-compacto w-40"
+            aria-label={`Vencimento de ${e.nome}`}
+          />
+        </label>
+        <label className="flex h-9 items-center gap-1.5 text-xs text-slate-600">
           <input type="checkbox" checked={isenta} onChange={(ev) => setIsenta(ev.target.checked)} /> Isenta
         </label>
         {mudou && (
@@ -753,7 +811,7 @@ function CartaoCobranca({ dados }: { dados: DadosAssinaturas }) {
           </Campo>
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
-          <Campo label="Valor mensal (R$)">
+          <Campo label="Valor mensal (R$)" hint="Trimestral, semestral e anual: × meses.">
             <input
               name="valor"
               inputMode="decimal"

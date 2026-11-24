@@ -39,6 +39,17 @@ alter table public.assinaturas add column if not exists bloqueio_manual boolean 
 alter table public.assinaturas add column if not exists bloqueio_motivo text;
 alter table public.assinaturas add column if not exists bloqueado_em    timestamptz;
 
+-- Plano e dia do vencimento por empresa (pedido do dono em 24/11/2026):
+-- ciclo_meses = de quantos em quantos meses paga (1 mensal, 3 trimestral,
+-- 6 semestral, 12 anual; o Pix cobra o valor mensal × meses) e
+-- dia_vencimento = dia fixo do mês em que vence (vazio = segue a data).
+alter table public.assinaturas add column if not exists ciclo_meses    smallint not null default 1;
+alter table public.assinaturas add column if not exists dia_vencimento smallint;
+alter table public.assinaturas drop constraint if exists assinaturas_ciclo_valido;
+alter table public.assinaturas add constraint assinaturas_ciclo_valido check (ciclo_meses in (1, 3, 6, 12));
+alter table public.assinaturas drop constraint if exists assinaturas_dia_valido;
+alter table public.assinaturas add constraint assinaturas_dia_valido check (dia_vencimento between 1 and 31);
+
 alter table public.assinaturas enable row level security;
 revoke insert, update, delete on public.assinaturas from public, anon, authenticated;
 grant select on public.assinaturas to authenticated;
@@ -151,6 +162,8 @@ declare
   v_isenta boolean := false;
   v_manual boolean := false;
   v_motivo text;
+  v_ciclo int := 1;
+  v_dia   int;
   v_dias  int;
   v_estado text;
 begin
@@ -160,9 +173,10 @@ begin
     return null;
   end if;
 
-  select a.vencimento, a.isenta, a.bloqueio_manual, a.bloqueio_motivo
-    into v_venc, v_isenta, v_manual, v_motivo
+  select a.vencimento, a.isenta, a.bloqueio_manual, a.bloqueio_motivo, a.ciclo_meses, a.dia_vencimento
+    into v_venc, v_isenta, v_manual, v_motivo, v_ciclo, v_dia
     from public.assinaturas a where a.org_id = p_org;
+  v_ciclo := coalesce(v_ciclo, 1);
   v_isenta := coalesce(v_isenta, false);
   v_manual := coalesce(v_manual, false);
   v_dias := v_venc - v_hoje;
@@ -183,7 +197,11 @@ begin
     'dias',        v_dias,
     'tolerancia',  v_tol,
     'bloqueia_em', v_venc + v_tol + 1,
-    'valor',       v_valor,
+    -- Valor do período do plano (mensal × meses); valor_mensal é o da config.
+    'valor',       v_valor * v_ciclo,
+    'valor_mensal', v_valor,
+    'ciclo_meses', v_ciclo,
+    'dia_vencimento', v_dia,
     'bloqueio_manual', v_manual,
     'bloqueio_motivo', case when v_manual then v_motivo end,
     'pendente',    exists (select 1 from public.assinatura_pagamentos p
@@ -223,24 +241,60 @@ insert into public.assinaturas (org_id, vencimento)
 select o.id, public.assinatura_hoje() + 30 from public.organizacoes o
 on conflict (org_id) do nothing;
 
--- Próximo vencimento depois de um pagamento (pedido do dono em 24/11/2026:
--- vale o dia em que ele paga). Pagou no dia ou adiantado: 1 mês a partir do
--- vencimento atual (adiantado não perde dias e o dia do mês não muda).
--- Pagou atrasado (ou sem vencimento): 1 mês a partir do dia do pagamento.
-create or replace function public.assinatura_proximo_vencimento(p_atual date)
+-- Data no dia `p_dia` do mês de `p_data` (dia 31 em fevereiro vira o último
+-- dia); se ficar antes de `p_data`, a mesma coisa no mês seguinte. Ou seja: o
+-- primeiro "dia p_dia" a partir de p_data, sem nunca encurtar o período.
+create or replace function public.assinatura_no_dia(p_data date, p_dia int)
+returns date
+language sql
+immutable
+set search_path = public
+as $$
+  with m as (
+    select date_trunc('month', p_data)::date as ini1,
+           (date_trunc('month', p_data) + interval '1 month')::date as ini2
+  ), d as (
+    select ini1 + (least(p_dia, ((ini2 - 1) - ini1) + 1) - 1) as no_mes,
+           ini2 + (least(p_dia, (((ini2 + interval '1 month')::date - 1) - ini2) + 1) - 1) as no_seguinte
+      from m
+  )
+  select case when p_dia is null then p_data
+              when no_mes >= p_data then no_mes
+              else no_seguinte end
+    from d
+$$;
+
+-- Próximo vencimento depois de um pagamento (pedido do dono em 24/11/2026).
+--   * pagou no dia ou adiantado: o plano (1, 3, 6 ou 12 meses) a partir do
+--     vencimento atual (adiantado não perde dias);
+--   * com dia fixo de vencimento: o dia não muda nunca. Pagou atrasado, paga
+--     o período que venceu; atrasou mais que o plano inteiro, conta de hoje;
+--   * sem dia fixo e atrasado (ou sem vencimento): o plano a partir do dia do
+--     pagamento.
+drop function if exists public.assinatura_proximo_vencimento(date);
+create or replace function public.assinatura_proximo_vencimento(p_atual date, p_ciclo int, p_dia int)
 returns date
 language sql
 stable
 set search_path = public
 as $$
-  select case
-    when p_atual is null or p_atual < public.assinatura_hoje()
-      then (public.assinatura_hoje() + interval '1 month')::date
-    else (p_atual + interval '1 month')::date
-  end
+  with b as (
+    select public.assinatura_hoje() as hoje,
+           make_interval(months => greatest(1, coalesce(p_ciclo, 1))) as plano
+  ), c as (
+    select case
+             when p_atual is null then (hoje + plano)::date
+             when p_atual >= hoje then (p_atual + plano)::date
+             when p_dia is not null and (p_atual + plano)::date > hoje then (p_atual + plano)::date
+             else (hoje + plano)::date
+           end as data
+      from b
+  )
+  select public.assinatura_no_dia(data, p_dia) from c
 $$;
 
-revoke execute on function public.assinatura_proximo_vencimento(date) from public, anon, authenticated;
+revoke execute on function public.assinatura_no_dia(date, int) from public, anon, authenticated;
+revoke execute on function public.assinatura_proximo_vencimento(date, int, int) from public, anon, authenticated;
 
 -- A empresa envia o comprovante -------------------------------------------------
 -- Só proprietário/gestor. O arquivo já subiu para {org_id}/assinatura/...
@@ -272,20 +326,21 @@ begin
     raise exception 'Já há 3 comprovantes esperando o administrador. Aguarde antes de enviar outro.';
   end if;
 
+  -- Valor do período do plano da empresa (mensal × meses).
+  insert into public.assinaturas (org_id, vencimento) values (p_org, null)
+  on conflict (org_id) do nothing;
+  select * into v_ass from public.assinaturas where org_id = p_org for update;
+
   insert into public.assinatura_pagamentos (org_id, valor, comprovante, nome_arquivo, observacao, enviado_por)
-  values (p_org, v_valor, p_caminho, left(coalesce(nullif(trim(p_nome), ''), 'comprovante'), 200),
+  values (p_org, v_valor * v_ass.ciclo_meses, p_caminho, left(coalesce(nullif(trim(p_nome), ''), 'comprovante'), 200),
           nullif(left(trim(coalesce(p_observacao, '')), 500), ''), auth.uid())
   returning id into v_id;
 
   -- Vale na hora, sem aprovação: o dono olha depois e marca como falso se
   -- precisar. A única exceção é a empresa bloqueada à mão pelo superadmin:
   -- aí o comprovante espera por ele (senão bloquear não adiantaria nada).
-  insert into public.assinaturas (org_id, vencimento) values (p_org, null)
-  on conflict (org_id) do nothing;
-  select * into v_ass from public.assinaturas where org_id = p_org for update;
-
   if not v_ass.bloqueio_manual then
-    v_novo := public.assinatura_proximo_vencimento(v_ass.vencimento);
+    v_novo := public.assinatura_proximo_vencimento(v_ass.vencimento, v_ass.ciclo_meses, v_ass.dia_vencimento);
     update public.assinaturas set vencimento = v_novo, atualizado_em = now() where org_id = p_org;
     update public.assinatura_pagamentos
        set situacao = 'aprovado', liberado_em = now(),
@@ -314,6 +369,8 @@ as $$
                'org_id', o.id,
                'nome', o.nome,
                'isenta', coalesce(a.isenta, false),
+               'ciclo_meses', coalesce(a.ciclo_meses, 1),
+               'dia_vencimento', a.dia_vencimento,
                'bloqueio_manual', coalesce(a.bloqueio_manual, false),
                'bloqueio_motivo', a.bloqueio_motivo,
                'bloqueado_em', a.bloqueado_em,
@@ -346,27 +403,41 @@ as $$
   )
 $$;
 
--- Vencimento e isenção definidos à mão.
-create or replace function public.admin_definir_assinatura(p_org uuid, p_vencimento date, p_isenta boolean)
+-- Vencimento, plano, dia fixo e isenção definidos à mão. Com dia fixo, a
+-- data é posta nesse dia (o primeiro a partir da data escolhida).
+drop function if exists public.admin_definir_assinatura(uuid, date, boolean);
+create or replace function public.admin_definir_assinatura(
+  p_org uuid, p_vencimento date, p_isenta boolean, p_ciclo int, p_dia int
+)
 returns void
 language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  v_ciclo int := coalesce(p_ciclo, 1);
 begin
   if not exists (select 1 from public.organizacoes where id = p_org) then
     raise exception 'Empresa não encontrada.' using errcode = 'P0002';
   end if;
-  insert into public.assinaturas (org_id, vencimento, isenta, atualizado_em)
-  values (p_org, p_vencimento, coalesce(p_isenta, false), now())
+  if v_ciclo not in (1, 3, 6, 12) then
+    raise exception 'Plano inválido: use mensal, trimestral, semestral ou anual.';
+  end if;
+  if p_dia is not null and p_dia not between 1 and 31 then
+    raise exception 'Dia do vencimento inválido: de 1 a 31.';
+  end if;
+  insert into public.assinaturas (org_id, vencimento, isenta, ciclo_meses, dia_vencimento, atualizado_em)
+  values (p_org, public.assinatura_no_dia(p_vencimento, p_dia), coalesce(p_isenta, false), v_ciclo, p_dia, now())
   on conflict (org_id) do update
-    set vencimento = excluded.vencimento, isenta = excluded.isenta, atualizado_em = now();
+    set vencimento = excluded.vencimento, isenta = excluded.isenta,
+        ciclo_meses = excluded.ciclo_meses, dia_vencimento = excluded.dia_vencimento,
+        atualizado_em = now();
 end;
 $$;
 
 -- O que o superadmin faz com um comprovante:
 --   * aprovar um 'pendente' (empresa que ele bloqueou mandou comprovante):
---     estende 1 mês e tira o bloqueio à mão;
+--     estende o plano e tira o bloqueio à mão;
 --   * recusar (marcar como falso) um 'pendente' ou um que liberou sozinho
 --     (liberado_em): desfaz o mês dado, se ninguém mexeu no vencimento
 --     depois (mudança à mão ou outro comprovante valem mais). Devolve
@@ -415,7 +486,10 @@ begin
                              'vencimento', (select vencimento from public.assinaturas where org_id = v_pag.org_id));
   end if;
 
-  v_novo := public.assinatura_proximo_vencimento(v_ant);
+  v_novo := public.assinatura_proximo_vencimento(
+    v_ant,
+    (select ciclo_meses from public.assinaturas where org_id = v_pag.org_id),
+    (select dia_vencimento from public.assinaturas where org_id = v_pag.org_id));
   update public.assinaturas
      set vencimento = v_novo, bloqueio_manual = false, bloqueio_motivo = null, bloqueado_em = null,
          atualizado_em = now()

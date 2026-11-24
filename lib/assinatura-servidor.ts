@@ -53,20 +53,24 @@ export function qrSvg(texto: string) {
   return QRCode.toString(texto, { type: "svg", margin: 1, errorCorrectionLevel: "M" });
 }
 
-/** Pix desta empresa: o identificador (aparece no extrato) leva o começo do id dela. */
-export async function pixDaEmpresa(orgId: string, config?: ConfigCobranca): Promise<PixPronto | null> {
+/**
+ * Pix desta empresa: o identificador (aparece no extrato) leva o começo do id
+ * dela. `meses` = plano da empresa (trimestral cobra 3 × o valor mensal).
+ */
+export async function pixDaEmpresa(orgId: string, config?: ConfigCobranca, meses = 1): Promise<PixPronto | null> {
   const c = config ?? (await configCobranca());
   if (!cobrancaLigada(c)) return null;
+  const valor = Math.round(c.valor * Math.max(1, meses) * 100) / 100;
   const chave = normalizarChavePix(c.chave);
   if (!chave) return null;
   const copiaECola = montarPix({
     chave: chave.chave,
     nome: c.nome!,
     cidade: c.cidade!,
-    valor: c.valor,
+    valor,
     identificador: `MANUT${orgId.replace(/-/g, "").slice(0, 12)}`,
   });
-  return { copiaECola, qrSvg: await qrSvg(copiaECola), valor: c.valor, nome: c.nome!, chave: chave.chave, tipoChave: chave.tipo };
+  return { copiaECola, qrSvg: await qrSvg(copiaECola), valor, nome: c.nome!, chave: chave.chave, tipoChave: chave.tipo };
 }
 
 // --- Aviso no WhatsApp do dono -----------------------------------------------------

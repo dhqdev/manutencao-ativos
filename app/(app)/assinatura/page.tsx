@@ -10,6 +10,7 @@ import {
   PARA_EMPRESA,
   SITUACOES_PAGAMENTO,
   avisoAssinatura,
+  descreverPlano,
   type PagamentoAssinatura,
 } from "@/lib/assinatura";
 import { pixDaEmpresa } from "@/lib/assinatura-servidor";
@@ -30,7 +31,7 @@ export default async function AssinaturaPage() {
   const db = await createClient();
 
   const [pix, { data: pagamentos }] = await Promise.all([
-    pixDaEmpresa(orgId).catch((e) => {
+    pixDaEmpresa(orgId, undefined, assinatura?.ciclo_meses ?? 1).catch((e) => {
       console.error("[assinatura] Pix", e);
       return null;
     }),
@@ -53,7 +54,7 @@ export default async function AssinaturaPage() {
     <>
       <Cabecalho
         titulo="Assinatura"
-        descricao={`Mensalidade do sistema para ${organizacao.nome}. Pague pelo Pix e anexe o comprovante: o próximo mês é liberado na hora.`}
+        descricao={`Assinatura do sistema para ${organizacao.nome}. Pague pelo Pix e anexe o comprovante: o acesso é liberado na hora.`}
       />
 
       {bloqueada && (
@@ -92,6 +93,36 @@ export default async function AssinaturaPage() {
           {estado === "isenta" ? "Esta empresa é isenta da assinatura." : "Nenhuma cobrança em aberto para esta empresa."}
         </p>
       ) : (
+        <>
+        {/* Pedido do dono: deixar claro que sem o comprovante anexado o pagamento não conta. */}
+        <ol
+          className="mb-4 grid gap-2 rounded-xl border border-slate-200 bg-superficie p-3 text-sm sm:grid-cols-3 sm:p-4"
+          data-passos-pagamento
+        >
+          <li className="flex items-start gap-2.5">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white">1</span>
+            <span>
+              <strong className="text-slate-900">Pague pelo Pix</strong>
+              <span className="block text-xs text-slate-500">QR code ou copia e cola, no valor do seu plano.</span>
+            </span>
+          </li>
+          <li className="flex items-start gap-2.5 rounded-lg bg-amber-50 p-2 ring-1 ring-amber-200 sm:-m-2">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-500 text-xs font-semibold text-white">2</span>
+            <span>
+              <strong className="text-amber-950">Anexe o comprovante: é obrigatório</strong>
+              <span className="block text-xs text-amber-900">
+                Sem o comprovante anexado aqui, o pagamento não é reconhecido e o acesso não é liberado.
+              </span>
+            </span>
+          </li>
+          <li className="flex items-start gap-2.5">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-xs font-semibold text-white">3</span>
+            <span>
+              <strong className="text-slate-900">Acesso liberado na hora</strong>
+              <span className="block text-xs text-slate-500">O próximo vencimento aparece no histórico.</span>
+            </span>
+          </li>
+        </ol>
         <div className="grid items-start gap-4 lg:grid-cols-[22rem_1fr]">
           <Secao
             titulo="Situação"
@@ -103,8 +134,14 @@ export default async function AssinaturaPage() {
                 <dd className="font-semibold text-slate-900" data-vencimento>{dataBR(assinatura?.vencimento)}</dd>
               </div>
               <div>
-                <dt className="text-xs text-slate-500">Valor mensal</dt>
+                <dt className="text-xs text-slate-500">Valor a pagar</dt>
                 <dd className="font-semibold text-slate-900">{moeda(assinatura?.valor ?? 0)}</dd>
+              </div>
+              <div className="col-span-2">
+                <dt className="text-xs text-slate-500">Plano</dt>
+                <dd className="font-medium text-slate-900" data-plano>
+                  {descreverPlano(assinatura?.ciclo_meses, assinatura?.dia_vencimento)}
+                </dd>
               </div>
             </dl>
             {pix ? (
@@ -176,6 +213,7 @@ export default async function AssinaturaPage() {
             </Secao>
           </div>
         </div>
+        </>
       )}
     </>
   );

@@ -144,8 +144,12 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   **Comprovante sem aprovação** (pedido do dono em 24/11/2026: "anexou, já
   vale"): `assinatura_enviar_comprovante` já grava `aprovado` com
   `liberado_em` e empurra o vencimento (`assinatura_proximo_vencimento`: no
-  dia ou adiantado, +1 mês do vencimento; atrasado, +1 mês do dia do
-  pagamento). O dono só olha depois: **Comprovante falso**
+  dia ou adiantado, +1 plano do vencimento; atrasado sem dia fixo, +1 plano
+  do dia do pagamento). **Plano e dia** por empresa (pedido do dono):
+  `assinaturas.ciclo_meses` (1, 3, 6, 12; Pix e comprovante = valor mensal ×
+  meses, `pixDaEmpresa(org, config, meses)`) e `dia_vencimento` (todo dia N:
+  `assinatura_no_dia` no banco e `dataNoDia` na tela fazem a mesma conta;
+  mudou uma, mude a outra e o teste). O dono só olha depois: **Comprovante falso**
   (`admin_avaliar_pagamento` recusando um liberado) desfaz o mês se ninguém
   mexeu no vencimento depois, e a tela já marca bloquear junto. `pendente`
   só existe com bloqueio à mão (o comprovante espera; Liberar = +1 mês e

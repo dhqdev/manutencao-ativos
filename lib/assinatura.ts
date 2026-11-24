@@ -12,7 +12,13 @@ export type SituacaoAssinatura = {
   dias: number | null;
   tolerancia: number;
   bloqueia_em: string | null;
+  /** Valor do período do plano (mensal × meses). */
   valor: number;
+  valor_mensal?: number;
+  /** Plano: de quantos em quantos meses paga (1, 3, 6 ou 12). */
+  ciclo_meses?: number;
+  /** Dia fixo do mês em que vence (null = segue a data). */
+  dia_vencimento?: number | null;
   pendente: boolean;
   /** O superadmin bloqueou à mão (vale por cima do vencimento). */
   bloqueio_manual?: boolean;
@@ -67,6 +73,35 @@ export const PARA_EMPRESA: Record<SituacaoPagamento, string> = {
   aprovado: "Pago",
   recusado: "Recusado",
 };
+
+/** Planos (db/sql/74-assinaturas.sql, assinaturas.ciclo_meses). O Pix cobra o valor mensal × meses. */
+export const CICLOS = { 1: "Mensal", 3: "Trimestral", 6: "Semestral", 12: "Anual" } as const;
+export type Ciclo = keyof typeof CICLOS;
+export const LISTA_CICLOS = [1, 3, 6, 12] as const satisfies readonly Ciclo[];
+export const ehCiclo = (n: unknown): n is Ciclo => (LISTA_CICLOS as readonly unknown[]).includes(n);
+
+/**
+ * O primeiro "dia `dia`" a partir de `iso` (dia 31 em fevereiro vira o último
+ * dia). Espelha `assinatura_no_dia()` do banco: a tela mostra a data que vai
+ * ser gravada quando o superadmin escolhe o dia do vencimento.
+ */
+export function dataNoDia(iso: string, dia: number | null) {
+  if (!dia || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
+  const [a, m, d] = iso.split("-").map(Number);
+  const noMes = (ano: number, mes: number) => {
+    const ultimo = new Date(Date.UTC(ano, mes, 0)).getUTCDate();
+    return new Date(Date.UTC(ano, mes - 1, Math.min(dia, ultimo))).toISOString().slice(0, 10);
+  };
+  const atual = noMes(a, m);
+  if (Number(atual.slice(8)) >= d) return atual;
+  return m === 12 ? noMes(a + 1, 1) : noMes(a, m + 1);
+}
+
+/** "Mensal, vence todo dia 5" / "Trimestral". */
+export function descreverPlano(ciclo: number | null | undefined, dia: number | null | undefined) {
+  const nome = ehCiclo(ciclo) ? CICLOS[ciclo] : CICLOS[1];
+  return dia ? `${nome}, vence todo dia ${dia}` : nome;
+}
 
 /** Chaves em sistema_credenciais (seção Assinaturas do console). */
 export const CFG = {

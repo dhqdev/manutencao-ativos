@@ -513,6 +513,8 @@ await passo("assinatura: Pix no console, empresa vencida bloqueia, comprovante l
   await entrar(GESTOR, "**/assinatura");
   await page.locator("[data-bloqueio]").waitFor();
   await page.locator("[data-qr-pix] svg").waitFor();
+  // A tela diz que anexar o comprovante é obrigatório.
+  await page.locator("[data-passos-pagamento]").getByText(/Anexe o comprovante: é obrigatório/).waitFor();
   const pix = await page.locator("textarea[data-pix]").inputValue();
   verdade(pix.startsWith("000201") && pix.includes("br.gov.bcb.pix") && pix.includes("540549.90"), `Pix estranho: ${pix}`);
   await page.goto("/manutencoes");
@@ -573,7 +575,14 @@ await passo("assinatura: Pix no console, empresa vencida bloqueia, comprovante l
   await empresa.getByText("Bloqueada por você").waitFor();
   await empresa.getByRole("button", { name: "Desbloquear" }).click();
   await empresa.getByRole("button", { name: "Bloquear acesso" }).waitFor();
-  // Desbloqueada e com o mês liberado, a empresa volta a entrar normalmente.
+  // Plano e dia fixo do vencimento: a data vai para o dia escolhido.
+  await empresa.getByLabel("Plano de Oficina E2E").selectOption("3");
+  await empresa.getByLabel("Dia do vencimento de Oficina E2E").selectOption("10");
+  verdade((await empresa.getByLabel("Vencimento de Oficina E2E").inputValue()).endsWith("-10"), "vencimento não foi para o dia 10");
+  await empresa.getByRole("button", { name: "Salvar" }).click();
+  await empresa.getByText(/Trimestral, vence todo dia 10/).waitFor();
+
+  // Desbloqueada e com o período liberado, a empresa volta a entrar normalmente.
   await page.goto("/auth/sair");
   await entrar(GESTOR);
 

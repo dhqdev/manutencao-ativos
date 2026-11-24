@@ -105,6 +105,8 @@ export type EmpresaAssinatura = {
   org_id: string;
   nome: string;
   isenta: boolean;
+  ciclo_meses?: number;
+  dia_vencimento?: number | null;
   bloqueio_manual?: boolean;
   bloqueio_motivo?: string | null;
   bloqueado_em?: string | null;

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { crc16, montarPix, normalizarChavePix, textoPix } from "../../lib/pix.ts";
-import { avisoAssinatura, lerValorReais } from "../../lib/assinatura.ts";
+import { avisoAssinatura, dataNoDia, descreverPlano, lerValorReais } from "../../lib/assinatura.ts";
 
 test("Pix: confere com o exemplo do manual do BR Code (Banco Central)", () => {
   const codigo = montarPix({
@@ -67,4 +67,20 @@ test("Assinatura: valor em reais e avisos", () => {
     avisoAssinatura({ ...base, estado: "bloqueada", dias: 20, bloqueio_manual: true }),
     "Acesso bloqueado pelo administrador do sistema.",
   );
+});
+
+test("Assinatura: dia fixo do vencimento igual ao banco (assinatura_no_dia)", () => {
+  // O primeiro "dia N" a partir da data, sem encurtar o período.
+  assert.equal(dataNoDia("2026-11-24", 5), "2026-12-05");
+  assert.equal(dataNoDia("2026-11-03", 5), "2026-11-05");
+  assert.equal(dataNoDia("2026-11-05", 5), "2026-11-05");
+  // Dia 31 em fevereiro vira o último dia; virada de ano.
+  assert.equal(dataNoDia("2026-02-10", 31), "2026-02-28");
+  assert.equal(dataNoDia("2026-01-31", 30), "2026-02-28");
+  assert.equal(dataNoDia("2028-02-10", 30), "2028-02-29");
+  assert.equal(dataNoDia("2026-12-20", 10), "2027-01-10");
+  // Sem dia, a data fica como está.
+  assert.equal(dataNoDia("2026-11-24", null), "2026-11-24");
+  assert.equal(descreverPlano(3, 5), "Trimestral, vence todo dia 5");
+  assert.equal(descreverPlano(undefined, null), "Mensal");
 });

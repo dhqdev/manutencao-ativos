@@ -7,9 +7,9 @@ import { obterSessao } from "@/lib/auth/sessao";
 import { createAdminClient } from "@/lib/db/admin";
 import { createClient } from "@/lib/db/server";
 import { caminhoNoDisco, caminhoValido, tipoDoArquivo, tokenDeEnvio } from "@/lib/arquivos";
-import { CFG, lerValorReais } from "@/lib/assinatura";
+import { CFG, ehCiclo, lerValorReais } from "@/lib/assinatura";
 import { avisarComprovante, testarAvisoWhatsapp } from "@/lib/assinatura-servidor";
-import { booleano, data, erroBanco, exigirId, mensagemErro, texto, type Resultado } from "@/lib/form";
+import { booleano, data, erroBanco, exigirId, inteiro, mensagemErro, texto, type Resultado } from "@/lib/form";
 import { SEM_PERMISSAO, podeGerenciar } from "@/lib/permissoes";
 import { montarPix, normalizarChavePix } from "@/lib/pix";
 import { getContextoSemBloqueio } from "@/lib/session";
@@ -169,7 +169,7 @@ export async function adminDesligarCobranca(): Promise<Resultado> {
   }
 }
 
-/** Vencimento e isenção de uma empresa, definidos à mão. */
+/** Vencimento, plano, dia fixo do vencimento e isenção de uma empresa, definidos à mão. */
 export async function adminDefinirAssinatura(fd: FormData): Promise<Resultado> {
   try {
     const { admin } = await exigirSuperadmin();
@@ -177,10 +177,16 @@ export async function adminDefinirAssinatura(fd: FormData): Promise<Resultado> {
     const bruto = texto(fd, "vencimento");
     const vencimento = data(fd, "vencimento");
     if (bruto && !vencimento) return { ok: false, erro: "Data de vencimento inválida." };
+    const ciclo = inteiro(fd, "ciclo", 1);
+    if (!ehCiclo(ciclo)) return { ok: false, erro: "Plano inválido: use mensal, trimestral, semestral ou anual." };
+    const dia = inteiro(fd, "dia");
+    if (dia !== null && (dia < 1 || dia > 31)) return { ok: false, erro: "Dia do vencimento: de 1 a 31." };
     const { error } = await admin.rpc("admin_definir_assinatura", {
       p_org: org,
       p_vencimento: vencimento,
       p_isenta: booleano(fd, "isenta"),
+      p_ciclo: ciclo,
+      p_dia: dia,
     });
     if (error) return erroBanco(error);
     return pronto();

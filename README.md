@@ -373,8 +373,9 @@ Central, `lib/pix.ts`):
 - **Cartões no topo**: comprovantes nos últimos 7 dias, recebido no mês, em
   dia, vencendo ou vencidas e bloqueadas (os três últimos filtram a lista).
 - **Comprovantes recebidos**: o comprovante **já vale** quando o cliente anexa,
-  sem aprovação. Pagou no dia ou adiantado, o vencimento anda 1 mês e o dia
-  não muda; pagou atrasado, conta 1 mês a partir do dia do pagamento. **Ver
+  sem aprovação. O vencimento anda um período do plano da empresa (pagou
+  adiantado não perde dias); com dia fixo, cai sempre nesse dia; sem dia
+  fixo e atrasado, conta a partir do dia do pagamento. **Ver
   comprovante** abre o PDF ou a imagem ali mesmo; **Comprovante falso** (com
   motivo, que a empresa vê) desfaz o mês e, marcado por padrão, **bloqueia a
   empresa** na hora. Bolinha azul = chegou há menos de 2 dias.
@@ -382,14 +383,19 @@ Central, `lib/pix.ts`):
   comprovante, então ele não liberou sozinho. **Liberar** dá +1 mês e tira o
   bloqueio; **Recusar** mantém bloqueada.
 - **Empresas: vencimento e acesso**: situação (em dia, vence em breve,
-  vencida, bloqueada), a **data de vencimento** editável, a opção **Isenta** e
+  vencida, bloqueada), o **plano** (mensal, trimestral, semestral ou anual: o
+  Pix cobra o valor mensal × meses), o **dia do vencimento** (todo dia N; a
+  data já vai para esse dia), o **próximo vencimento** editável, a opção
+  **Isenta** e
   **Bloquear acesso** / **Desbloquear**, que vale na hora e por cima de
   qualquer vencimento (o motivo aparece para a empresa). Liberar um
   comprovante dela também desbloqueia.
 
 Do lado da empresa, o menu **Assinatura** mostra a situação, o QR, o copia e
-cola e o envio do comprovante (proprietário ou gestor), com o histórico; ao
-anexar, as telas voltam a abrir na hora. Uma
+cola, o plano e o envio do comprovante (proprietário ou gestor), com o
+histórico. A tela mostra os 3 passos e deixa claro que **anexar o comprovante
+é obrigatório**: só o Pix, sem o comprovante, não libera. Ao anexar, as telas
+voltam a abrir na hora. Uma
 faixa no topo avisa quando faltam 5 dias ou menos e quando já venceu. Passou
 do vencimento + tolerância, a empresa fica **bloqueada**: qualquer tela leva
 para Assinatura, que continua deixando pagar e anexar. O superadmin no
