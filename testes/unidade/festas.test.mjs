@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { domingoDoMes, enfeitesLigados, festaDoDia, festasDoAno, pascoa, proximasFestas } from "../../lib/festas.ts";
+import { DIAS_ANTES, domingoDoMes, enfeitesLigados, festaDoDia, festasDoAno, pascoa, proximasFestas } from "../../lib/festas.ts";
+import { somarDias } from "../../lib/format.ts";
 import { contagem, diaPorExtenso, naRetaFinal } from "../../components/festas/temas.ts";
 
 // Meio-dia em Brasília (15h UTC): longe da virada do dia.
@@ -53,6 +54,35 @@ test("datas sobrepostas: a mais próxima ganha e a outra assume depois", () => {
   assert.equal(festa("2027-05-25").id, "junina");
   assert.deepEqual([festa("2027-06-29").id, festa("2027-06-29").durante], ["junina", true]);
   assert.equal(festa("2027-06-30"), null);
+});
+
+test("Carnaval, Ano Novo e Páscoa nunca brigam: varredura dia a dia de 2026 a 2060", () => {
+  // Páscoa e Carnaval andam juntos (47 dias de distância), mas o enfeite da
+  // Páscoa só entra 30 dias antes: sobram 16 dias sem nada entre os dois.
+  // Carnaval cedo (ex.: 2035) cai em cima do Ano Novo, que fica até o dia 6.
+  const problemas = [];
+  for (let ano = 2026; ano <= 2060; ano++) {
+    const festas = festasDoAno(ano);
+    let anterior = null;
+    for (let t = Date.UTC(ano, 0, 1, 15); t < Date.UTC(ano + 1, 0, 1, 15); t += 86_400_000) {
+      const dia = new Date(t).toISOString().slice(0, 10);
+      const f = festaDoDia(new Date(t));
+      // No(s) dia(s) de cada data, é ela que aparece.
+      for (const g of festas)
+        if (dia >= g.inicio && dia <= g.fim && f?.id !== g.id) problemas.push(`${dia}: era ${g.id}, veio ${f?.id}`);
+      // Nunca uma data que já passou, e a contagem só desce.
+      if (f && dia > f.fim) problemas.push(`${dia}: ${f.id} já passou`);
+      if (f && anterior?.id === f.id && f.dias > anterior.dias) problemas.push(`${dia}: contagem de ${f.id} subiu`);
+      anterior = f;
+    }
+    const carnaval = festas.find((f) => f.id === "carnaval");
+    const pascoa = festas.find((f) => f.id === "pascoa");
+    if (carnaval.fim >= somarDias(pascoa.inicio, -DIAS_ANTES)) problemas.push(`${ano}: Carnaval encosta na Páscoa`);
+  }
+  assert.deepEqual(problemas, []);
+  // O caso apertado: Carnaval em 3/2/2035 e o Ano Novo até o Dia de Reis.
+  assert.equal(festa("2035-01-06").id, "ano-novo");
+  assert.deepEqual([festa("2035-01-07").id, festa("2035-01-07").dias], ["carnaval", 27]);
 });
 
 test("o dia é o de Brasília, não o de UTC", () => {
