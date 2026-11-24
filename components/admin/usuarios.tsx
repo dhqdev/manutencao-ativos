@@ -42,7 +42,7 @@ import {
 import { chamarAcao } from "@/lib/acao-cliente";
 import { dataBR, dataHoraBR, iniciais } from "@/lib/format";
 import type { PapelMembro } from "@/lib/types";
-import { Busca, Erro, FormModal, normalizar, useAcao, type Credenciais } from "./comum";
+import { Busca, Erro, FormModal, Indicador, TONS, normalizar, useAcao, type Credenciais } from "./comum";
 import {
   FILTROS_USUARIO,
   LISTA_PAPEIS,
@@ -50,19 +50,20 @@ import {
   PAPEIS,
   passaNoFiltro,
   tempoRelativo,
+  ultimoAcesso,
   type EmpresaAdmin,
   type FiltroUsuario,
   type Ordem,
   type UsuarioAdmin,
 } from "./tipos";
 
-/** Cartões do topo: cada um é também um filtro da lista. */
-const CARTOES: { filtro: FiltroUsuario; Icone: typeof Users; cor: string }[] = [
-  { filtro: "todos", Icone: Users, cor: "text-slate-600 bg-slate-100" },
-  { filtro: "recentes", Icone: CircleCheck, cor: "text-emerald-700 bg-emerald-50" },
-  { filtro: "nunca", Icone: Clock, cor: "text-amber-700 bg-amber-50" },
-  { filtro: "sem_empresa", Icone: UserX, cor: "text-violet-700 bg-violet-50" },
-  { filtro: "bloqueados", Icone: Ban, cor: "text-red-700 bg-red-50" },
+/** Cartões do topo: cada um é também um filtro da lista (clique de novo para tirar). */
+const CARTOES: { filtro: FiltroUsuario; Icone: typeof Users; tom: keyof typeof TONS; detalhe: string }[] = [
+  { filtro: "todos", Icone: Users, tom: "neutro", detalhe: "contando você" },
+  { filtro: "recentes", Icone: CircleCheck, tom: "verde", detalhe: "abriram o sistema" },
+  { filtro: "nunca", Icone: Clock, tom: "ambar", detalhe: "criados e sem login" },
+  { filtro: "sem_empresa", Icone: UserX, tom: "violeta", detalhe: "não participam de nenhuma" },
+  { filtro: "bloqueados", Icone: Ban, tom: "vermelho", detalhe: "não conseguem entrar" },
 ];
 
 export function ListaUsuarios({
@@ -109,7 +110,7 @@ export function ListaUsuarios({
     return lista.sort((a, b) => {
       if (ordem === "nome") return nome(a).localeCompare(nome(b));
       if (ordem === "novos") return b.created_at.localeCompare(a.created_at);
-      return (b.last_sign_in_at ?? "").localeCompare(a.last_sign_in_at ?? "");
+      return (ultimoAcesso(b) ?? "").localeCompare(ultimoAcesso(a) ?? "");
     });
   }, [busca, filtro, empresa, ordem, usuarios, agora]);
 
@@ -120,30 +121,19 @@ export function ListaUsuarios({
   return (
     <>
       <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 xl:grid-cols-5">
-        {CARTOES.map(({ filtro: f, Icone, cor }) => (
-          <button
+        {CARTOES.map(({ filtro: f, Icone, tom, detalhe }) => (
+          <Indicador
             key={f}
-            type="button"
-            onClick={() => setFiltro(filtro === f && f !== "todos" ? "todos" : f)}
-            aria-pressed={filtro === f}
-            className={cn(
-              "card pressionavel flex items-center gap-3 p-3.5 text-left transition-shadow sm:p-4",
-              filtro === f ? "ring-2 ring-slate-900" : "hover:shadow-md",
-              f === "todos" && "col-span-2 sm:col-span-1",
-            )}
-          >
-            <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", cor)}>
-              <Icone className="h-5 w-5" />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-2xl font-semibold leading-none tabular-nums text-slate-900">
-                {contagem[f]}
-              </span>
-              <span className="mt-1 block truncate text-xs text-slate-500">
-                {f === "todos" ? "Usuários no sistema" : FILTROS_USUARIO[f]}
-              </span>
-            </span>
-          </button>
+            Icone={Icone}
+            tom={tom}
+            valor={contagem[f]}
+            rotulo={f === "todos" ? "Usuários no sistema" : FILTROS_USUARIO[f]}
+            detalhe={detalhe}
+            ativo={filtro === f}
+            alerta={f === "bloqueados" && contagem[f] > 0 && filtro !== f}
+            aoClicar={() => setFiltro(filtro === f && f !== "todos" ? "todos" : f)}
+            className={f === "todos" ? "col-span-2 sm:col-span-1" : undefined}
+          />
         ))}
       </div>
 
@@ -341,9 +331,9 @@ function LinhaUsuario({
         </span>
         <span
           className="hidden text-xs tabular-nums text-slate-600 lg:block"
-          title={u.last_sign_in_at ? dataHoraBR(u.last_sign_in_at) : undefined}
+          title={ultimoAcesso(u) ? dataHoraBR(ultimoAcesso(u)) : undefined}
         >
-          {tempoRelativo(u.last_sign_in_at, agora)}
+          {tempoRelativo(ultimoAcesso(u), agora)}
         </span>
         <span className="hidden lg:block">
           <Situacao usuario={u} />
@@ -353,7 +343,7 @@ function LinhaUsuario({
         {/* Celular: empresas e situação numa segunda linha */}
         <span className="col-span-2 flex min-w-0 flex-wrap items-center gap-1.5 pl-[3.25rem] lg:hidden">
           <Situacao usuario={u} />
-          <span className="text-[11px] text-slate-500">{tempoRelativo(u.last_sign_in_at, agora)}</span>
+          <span className="text-[11px] text-slate-500">{tempoRelativo(ultimoAcesso(u), agora)}</span>
           <SelosEmpresas usuario={u} limite={1} />
         </span>
       </button>
@@ -413,7 +403,7 @@ function DetalheUsuario({
     ["Criado em", dataBR(u.created_at)],
     [
       "Último acesso",
-      u.last_sign_in_at ? `${dataHoraBR(u.last_sign_in_at)} (${tempoRelativo(u.last_sign_in_at, agora)})` : "nunca entrou",
+      ultimoAcesso(u) ? `${dataHoraBR(ultimoAcesso(u))} (${tempoRelativo(ultimoAcesso(u), agora)})` : "nunca entrou",
     ],
     ["Sessões abertas", u.sessoes > 0 ? `${u.sessoes} aparelho(s)` : "nenhuma"],
     ["Telefone", u.telefone ?? "—"],
@@ -787,7 +777,7 @@ function exportarCsv(usuarios: UsuarioAdmin[]) {
       u.telefone ?? "",
       u.superadmin ? "superadmin" : u.empresas.map((e) => `${e.nome} (${PAPEIS[e.papel].label})`).join(", "),
       dataBR(u.created_at),
-      u.last_sign_in_at ? dataHoraBR(u.last_sign_in_at) : "nunca",
+      ultimoAcesso(u) ? dataHoraBR(ultimoAcesso(u)) : "nunca",
       u.bloqueado ? "bloqueado" : "ativo",
     ]),
   ];

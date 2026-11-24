@@ -369,8 +369,12 @@ await passo("conta que já existe vira convite; sem e-mail confirmado não entra
 await passo("superadmin (da stack) entra direto na gerência de usuários, sem acesso ao sistema", async () => {
   await page.goto("/auth/sair");
   await entrar(SUPERADMIN, "**/admin");
-  await page.getByRole("heading", { name: "Gerência", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "Usuários", exact: true }).waitFor();
   await page.locator(`li[data-usuario="${GESTOR.email}"]`).waitFor();
+  // As seções ficam no menu lateral (antes eram abas no topo).
+  for (const secao of ["Clientes e uso", "Assinaturas", "Integrações e backup", "Versão e atualização"]) {
+    await page.getByRole("navigation", { name: "Console", exact: true }).getByRole("link", { name: secao }).waitFor();
+  }
   // O sistema das empresas devolve o superadmin ao console.
   await page.goto("/dashboard");
   await page.waitForURL("**/admin");
@@ -378,6 +382,8 @@ await passo("superadmin (da stack) entra direto na gerência de usuários, sem a
 });
 
 await passo("console: bloco da versão do sistema com o atualizador", async () => {
+  await page.getByRole("navigation", { name: "Console", exact: true }).getByRole("link", { name: "Versão e atualização" }).click();
+  await page.waitForURL("**/admin/sistema");
   await page.getByRole("heading", { name: "Versão do sistema" }).waitFor();
   const versao = (await page.locator("[data-versao-atual]").textContent())?.trim();
   verdade(/^v\d{4}\.\d{2}\.\d{2}-\d+$/.test(versao ?? ""), `versão no ar fora do padrão: ${versao}`);
@@ -386,6 +392,7 @@ await passo("console: bloco da versão do sistema com o atualizador", async () =
 });
 
 await passo("console: detalhe do usuário troca o papel na empresa", async () => {
+  await page.goto("/admin");
   await page.locator(`li[data-usuario="${TECNICO.email}"] button`).click();
   const detalhe = page.locator(`[data-detalhe="${TECNICO.email}"]`);
   const papel = detalhe.getByLabel("Papel em Oficina E2E");
@@ -427,14 +434,16 @@ await passo("console: \"Entrar como\" abre a conta do usuário sem senha e volta
   await page.locator("[data-acessos-suporte]").getByText("Teste E2E: conferir relatório").waitFor();
   await page.getByRole("button", { name: "Voltar ao console" }).click();
   await page.waitForURL("**/admin");
-  await page.getByRole("heading", { name: "Gerência", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "Usuários", exact: true }).waitFor();
   // Depois de voltar, o sistema das empresas o devolve ao console de novo.
   await page.goto("/dashboard");
   await page.waitForURL("**/admin");
 });
 
 await passo("console: uso de cada cliente (arquivos e banco) e WhatsApp", async () => {
+  // Endereço antigo da aba continua valendo (vira a página da seção).
   await page.goto("/admin?aba=clientes");
+  await page.waitForURL("**/admin/clientes");
   const linha = page.locator('li[data-cliente="Oficina E2E"]');
   await linha.waitFor();
   // A Oficina E2E tem uma foto e um PDF: o espaço não pode ser zero.
@@ -445,7 +454,7 @@ await passo("console: uso de cada cliente (arquivos e banco) e WhatsApp", async 
 
 await passo("console: aba Integrações guarda a chave do Groq sem devolvê-la à tela", async () => {
   const chave = "gsk_e2eTesteDeChaveFalsa0000abcd";
-  await page.goto("/admin?aba=integracoes");
+  await page.goto("/admin/integracoes");
   // O cartão do backup também tem Salvar/Remover: tudo dentro do cartão do Groq.
   const groq = page.locator("section", { has: page.getByRole("heading", { name: "Groq · assistente de IA" }) });
   await groq.locator('input[name="chave"]').fill(chave);
@@ -461,7 +470,7 @@ await passo("console: aba Integrações guarda a chave do Groq sem devolvê-la �
 });
 
 await passo("console: integrações com o backup (serviço no ar e backup agora)", async () => {
-  await page.goto("/admin?aba=integracoes");
+  await page.goto("/admin/integracoes");
   const cartao = page.locator("[data-cartao-backup]");
   await cartao.waitFor();
   // O serviço backup da stack manda sinal de vida a cada 15 s.
@@ -482,8 +491,8 @@ await passo("console: integrações com o backup (serviço no ar e backup agora)
   await cartao.getByText("Não configurado").waitFor();
 });
 
-await passo("assinatura: Pix no console, empresa vencida bloqueia, comprovante e aprovação liberam", async () => {
-  await page.goto("/admin?aba=assinaturas");
+await passo("assinatura: Pix no console, empresa vencida bloqueia, comprovante libera na hora, conferência e bloqueio à mão", async () => {
+  await page.goto("/admin/assinaturas");
   // Formulários com ação no cliente: só depois de a tela hidratar.
   await page.waitForLoadState("networkidle");
   const cobranca = page.locator("section", { has: page.getByRole("heading", { name: "Pix da assinatura" }) });
@@ -512,24 +521,50 @@ await passo("assinatura: Pix no console, empresa vencida bloqueia, comprovante e
   await page.locator("[data-comprovante-arquivo]").setInputFiles({ name: "comprovante.png", mimeType: "image/png", buffer: PNG });
   await page.getByRole("button", { name: "Enviar comprovante" }).click();
   await page.locator("[data-comprovante-enviado]").waitFor();
-  await page.locator("[data-historico-assinatura]").getByText("Em análise", { exact: true }).waitFor();
+  const historico = page.locator("[data-historico-assinatura]");
+  await historico.getByText("Em análise", { exact: true }).waitFor();
+  // Comprovante anexado libera na hora (o superadmin confere depois).
+  await historico.getByText(/Acesso liberado até/).waitFor();
+  await page.goto("/manutencoes");
+  await page.waitForURL("**/manutencoes");
 
-  // O superadmin aprova: o vencimento anda 1 mês e a empresa volta a entrar.
+  // O superadmin vê o comprovante ali mesmo e confirma.
   await page.goto("/auth/sair");
   await entrar(SUPERADMIN, "**/admin");
-  await page.goto("/admin?aba=assinaturas");
+  // O menu avisa que há comprovante para conferir.
+  await page.locator('[data-contador-menu="conferir"]').first().waitFor();
+  await page.goto("/admin/assinaturas");
   await page.waitForLoadState("networkidle");
-  await page.locator('li[data-comprovante="Oficina E2E"]').getByRole("button", { name: /Aprovar/ }).click();
+  const comprovante = page.locator('[data-comprovantes="Para conferir"] li[data-comprovante="Oficina E2E"]');
+  await comprovante.getByText(/Acesso liberado na hora/).waitFor();
+  await comprovante.getByRole("button", { name: "Ver comprovante" }).click();
+  await page.locator("[data-visualizador-comprovante] img").waitFor();
+  await page.getByRole("button", { name: "Confirmar pagamento" }).click();
   await page.locator('[data-comprovantes="Histórico de pagamentos"] li[data-comprovante="Oficina E2E"]').getByText("Aprovado", { exact: true }).waitFor();
+
+  // Bloqueio à mão: vale na hora, por cima do vencimento em dia.
+  const empresa = page.locator('li[data-empresa-assinatura="Oficina E2E"]');
+  await empresa.getByRole("button", { name: "Bloquear acesso" }).click();
+  await page.locator('input[name="motivo_bloqueio"]').pressSequentially("Teste E2E de bloqueio");
+  await page.getByRole("button", { name: "Bloquear agora" }).click();
+  await empresa.getByText("Bloqueada por você").waitFor();
   await page.goto("/auth/sair");
-  await entrar(GESTOR);
-  await page.goto("/assinatura");
+  await entrar(GESTOR, "**/assinatura");
+  await page.locator("[data-bloqueio]").getByText(/bloqueado pelo administrador do sistema: Teste E2E de bloqueio/).waitFor();
   await page.locator("[data-historico-assinatura]").getByText("Aprovado", { exact: true }).waitFor();
+
+  // Desbloquear devolve o acesso.
+  await page.goto("/auth/sair");
+  await entrar(SUPERADMIN, "**/admin");
+  await page.goto("/admin/assinaturas");
+  await page.waitForLoadState("networkidle");
+  await empresa.getByRole("button", { name: "Desbloquear" }).click();
+  await empresa.getByRole("button", { name: "Bloquear acesso" }).waitFor();
 
   // Desliga a cobrança para o resto do teste.
   await page.goto("/auth/sair");
   await entrar(SUPERADMIN, "**/admin");
-  await page.goto("/admin?aba=assinaturas");
+  await page.goto("/admin/assinaturas");
   await page.waitForLoadState("networkidle");
   await page.getByRole("button", { name: "Desligar cobrança" }).click();
   await page.getByText("Desligada", { exact: true }).waitFor();

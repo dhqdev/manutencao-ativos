@@ -24,8 +24,8 @@ import {
 
 /**
  * Assinatura mensal por Pix. A empresa (proprietário/gestor) envia o
- * comprovante; o superadmin configura a cobrança, define vencimentos e
- * aprova. As ações da empresa usam o contexto SEM bloqueio: com a assinatura
+ * comprovante (que libera o mês na hora); o superadmin configura a cobrança,
+ * define vencimentos, confere os comprovantes e bloqueia quem quiser. As ações da empresa usam o contexto SEM bloqueio: com a assinatura
  * vencida, pagar é justamente o que precisa continuar funcionando.
  */
 
@@ -98,7 +98,7 @@ async function exigirSuperadmin() {
 }
 
 function pronto(): Resultado {
-  revalidatePath("/admin");
+  revalidatePath("/admin", "layout");
   return { ok: true };
 }
 
@@ -189,17 +189,60 @@ export async function adminDefinirAssinatura(fd: FormData): Promise<Resultado> {
   }
 }
 
-/** Aprova (estende 1 mês) ou recusa um comprovante. */
-export async function adminAvaliarPagamento(id: string, aprovar: boolean, motivo?: string | null): Promise<Resultado> {
+/**
+ * Confirma ou recusa um comprovante. O que chegou já tinha liberado o mês:
+ * confirmar só marca como conferido; recusar desfaz o mês dado e, com
+ * `bloquear`, ainda tranca o acesso da empresa na hora.
+ */
+export async function adminAvaliarPagamento(
+  id: string,
+  aprovar: boolean,
+  motivo?: string | null,
+  bloquear?: boolean,
+): Promise<Resultado> {
   try {
     const pagamento = exigirId(id, "o comprovante");
     const { sessao, admin } = await exigirSuperadmin();
     if (!aprovar && !String(motivo ?? "").trim()) return { ok: false, erro: "Diga o motivo da recusa (a empresa vê)." };
+    const { data: pag, error: erroPag } = await admin
+      .from("assinatura_pagamentos")
+      .select("org_id")
+      .eq("id", pagamento)
+      .maybeSingle();
+    if (erroPag) return erroBanco(erroPag);
+    if (!pag) return { ok: false, erro: "Comprovante não encontrado." };
+
     const { error } = await admin.rpc("admin_avaliar_pagamento", {
       p_id: pagamento,
       p_aprovar: Boolean(aprovar),
       p_motivo: motivo ? String(motivo).slice(0, 500) : null,
       p_admin: sessao.userId,
+    });
+    if (error) return erroBanco(error);
+    if (!aprovar && bloquear) {
+      const { error: e2 } = await admin.rpc("admin_bloquear_empresa", {
+        p_org: pag.org_id,
+        p_bloquear: true,
+        p_motivo: String(motivo ?? "").slice(0, 300),
+      });
+      if (e2) return { ok: false, erro: `Comprovante recusado, mas o bloqueio falhou: ${erroBanco(e2).erro}` };
+    }
+    revalidatePath("/assinatura");
+    return pronto();
+  } catch (e) {
+    return { ok: false, erro: mensagemErro(e) };
+  }
+}
+
+/** Bloqueia (ou libera) o acesso de uma empresa na hora, sem olhar o vencimento. */
+export async function adminBloquearEmpresa(orgId: string, bloquear: boolean, motivo?: string | null): Promise<Resultado> {
+  try {
+    const org = exigirId(orgId, "a empresa");
+    const { admin } = await exigirSuperadmin();
+    const { error } = await admin.rpc("admin_bloquear_empresa", {
+      p_org: org,
+      p_bloquear: Boolean(bloquear),
+      p_motivo: motivo ? String(motivo).slice(0, 300) : null,
     });
     if (error) return erroBanco(error);
     revalidatePath("/assinatura");
@@ -220,7 +263,7 @@ export async function adminReenviarAviso(id: string): Promise<Resultado> {
       .select("whatsapp_erro")
       .eq("id", pagamento)
       .maybeSingle();
-    revalidatePath("/admin");
+    revalidatePath("/admin", "layout");
     return linha?.whatsapp_erro ? { ok: false, erro: linha.whatsapp_erro } : { ok: true };
   } catch (e) {
     return { ok: false, erro: mensagemErro(e) };

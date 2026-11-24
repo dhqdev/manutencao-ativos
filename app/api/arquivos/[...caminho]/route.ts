@@ -58,9 +58,17 @@ export async function GET(request: NextRequest, contexto: Contexto) {
   const tipo = tipoDoArquivo(caminho);
   const nome = path.basename(caminho).replace(/^[0-9a-f-]{36}-/i, "");
 
+  // O leitor de PDF do Chrome não abre em documento com CSP "sandbox" (mostra
+  // "bloqueado pelo Chrome"): o comprovante em PDF não dava para ver. Para PDF
+  // (com nosniff, nunca vira HTML) o sandbox sai; o resto continua igual.
+  const seguranca =
+    tipo === "application/pdf"
+      ? { ...SEGURANCA, "Content-Security-Policy": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'" }
+      : SEGURANCA;
+
   return new Response(Readable.toWeb(createReadStream(arquivo)) as unknown as ReadableStream<Uint8Array>, {
     headers: {
-      ...SEGURANCA,
+      ...seguranca,
       "Content-Type": tipo ?? "application/octet-stream",
       "Content-Length": String(tamanho),
       "Content-Disposition": `${tipo ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(nome)}`,

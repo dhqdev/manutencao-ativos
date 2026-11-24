@@ -94,7 +94,7 @@ export async function avisarComprovante(pagamentoId: string) {
 
     const { data: pag, error } = await admin
       .from("assinatura_pagamentos")
-      .select("id, org_id, valor, comprovante, nome_arquivo, observacao, enviado_em, organizacoes(nome)")
+      .select("id, org_id, valor, comprovante, nome_arquivo, observacao, enviado_em, liberado_em, vencimento_novo, organizacoes(nome)")
       .eq("id", pagamentoId)
       .maybeSingle();
     if (error || !pag) throw new Error(error?.message ?? "Comprovante não encontrado.");
@@ -107,9 +107,15 @@ export async function avisarComprovante(pagamentoId: string) {
       "*Comprovante de pagamento recebido*",
       `Empresa: ${empresa}`,
       `Valor da assinatura: ${moeda(Number(pag.valor))}`,
-      assinatura?.vencimento ? `Vencimento atual: ${dataBR(assinatura.vencimento)}` : null,
+      pag.liberado_em && pag.vencimento_novo
+        ? `✅ Acesso liberado automaticamente até ${dataBR(pag.vencimento_novo)}.`
+        : assinatura?.vencimento
+          ? `Vencimento atual: ${dataBR(assinatura.vencimento)} (não liberado sozinho: confira e confirme).`
+          : null,
       pag.observacao ? `Observação: ${pag.observacao}` : null,
-      site ? `\nAprovar ou recusar: ${site}/admin?aba=assinaturas` : "\nAprove ou recuse no console do sistema, aba Assinaturas.",
+      site
+        ? `\nConfirmar, recusar ou bloquear o acesso: ${site}/admin/assinaturas`
+        : "\nConfirme, recuse ou bloqueie no console do sistema, em Assinaturas.",
     ]
       .filter(Boolean)
       .join("\n");

@@ -30,7 +30,7 @@ export default async function AssinaturaPage() {
     }),
     db
       .from("assinatura_pagamentos")
-      .select("id, org_id, valor, comprovante, nome_arquivo, observacao, situacao, enviado_em, avaliado_em, motivo, vencimento_anterior, vencimento_novo")
+      .select("id, org_id, valor, comprovante, nome_arquivo, observacao, situacao, enviado_em, avaliado_em, motivo, vencimento_anterior, vencimento_novo, liberado_em")
       .eq("org_id", orgId)
       .order("enviado_em", { ascending: false })
       .limit(50),
@@ -47,14 +47,17 @@ export default async function AssinaturaPage() {
     <>
       <Cabecalho
         titulo="Assinatura"
-        descricao={`Mensalidade do sistema para ${organizacao.nome}. Pague pelo Pix e anexe o comprovante: assim que ele for aprovado, o próximo mês fica liberado.`}
+        descricao={`Mensalidade do sistema para ${organizacao.nome}. Pague pelo Pix e anexe o comprovante: o próximo mês é liberado na hora.`}
       />
 
       {bloqueada && (
         <div className="mb-4 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" data-bloqueio>
           <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <p>
-            <strong>{aviso}</strong> As outras telas voltam a abrir assim que o pagamento for confirmado.
+            <strong>{aviso}</strong>{" "}
+            {assinatura?.bloqueio_manual
+              ? "Fale com o administrador do sistema para liberar."
+              : "Pague pelo Pix e anexe o comprovante: as outras telas voltam a abrir na hora."}
           </p>
         </div>
       )}
@@ -121,7 +124,10 @@ export default async function AssinaturaPage() {
 
           <div className="space-y-4">
             {gestor ? (
-              <EnviarComprovante pendente={Boolean(assinatura?.pendente)} />
+              <EnviarComprovante
+                pendente={Boolean(assinatura?.pendente)}
+                bloqueioManual={Boolean(assinatura?.bloqueio_manual)}
+              />
             ) : (
               <p className="card px-5 py-4 text-sm text-slate-600">
                 Quem envia o comprovante é o proprietário ou um gestor da empresa.
@@ -139,6 +145,12 @@ export default async function AssinaturaPage() {
                         <p className="font-medium text-slate-900">
                           {moeda(Number(p.valor))} · enviado em {dataHoraBR(p.enviado_em)}
                         </p>
+                        {p.situacao === "pendente" && p.liberado_em && p.vencimento_novo && (
+                          <p className="text-xs text-emerald-700">Acesso liberado até {dataBR(p.vencimento_novo)}</p>
+                        )}
+                        {p.situacao === "pendente" && !p.liberado_em && (
+                          <p className="text-xs text-amber-700">Esperando a conferência do administrador.</p>
+                        )}
                         {p.situacao === "aprovado" && p.vencimento_novo && (
                           <p className="text-xs text-emerald-700">Pago até {dataBR(p.vencimento_novo)}</p>
                         )}
@@ -151,7 +163,10 @@ export default async function AssinaturaPage() {
                           </a>
                         )}
                       </div>
-                      <Badge className={cn(SITUACOES_PAGAMENTO[p.situacao].classe)}>{SITUACOES_PAGAMENTO[p.situacao].label}</Badge>
+                      <Badge className={cn(SITUACOES_PAGAMENTO[p.situacao].classe)}>
+                        {/* Para quem pagou, "a conferir" é "em análise". */}
+                        {p.situacao === "pendente" ? "Em análise" : SITUACOES_PAGAMENTO[p.situacao].label}
+                      </Badge>
                     </li>
                   ))}
                 </ul>

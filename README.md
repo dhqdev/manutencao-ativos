@@ -16,9 +16,12 @@ sem depender de Supabase, Vercel ou outro serviço externo.
   carregado na hora e busca global com **Ctrl+K** ([detalhes](#busca-e-atalhos-de-teclado)).
 - **Periódicas em quadro (kanban)**: colunas Atrasadas, Vencendo em breve, Em
   dia e Pausadas ([detalhes](#manutenções-periódicas)).
-- **Assinatura mensal por Pix**: QR e copia e cola no sistema, comprovante que
-  chega no WhatsApp do dono, aprovação no console e bloqueio depois da
-  tolerância ([detalhes](#assinatura-por-pix)).
+- **Assinatura mensal por Pix**: QR e copia e cola no sistema; o comprovante
+  anexado **libera o acesso na hora** e chega no WhatsApp do dono, que confere
+  no console (vê o PDF ali mesmo), recusa ou **bloqueia a empresa quando
+  quiser** ([detalhes](#assinatura-por-pix)).
+- **Console do superadmin com menu lateral**: Usuários, Clientes e uso,
+  Assinaturas, Integrações e backup e Versão, cada um na sua página.
 - **Backup a cada 15 dias** com o Backblaze B2 espelhado com o app, sem senha
   de criptografia obrigatória ([detalhes](#backup-no-backblaze-b2)).
 - **"Entrar como" sem limite de 1 hora**: vale até voltar ao console ou sair.
@@ -51,7 +54,7 @@ migrador · cron (resumo do WhatsApp) · backup (a cada 15 dias) · atualizador
 | **whatsapp** | Servidor Baileys sempre ligado (QR, "digitando", reconexão) |
 | **migrador** | Aplica `db/sql/*.sql` a cada deploy (idempotente) e cria/atualiza o superadmin. Backup e atualizador também conferem a versão do banco ao subir e aplicam o SQL que faltar |
 | **cron** | Chama a rotina do resumo diário do WhatsApp de hora em hora |
-| **backup** | `pg_dump` + arquivos a cada 15 dias (configurável), com cópia no Backblaze B2 espelhada com o app (credenciais no console do superadmin, aba Integrações) |
+| **backup** | `pg_dump` + arquivos a cada 15 dias (configurável), com cópia no Backblaze B2 espelhada com o app (credenciais no console do superadmin, Integrações e backup) |
 | **atualizador** | Aplica a release nova quando o superadmin clica em **Atualizar** no console e apaga as sobras da stack (tem o socket do Docker; não abre porta) |
 | **traefik** | Porta de entrada, HTTPS automático, painel protegido por senha |
 
@@ -227,7 +230,7 @@ O alternador **Quadro/Lista** fica lembrado no aparelho.
 A tela **Assistente** (grupo Análise do menu) é um chat em que qualquer pessoa
 da equipe pergunta em português sobre a empresa: "quais manutenções estão
 atrasadas?", "quanto gastei por ativo este mês?", "pneus com sulco abaixo de
-3 mm". A IA é do **Groq**, ligada pelo superadmin na aba **Integrações** do
+3 mm". A IA é do **Groq**, ligada pelo superadmin em **Integrações e backup** no
 console (sem chave, a tela avisa que ainda não está disponível).
 
 O modelo não fala com o banco: ele pede uma consulta (tabela, colunas,
@@ -301,13 +304,16 @@ ao console** (sair pelo menu também volta). Cada entrada fica registrada em
 `sistema_entradas_como` (quem, na conta de quem, quando, IP e quando saiu).
 Não vale para usuário bloqueado, sem empresa ou outro superadmin.
 
-O console tem quatro abas: **Usuários**, **Clientes e uso**, **Assinaturas**
-e **Integrações**, com o bloco **Versão do sistema** embaixo.
+O console tem um **menu lateral** (no celular, a barra de baixo) com as
+seções **Usuários**, **Clientes e uso**, **Assinaturas** (com o número de
+comprovantes para conferir), **Integrações e backup** e **Versão e
+atualização**. Links antigos com `?aba=` continuam abrindo a seção certa.
 
-Na aba **Usuários** fica a gerência de todos, de todas as empresas:
+Em **Usuários** fica a gerência de todos, de todas as empresas:
 
-- **Cartões no topo** que também filtram: usuários no sistema, entraram em 7
-  dias, nunca entraram, sem empresa e bloqueados.
+- **Cartões no topo** que também filtram: usuários no sistema, usaram em 7
+  dias, nunca entraram, sem empresa e bloqueados. O **último acesso** conta o
+  uso da sessão (que se renova sozinha por 30 dias), não só o último login.
 - **Lista** com busca (nome, e-mail, telefone, empresa), filtro por empresa,
   ordenação (último acesso, nome, mais novos), situação de cada um e
   **exportar CSV** (abre no Excel) da lista filtrada.
@@ -318,13 +324,15 @@ Na aba **Usuários** fica a gerência de todos, de todas as empresas:
   acesso e sessões, **empresas** (pôr em outra empresa, trocar o papel, tirar)
   e excluir.
 
-Na aba **Clientes e uso**, cada empresa aparece com o **espaço que ocupa**
+Em **Clientes e uso**, cada empresa aparece com o **espaço que ocupa**
 (fotos e anexos no disco + estimativa das linhas no banco, com barra
-comparando os clientes), quantos ativos e manutenções tem e se o **WhatsApp
-está conectado** (com o número). No topo, os totais: clientes, espaço usado,
-quanto é arquivo e quanto é banco, e quantos estão com WhatsApp.
+comparando os clientes), quantos ativos e manutenções tem (e a data da última
+lançada), o **último acesso** de alguém da equipe, se o **WhatsApp está
+conectado** (com o número) e a **situação da assinatura**. No topo, os
+totais: clientes e pessoas, espaço usado, quanto é arquivo e quanto é banco,
+e quantos estão com WhatsApp.
 
-Na aba **Integrações** ficam as chaves de serviços externos, guardadas no
+Em **Integrações e backup** ficam as chaves de serviços externos, guardadas no
 banco (`sistema_credenciais`) e nunca devolvidas à tela (só o final aparece):
 o **Groq** do assistente de IA (chave, lista de modelos e **Testar conexão**,
 que também roda sozinho depois de salvar) e o backup.
@@ -347,7 +355,7 @@ criptografia não é pedida (uma já salva continua valendo).
 
 #### Assinatura por Pix
 
-Na aba **Assinaturas** fica a cobrança mensal por **Pix** (sem gateway: o
+Em **Assinaturas** fica a cobrança mensal por **Pix** (sem gateway: o
 sistema monta o Pix copia e cola e o QR code no padrão BR Code do Banco
 Central, `lib/pix.ts`):
 
@@ -359,24 +367,36 @@ Central, `lib/pix.ts`):
   ninguém é bloqueado (botão **Desligar cobrança**).
 - **WhatsApp dos avisos**: conecte um WhatsApp seu (QR ou código). Quando um
   cliente anexa o comprovante, a imagem/PDF chega no número cadastrado, com a
-  empresa, o valor e o link para aprovar. **Enviar teste** confere.
-- **Comprovantes para aprovar**: ver o arquivo, **Aprovar (+1 mês)** ou
-  **Recusar** com motivo (a empresa vê). Aprovar empurra o vencimento 1 mês a
-  partir do vencimento atual (o dia do mês não muda).
-- **Vencimento de cada empresa**: situação (em dia, vence em breve, vencida,
-  bloqueada), a **data de vencimento** editável e a opção **Isenta**.
-- **Histórico de pagamentos**: aprovados (vencimento antes → depois) e recusados.
+  empresa, o valor, até quando o acesso foi liberado e o link do console.
+  **Enviar teste** confere.
+- **Cartões no topo**: comprovantes para conferir, recebido no mês, em dia,
+  vencendo ou vencidas e bloqueadas (os três últimos filtram a lista).
+- **Comprovantes para conferir**: o comprovante anexado **já liberou** o mês
+  seguinte (o vencimento anda 1 mês a partir do atual; atrasado mais de um
+  mês, a partir de hoje). **Ver comprovante** abre o PDF ou a imagem ali
+  mesmo; **Confirmar** marca como conferido; **Recusar** (com motivo, que a
+  empresa vê) desfaz o mês dado e pode **bloquear a empresa** junto. Não
+  libera sozinho quando a empresa está bloqueada por você, quando já há outro
+  comprovante liberado esperando conferência ou quando o último foi recusado:
+  aí Confirmar dá o mês.
+- **Empresas: vencimento e acesso**: situação (em dia, vence em breve,
+  vencida, bloqueada), a **data de vencimento** editável, a opção **Isenta** e
+  **Bloquear acesso** / **Desbloquear**, que vale na hora e por cima de
+  qualquer vencimento (o motivo aparece para a empresa). Confirmar um
+  comprovante também desbloqueia.
+- **Histórico de pagamentos**: confirmados (vencimento antes → depois) e recusados.
 
 Do lado da empresa, o menu **Assinatura** mostra a situação, o QR, o copia e
-cola e o envio do comprovante (proprietário ou gestor), com o histórico. Uma
+cola e o envio do comprovante (proprietário ou gestor), com o histórico; ao
+anexar, as telas voltam a abrir na hora. Uma
 faixa no topo avisa quando faltam 5 dias ou menos e quando já venceu. Passou
 do vencimento + tolerância, a empresa fica **bloqueada**: qualquer tela leva
 para Assinatura, que continua deixando pagar e anexar. O superadmin no
 "Entrar como" não é barrado. Empresas que já existiam ganharam 30 dias a
 partir da instalação desta versão.
 
-Abaixo fica o bloco **Versão do sistema** (a que está no ar e a
-última publicada no GitHub Packages, com o botão **Atualizar**).
+Em **Versão e atualização** fica o bloco **Versão do sistema** (a que está no
+ar e a última publicada no GitHub Packages, com o botão **Atualizar**).
 
 #### Atualizar pelo console
 

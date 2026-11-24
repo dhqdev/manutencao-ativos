@@ -330,7 +330,9 @@ Fotos e anexos ficam no volume `manutencao_arquivos`. Nada é público:
   tudo" parecer órfão, a limpeza não mexe em nada e avisa.
 - Caminhos com `..`, barras extras ou fora do formato são recusados.
 - A resposta vem com `Content-Security-Policy: sandbox` e `nosniff`: mesmo um
-  arquivo malicioso não executa nada no navegador.
+  arquivo malicioso não executa nada no navegador. PDF é a exceção do
+  `sandbox` (o leitor do Chrome se recusa a abrir com ele); continua com
+  `default-src 'none'` e `nosniff`, então não vira página.
 
 ## O que continua sendo responsabilidade sua
 

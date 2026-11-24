@@ -157,7 +157,7 @@ Quem chama é só o app — a chave nunca vai ao navegador (`lib/whatsapp.ts` é
 
 `:id` é a coluna `whatsapp_conexoes.instancia` (`manut_<id-da-empresa>`), ou
 `sistema_cobranca`: o WhatsApp do dono do sistema, conectado no console
-(aba Assinaturas), que recebe os comprovantes de pagamento das empresas.
+(seção Assinaturas), que recebe os comprovantes de pagamento das empresas.
 
 ---
 

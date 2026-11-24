@@ -24,6 +24,8 @@ export type UsuarioAdmin = {
   bloqueado: boolean;
   created_at: string;
   last_sign_in_at: string | null;
+  /** Login ou último uso da sessão (bancos antigos não mandam: cai no login). */
+  ultimo_acesso?: string | null;
   sessoes: number;
   empresas: { id: string; nome: string; papel: PapelMembro }[];
 };
@@ -45,6 +47,8 @@ export type EmpresaAdmin = {
   ativos: number;
   manutencoes: number;
   ultima_atividade: string | null;
+  /** Último acesso de alguém da empresa (login ou uso da sessão). */
+  ultimo_acesso?: string | null;
   whatsapp: string | null;
   whatsapp_numero: string | null;
   membros: MembroAdmin[];
@@ -61,7 +65,7 @@ export const LISTA_PAPEIS = Object.keys(PAPEIS) as PapelMembro[];
 /** Filtros da lista de usuários (também usados nos atalhos da visão geral). */
 export const FILTROS_USUARIO = {
   todos: "Todos",
-  recentes: "Entraram em 7 dias",
+  recentes: "Usaram em 7 dias",
   nunca: "Nunca entraram",
   sem_empresa: "Sem empresa",
   bloqueados: "Bloqueados",
@@ -70,10 +74,17 @@ export type FiltroUsuario = keyof typeof FILTROS_USUARIO;
 
 const SETE_DIAS = 7 * 24 * 60 * 60 * 1000;
 
+/**
+ * Último acesso de verdade. A sessão dura 30 dias e se renova com o uso, então
+ * só o login (last_sign_in_at) envelhece para quem usa todo dia sem sair.
+ */
+export const ultimoAcesso = (u: Pick<UsuarioAdmin, "last_sign_in_at" | "ultimo_acesso">) =>
+  u.ultimo_acesso ?? u.last_sign_in_at;
+
 export function passaNoFiltro(u: UsuarioAdmin, filtro: FiltroUsuario, agora: number) {
   switch (filtro) {
     case "recentes":
-      return !!u.last_sign_in_at && agora - new Date(u.last_sign_in_at).getTime() < SETE_DIAS;
+      return !!ultimoAcesso(u) && agora - new Date(ultimoAcesso(u)!).getTime() < SETE_DIAS;
     case "nunca":
       return !u.last_sign_in_at;
     case "sem_empresa":

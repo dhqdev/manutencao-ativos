@@ -145,6 +145,12 @@ as $$
     from (
       select u.id, u.email, p.nome, p.telefone, u.superadmin, u.bloqueado,
              u.created_at, u.last_sign_in_at,
+             -- Último uso de verdade: a sessão dura 30 dias e se renova com o
+             -- uso, então o login sozinho (last_sign_in_at) fica velho para quem
+             -- usa todo dia sem sair. "Entrar como" não conta.
+             greatest(u.last_sign_in_at,
+                      (select max(s.ultimo_uso) from auth.sessoes s
+                        where s.user_id = u.id and s.aberta_por is null)) as ultimo_acesso,
              -- A sessão do "Entrar como" é do superadmin, não da pessoa: fica fora da conta.
              (select count(*) from auth.sessoes s
                where s.user_id = u.id and s.expira_em > now() and s.aberta_por is null) as sessoes,
@@ -173,6 +179,11 @@ as $$
              (select count(*) from public.ativos a where a.org_id = o.id) as ativos,
              (select count(*) from public.manutencoes m where m.org_id = o.id) as manutencoes,
              (select max(m.created_at) from public.manutencoes m where m.org_id = o.id) as ultima_atividade,
+             (select max(greatest(u.last_sign_in_at,
+                                  (select max(s.ultimo_uso) from auth.sessoes s
+                                    where s.user_id = u.id and s.aberta_por is null)))
+                from public.org_membros m join auth.users u on u.id = m.user_id
+               where m.org_id = o.id) as ultimo_acesso,
              (select w.status from public.whatsapp_conexoes w where w.org_id = o.id) as whatsapp,
              (select w.numero from public.whatsapp_conexoes w where w.org_id = o.id) as whatsapp_numero,
              coalesce((

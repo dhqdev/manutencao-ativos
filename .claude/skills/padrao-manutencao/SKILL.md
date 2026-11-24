@@ -106,17 +106,28 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   o proxy quando o cookie curto vence) fecha a sessão emprestada e o devolve.
   Faixa `AvisoEntrarComo` no topo do `(app)` via `getContexto().entradaComo`.
   Contagem de sessões/acessos (`admin_usuarios`, `equipe_acessos`,
-  `admin_resumo`) ignora `aberta_por`. O dono quer
-  **uma tela só** (`app/admin/page.tsx`: abas Usuários, Clientes e uso,
-  Assinaturas e Integrações + bloco da versão);
-  não crie telas novas no console sem ele pedir.
+  `admin_resumo`) ignora `aberta_por`. "Último acesso" (console e Equipe) é
+  `greatest(last_sign_in_at, max(sessoes.ultimo_uso))` sem `aberta_por`
+  (`ultimoAcesso()` em `components/admin/tipos.ts`): a sessão dura 30 dias e
+  se renova, então só o login envelhece para quem usa todo dia.
+  **Seções no menu lateral** (pedido do dono em 24/11/2026, antes eram abas
+  no topo): `SECOES` de `components/admin/console.tsx`, cada uma com a
+  própria página: Usuários (`/admin`), Clientes e uso (`/admin/clientes`),
+  Assinaturas (`/admin/assinaturas`), Integrações e backup
+  (`/admin/integracoes`) e Versão e atualização (`/admin/sistema`). O
+  `/admin?aba=...` antigo redireciona. Os números do menu vêm de
+  `carregarContadores()` (leve: `admin_resumo` + contagem de comprovantes a
+  conferir). Ação do console revalida com `revalidatePath("/admin", "layout")`.
+  Cartão de número em qualquer seção = `Indicador` de
+  `components/admin/comum.tsx` (ícone, valor, rótulo, detalhe; vira filtro
+  com `aoClicar`). Não crie seções novas no console sem o dono pedir.
   - Toda página do console começa com `exigirSuperadminTela()`
     (`lib/admin-console.ts`) — layout e página rodam em paralelo, não confie
     só no layout. Dados pelos `carregar*()` do mesmo arquivo.
   - Toda ação começa com `exigirSuperadmin()` (`lib/actions/admin.ts`), que
     confere `obterSessao().superadmin` — o posto vem do banco a cada
     requisição, nunca do cookie.
-- **Assinatura (pedido do dono em 24/11/2026)**: aba **Assinaturas** do
+- **Assinatura (pedido do dono em 24/11/2026)**: seção **Assinaturas** do
   console (`components/admin/assinaturas.tsx`) e tela `/assinatura` da
   empresa. Pix copia e cola + QR montados no servidor por `lib/pix.ts` (BR
   Code estático, CRC16; teste com o exemplo do Banco Central) e
@@ -130,8 +141,22 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   (`after()`), segue para o WhatsApp do dono pela sessão `sistema_cobranca`
   do serviço de WhatsApp (`INSTANCIA_COBRANCA`, rota `/arquivos` para
   imagem/PDF); o resultado fica em `whatsapp_em`/`whatsapp_erro`.
+  **Comprovante libera na hora** (pedido do dono em 24/11/2026):
+  `assinatura_enviar_comprovante` já empurra o vencimento 1 mês
+  (`assinatura_proximo_vencimento`: atrasado mais de 1 mês conta de hoje) e
+  marca `liberado_em`; o comprovante fica `pendente` ("A conferir" no
+  console, "Em análise" para a empresa). Não libera sozinho com bloqueio à
+  mão, com outro liberado ainda na fila ou se o último avaliado foi
+  recusado. Confirmar (`admin_avaliar_pagamento`) só marca o que já liberou
+  e tira o bloqueio à mão; recusar desfaz o mês se ninguém mexeu no
+  vencimento depois. **Bloqueio à mão**: `assinaturas.bloqueio_manual`
+  (`admin_bloquear_empresa`, `adminBloquearEmpresa`) vira estado
+  `bloqueada` por cima de tudo (até isenta/sem cobrança). O console mostra o
+  comprovante ali mesmo (modal com `iframe` para PDF, `img` para imagem):
+  por isso `/api/arquivos` serve PDF sem o `sandbox` da CSP (o Chrome não
+  abre PDF com ele).
 - Credenciais de serviços externos (Groq, Backblaze...) **não** viram
-  variável da stack: o superadmin cola na aba **Integrações** do console
+  variável da stack: o superadmin cola em **Integrações e backup** no console
   (`components/admin/integracoes.tsx`, um cartão por serviço dentro de
   `IntegracoesAdmin`). Ficam em `sistema_credenciais` (chave/valor, só
   `service_role`, `db/sql/70-integracoes.sql`); leia no servidor com

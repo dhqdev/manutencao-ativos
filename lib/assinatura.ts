@@ -14,6 +14,9 @@ export type SituacaoAssinatura = {
   bloqueia_em: string | null;
   valor: number;
   pendente: boolean;
+  /** O superadmin bloqueou à mão (vale por cima do vencimento). */
+  bloqueio_manual?: boolean;
+  bloqueio_motivo?: string | null;
 };
 
 export type SituacaoPagamento = "pendente" | "aprovado" | "recusado";
@@ -33,6 +36,8 @@ export type PagamentoAssinatura = {
   vencimento_novo: string | null;
   whatsapp_em?: string | null;
   whatsapp_erro?: string | null;
+  /** O comprovante já liberou o mês ao chegar (falta o superadmin conferir). */
+  liberado_em?: string | null;
 };
 
 export const ESTADOS_ASSINATURA: Record<EstadoAssinatura, { label: string; classe: string }> = {
@@ -45,7 +50,7 @@ export const ESTADOS_ASSINATURA: Record<EstadoAssinatura, { label: string; class
 };
 
 export const SITUACOES_PAGAMENTO: Record<SituacaoPagamento, { label: string; classe: string }> = {
-  pendente: { label: "Em análise", classe: "bg-amber-50 text-amber-700 ring-amber-600/20" },
+  pendente: { label: "A conferir", classe: "bg-amber-50 text-amber-700 ring-amber-600/20" },
   aprovado: { label: "Aprovado", classe: "bg-emerald-50 text-emerald-700 ring-emerald-600/20" },
   recusado: { label: "Recusado", classe: "bg-red-50 text-red-700 ring-red-600/20" },
 };
@@ -73,6 +78,9 @@ const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um :
 
 /** Frase da faixa do topo; null = nada a avisar. */
 export function avisoAssinatura(s: SituacaoAssinatura | null | undefined): string | null {
+  if (s?.bloqueio_manual) {
+    return `Acesso bloqueado pelo administrador do sistema${s.bloqueio_motivo ? `: ${s.bloqueio_motivo}` : ""}.`;
+  }
   if (!s || s.dias === null) return null;
   const analise = s.pendente ? " Seu comprovante está em análise." : "";
   switch (s.estado) {

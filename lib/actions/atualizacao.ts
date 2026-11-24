@@ -23,7 +23,7 @@ export async function adminVerificarVersao(): Promise<Resultado> {
   try {
     await exigirSuperadmin();
     esquecerVersaoPublicada();
-    revalidatePath("/admin");
+    revalidatePath("/admin", "layout");
     return { ok: true };
   } catch (e) {
     return { ok: false, erro: mensagemErro(e) };
@@ -54,7 +54,7 @@ export async function adminAtualizarSistema(versao: string): Promise<Resultado> 
       return { ok: false, erro: error.message };
     }
 
-    revalidatePath("/admin");
+    revalidatePath("/admin", "layout");
     return { ok: true };
   } catch (e) {
     return { ok: false, erro: mensagemErro(e) };

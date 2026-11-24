@@ -32,7 +32,7 @@ async function exigirSuperadmin() {
 }
 
 function pronto(): Resultado {
-  revalidatePath("/admin");
+  revalidatePath("/admin", "layout");
   return { ok: true };
 }
 

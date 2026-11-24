@@ -21,7 +21,10 @@ security definer
 set search_path = public, auth
 as $$
   select m.user_id,
-         u.last_sign_in_at,
+         -- Login ou último uso da sessão (ela se renova com o uso por 30 dias).
+         greatest(u.last_sign_in_at,
+                  (select max(s.ultimo_uso) from auth.sessoes s
+                    where s.user_id = m.user_id and s.aberta_por is null)),
          (select count(*)::int from auth.sessoes s
            where s.user_id = m.user_id and s.expira_em > now()
              and s.aberta_por is null),  -- "Entrar como" do superadmin não conta

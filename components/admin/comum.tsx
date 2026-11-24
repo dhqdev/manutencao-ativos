@@ -2,7 +2,7 @@
 
 import { useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { LoaderCircle, Search } from "lucide-react";
+import { LoaderCircle, type LucideIcon, Search } from "lucide-react";
 import { Modal, RodapeModal } from "@/components/modal";
 import { Botao, cn } from "@/components/ui";
 import type { CredenciaisAdmin } from "@/lib/actions/admin";
@@ -35,6 +35,69 @@ export function Busca({
         className="campo pl-9"
       />
     </div>
+  );
+}
+
+/** Tons dos ícones dos indicadores do console. */
+export const TONS = {
+  neutro: "text-slate-600 bg-slate-100",
+  azul: "text-marca-700 bg-marca-50",
+  verde: "text-emerald-700 bg-emerald-50",
+  ambar: "text-amber-700 bg-amber-50",
+  laranja: "text-orange-700 bg-orange-50",
+  vermelho: "text-red-700 bg-red-50",
+  violeta: "text-violet-700 bg-violet-50",
+} as const;
+
+/**
+ * Cartão de número do console (o mesmo em todas as seções): ícone, valor
+ * grande, o que ele é e uma linha de detalhe. Com `aoClicar` vira filtro;
+ * `alerta` pinta a borda quando o número pede atenção.
+ */
+export function Indicador({
+  Icone,
+  tom = "neutro",
+  valor,
+  rotulo,
+  detalhe,
+  alerta,
+  ativo,
+  aoClicar,
+  className,
+}: {
+  Icone: LucideIcon;
+  tom?: keyof typeof TONS;
+  valor: ReactNode;
+  rotulo: string;
+  detalhe?: ReactNode;
+  alerta?: boolean;
+  ativo?: boolean;
+  aoClicar?: () => void;
+  className?: string;
+}) {
+  const conteudo = (
+    <>
+      <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", TONS[tom])}>
+        <Icone className="h-5 w-5" aria-hidden />
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate text-2xl font-semibold leading-none tabular-nums text-slate-900">{valor}</span>
+        <span className="mt-1 block truncate text-xs font-medium text-slate-600">{rotulo}</span>
+        {detalhe && <span className="mt-0.5 block truncate text-[11px] text-slate-500">{detalhe}</span>}
+      </span>
+    </>
+  );
+  const classe = cn(
+    "card flex items-center gap-3 p-3.5 text-left sm:p-4",
+    alerta && "border-amber-300 bg-amber-50/60",
+    ativo && "ring-2 ring-slate-900",
+    className,
+  );
+  if (!aoClicar) return <div className={classe}>{conteudo}</div>;
+  return (
+    <button type="button" onClick={aoClicar} aria-pressed={ativo} className={cn(classe, "pressionavel transition-shadow hover:shadow-md")}>
+      {conteudo}
+    </button>
   );
 }
 

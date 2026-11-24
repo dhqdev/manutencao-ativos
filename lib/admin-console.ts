@@ -36,6 +36,26 @@ async function rpc<T>(nome: string, vazio: T): Promise<Dados<T>> {
 export const carregarUsuarios = cache(() => rpc<UsuarioAdmin[]>("admin_usuarios", []));
 export const carregarEmpresas = cache(() => rpc<EmpresaAdmin[]>("admin_empresas", []));
 
+/**
+ * Números do menu lateral do console. Leves de propósito (rodam em toda
+ * navegação): contagens prontas do banco, sem baixar as listas. Erro vira
+ * "sem número" no menu, nunca derruba a tela.
+ */
+export const carregarContadores = cache(async () => {
+  await exigirSuperadminTela();
+  const admin = createAdminClient();
+  const [resumo, conferir] = await Promise.all([
+    admin.rpc("admin_resumo"),
+    admin.from("assinatura_pagamentos").select("id", { count: "exact", head: true }).eq("situacao", "pendente"),
+  ]);
+  const r = (resumo.data ?? null) as { usuarios?: number; empresas?: number } | null;
+  return {
+    usuarios: resumo.error || r?.usuarios === undefined ? null : Number(r.usuarios),
+    clientes: resumo.error || r?.empresas === undefined ? null : Number(r.empresas),
+    conferir: conferir.error ? null : conferir.count ?? 0,
+  };
+});
+
 /** Nome para o rodapé do menu do console. */
 export const nomeDoSuperadmin = cache(async () => {
   const sessao = await exigirSuperadminTela();
@@ -85,6 +105,9 @@ export type EmpresaAssinatura = {
   org_id: string;
   nome: string;
   isenta: boolean;
+  bloqueio_manual?: boolean;
+  bloqueio_motivo?: string | null;
+  bloqueado_em?: string | null;
   dono: string | null;
   ultimo_pagamento: string | null;
   situacao: SituacaoAssinatura;

@@ -39,7 +39,7 @@ export async function adminSalvarGroq(fd: FormData): Promise<Resultado> {
 
     const { error } = await admin.from("sistema_credenciais").upsert(linhas, { onConflict: "chave" });
     if (error) return { ok: false, erro: error.message };
-    revalidatePath("/admin");
+    revalidatePath("/admin", "layout");
     return { ok: true };
   } catch (e) {
     return { ok: false, erro: mensagemErro(e) };
@@ -51,7 +51,7 @@ export async function adminRemoverGroq(): Promise<Resultado> {
     const { admin } = await exigirSuperadmin();
     const { error } = await admin.from("sistema_credenciais").delete().in("chave", [GROQ_CHAVE, GROQ_MODELO]);
     if (error) return { ok: false, erro: error.message };
-    revalidatePath("/admin");
+    revalidatePath("/admin", "layout");
     return { ok: true };
   } catch (e) {
     return { ok: false, erro: mensagemErro(e) };

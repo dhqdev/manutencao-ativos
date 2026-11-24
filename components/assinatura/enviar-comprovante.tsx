@@ -10,9 +10,10 @@ import { enviarArquivo } from "@/lib/arquivos-envio";
 
 /**
  * Anexar o comprovante do Pix: o arquivo vai direto para /api/arquivos (com a
- * autorização da action) e depois vira registro "em análise".
+ * autorização da action) e depois vira registro. O banco já libera o mês na
+ * hora (assinatura_enviar_comprovante) e o administrador confere depois.
  */
-export function EnviarComprovante({ pendente }: { pendente: boolean }) {
+export function EnviarComprovante({ pendente, bloqueioManual }: { pendente: boolean; bloqueioManual?: boolean }) {
   const router = useRouter();
   const [observacao, setObservacao] = useState("");
   const [erro, setErro] = useState<string | null>(null);
@@ -48,12 +49,13 @@ export function EnviarComprovante({ pendente }: { pendente: boolean }) {
     <Secao titulo="Enviar comprovante">
       <div className="space-y-4 px-4 py-4 sm:px-5">
         <p className="text-sm text-slate-600">
-          Depois de pagar, anexe o comprovante (print ou PDF do banco). O administrador confere e, ao aprovar, o
-          vencimento passa para o mês seguinte.
+          Depois de pagar, anexe o comprovante (print ou PDF do banco). O acesso do próximo mês é liberado{" "}
+          <strong>na hora</strong>; o administrador confere o comprovante depois.
         </p>
         {pendente && !enviado && (
           <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            Já há um comprovante em análise. Só envie outro se pagou um mês a mais ou se o anterior estava errado.
+            Já há um comprovante em análise. Só envie outro se pagou um mês a mais ou se o anterior estava errado
+            (o próximo só libera depois da conferência).
           </p>
         )}
         <Campo label="Comprovante" hint="Imagem (JPG, PNG) ou PDF, até 25 MB.">
@@ -77,7 +79,8 @@ export function EnviarComprovante({ pendente }: { pendente: boolean }) {
         {erro && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{erro}</p>}
         {enviado && (
           <p className="flex items-center gap-2 text-sm text-emerald-700" data-comprovante-enviado>
-            <CircleCheck className="h-4 w-4" aria-hidden /> Comprovante enviado. Ele aparece no histórico como “Em análise”.
+            <CircleCheck className="h-4 w-4" aria-hidden /> Comprovante enviado.{" "}
+            {bloqueioManual ? "O administrador vai conferir e liberar o acesso." : "Confira no histórico o acesso liberado."}
           </p>
         )}
         <Botao type="button" onClick={enviar} disabled={ocupado}>

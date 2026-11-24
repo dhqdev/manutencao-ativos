@@ -2,20 +2,44 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, type LucideIcon, ShieldCheck, Users } from "lucide-react";
+import { Building2, LogOut, type LucideIcon, Plug, Server, ShieldCheck, Users, Wallet } from "lucide-react";
 import { Logo } from "@/components/marca";
 import { cn } from "@/components/ui";
 import { AlternarTema } from "@/components/tema/alternar-tema";
 import { iniciais } from "@/lib/format";
 
-type Item = { href: string; rotulo: string; Icone: LucideIcon; exato?: boolean };
+type Item = {
+  href: string;
+  rotulo: string;
+  /** Nome curto da barra inferior do celular. */
+  curto: string;
+  Icone: LucideIcon;
+  grupo: "Gerência" | "Sistema";
+  exato?: boolean;
+  contador?: keyof Contadores;
+};
+
+/** Números ao lado de cada item do menu (vêm do layout, a cada navegação). */
+export type Contadores = {
+  usuarios: number | null;
+  clientes: number | null;
+  /** Comprovantes que chegaram e ainda não foram conferidos. */
+  conferir: number | null;
+};
 
 /**
- * O console tem uma tela só (gerência dos usuários). Seção nova entra aqui e
- * ganha a própria página em app/admin/<seção>/page.tsx; com mais de uma, a
- * barra inferior aparece no celular.
+ * Seções do console (pedido do dono em 24/11/2026: as abas de cima viraram
+ * itens do menu lateral, cada uma com a própria página em app/admin/<seção>).
+ * Seção nova entra aqui; no celular todas vão na barra inferior.
  */
-const SECOES: Item[] = [{ href: "/admin", rotulo: "Gerência", Icone: Users, exato: true }];
+const SECOES: Item[] = [
+  { href: "/admin", rotulo: "Usuários", curto: "Usuários", Icone: Users, grupo: "Gerência", exato: true, contador: "usuarios" },
+  { href: "/admin/clientes", rotulo: "Clientes e uso", curto: "Clientes", Icone: Building2, grupo: "Gerência", contador: "clientes" },
+  { href: "/admin/assinaturas", rotulo: "Assinaturas", curto: "Assinaturas", Icone: Wallet, grupo: "Gerência", contador: "conferir" },
+  { href: "/admin/integracoes", rotulo: "Integrações e backup", curto: "Integrações", Icone: Plug, grupo: "Sistema" },
+  { href: "/admin/sistema", rotulo: "Versão e atualização", curto: "Versão", Icone: Server, grupo: "Sistema" },
+];
+const GRUPOS = ["Gerência", "Sistema"] as const;
 
 /**
  * Casca do console do superadmin. Separada da navegação do sistema das
@@ -25,10 +49,12 @@ const SECOES: Item[] = [{ href: "/admin", rotulo: "Gerência", Icone: Users, exa
 export function ConsoleAdmin({
   nome,
   email,
+  contadores,
   children,
 }: {
   nome: string;
   email: string;
+  contadores: Contadores;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -48,28 +74,49 @@ export function ConsoleAdmin({
           </div>
         </Link>
 
-        <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-2" aria-label="Console">
-          {SECOES.map((i) => (
-            <Link
-              key={i.href}
-              href={i.href}
-              aria-current={ativo(i) ? "page" : undefined}
-              className={cn(
-                "pressionavel group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm",
-                ativo(i) ? "bg-white/10 font-medium text-white" : "text-slate-400 hover:bg-white/5 hover:text-slate-100",
-              )}
-            >
-              {ativo(i) && (
-                <span className="pop-in absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-r-full bg-amber-400" />
-              )}
-              <i.Icone
-                className={cn(
-                  "h-[18px] w-[18px] shrink-0 transition-colors",
-                  ativo(i) ? "text-amber-400" : "text-slate-500 group-hover:text-slate-300",
-                )}
-              />
-              {i.rotulo}
-            </Link>
+        <nav className="flex flex-1 flex-col gap-5 overflow-y-auto px-3 py-2" aria-label="Console">
+          {GRUPOS.map((g) => (
+            <div key={g} className="flex flex-col gap-0.5">
+              <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">{g}</p>
+              {SECOES.filter((i) => i.grupo === g).map((i) => {
+                const n = i.contador ? contadores[i.contador] : null;
+                const alerta = i.contador === "conferir";
+                return (
+                  <Link
+                    key={i.href}
+                    href={i.href}
+                    aria-current={ativo(i) ? "page" : undefined}
+                    className={cn(
+                      "pressionavel group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm",
+                      ativo(i) ? "bg-white/10 font-medium text-white" : "text-slate-400 hover:bg-white/5 hover:text-slate-100",
+                    )}
+                  >
+                    {ativo(i) && (
+                      <span className="pop-in absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-r-full bg-amber-400" />
+                    )}
+                    <i.Icone
+                      className={cn(
+                        "h-[18px] w-[18px] shrink-0 transition-colors",
+                        ativo(i) ? "text-amber-400" : "text-slate-500 group-hover:text-slate-300",
+                      )}
+                    />
+                    <span className="min-w-0 flex-1 truncate">{i.rotulo}</span>
+                    {n !== null && n !== undefined && (!alerta || n > 0) && (
+                      <span
+                        className={cn(
+                          "rounded-full px-1.5 py-px text-[11px] font-semibold tabular-nums",
+                          alerta ? "bg-amber-400 text-slate-900" : "bg-white/10 text-slate-300",
+                        )}
+                        title={alerta ? `${n} comprovante(s) para conferir` : undefined}
+                        data-contador-menu={i.contador}
+                      >
+                        {n}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
           ))}
         </nav>
 
@@ -102,7 +149,9 @@ export function ConsoleAdmin({
           <div className="flex items-center gap-2.5 px-4 py-2">
             <Logo tamanho="sm" />
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold leading-tight text-slate-900">Console do superadmin</p>
+              <p className="truncate text-sm font-semibold leading-tight text-slate-900">
+                {SECOES.find(ativo)?.rotulo ?? "Console do superadmin"}
+              </p>
               <p className="truncate text-[11px] leading-tight text-slate-500">{email}</p>
             </div>
             <AlternarTema className="text-slate-500 active:bg-slate-100" />
@@ -142,8 +191,9 @@ export function ConsoleAdmin({
             <Link
               key={i.href}
               href={i.href}
+              aria-current={ativo(i) ? "page" : undefined}
               className={cn(
-                "pressionavel flex flex-col items-center gap-0.5 pb-1.5 pt-2 text-[10.5px] font-medium",
+                "pressionavel relative flex flex-col items-center gap-0.5 pb-1.5 pt-2 text-[10.5px] font-medium",
                 ativo(i) ? "text-slate-900" : "text-slate-500 active:text-slate-900",
               )}
             >
@@ -155,7 +205,12 @@ export function ConsoleAdmin({
               >
                 <i.Icone className={cn("h-5 w-5", ativo(i) && "stroke-[2.3]")} />
               </span>
-              {i.rotulo}
+              {i.contador === "conferir" && (contadores.conferir ?? 0) > 0 && (
+                <span className="absolute right-[calc(50%-1.4rem)] top-1 min-w-4 rounded-full bg-amber-400 px-1 text-[10px] font-semibold leading-4 text-slate-900">
+                  {contadores.conferir}
+                </span>
+              )}
+              {i.curto}
             </Link>
           ))}
         </div>

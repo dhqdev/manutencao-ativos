@@ -379,7 +379,7 @@ docker exec -it $(docker ps -qf name=manutencao_db) psql -U postgres -d manutenc
 ### Assistente de IA (Groq, opcional)
 
 Crie uma chave em [console.groq.com/keys](https://console.groq.com/keys) e
-cole no console do superadmin, aba **Integrações** → **Groq**. Não é variável
+cole no console do superadmin, **Integrações e backup** → **Groq**. Não é variável
 da stack: vale na hora, sem deploy. O servidor precisa sair para
 `https://api.groq.com` (porta 443). Use **Testar conexão** para conferir.
 

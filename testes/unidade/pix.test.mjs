@@ -58,4 +58,13 @@ test("Assinatura: valor em reais e avisos", () => {
   assert.equal(avisoAssinatura({ ...base, estado: "vencendo", dias: 1 }), "A assinatura vence em 1 dia.");
   assert.match(avisoAssinatura({ ...base, estado: "tolerancia", dias: -1 }), /bloqueado em 3 dias/);
   assert.match(avisoAssinatura({ ...base, estado: "bloqueada", dias: -5, pendente: true }), /há 5 dias\. Seu comprovante está em análise/);
+  // Bloqueio à mão do superadmin vale por cima do vencimento (até sem vencimento).
+  assert.equal(
+    avisoAssinatura({ ...base, estado: "bloqueada", dias: null, bloqueio_manual: true, bloqueio_motivo: "comprovante falso" }),
+    "Acesso bloqueado pelo administrador do sistema: comprovante falso.",
+  );
+  assert.equal(
+    avisoAssinatura({ ...base, estado: "bloqueada", dias: 20, bloqueio_manual: true }),
+    "Acesso bloqueado pelo administrador do sistema.",
+  );
 });
