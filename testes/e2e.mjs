@@ -438,6 +438,8 @@ await passo("console: aba Integrações guarda a chave do Groq sem devolvê-la �
   await page.getByText("Chave salva terminando em").waitFor();
   await page.getByText("…abcd").waitFor();
   verdade(!(await page.content()).includes(chave), "a chave inteira apareceu na página");
+  // Modelo padrão vem escolhido na lista (o antigo llama foi desligado pelo Groq).
+  verdade((await groq.locator("select").inputValue()) === "openai/gpt-oss-120b", "modelo padrão errado");
   await groq.getByRole("button", { name: "Remover", exact: true }).click();
   await page.getByRole("button", { name: "Excluir", exact: true }).click();
   await page.getByText("Chave salva terminando em").waitFor({ state: "detached" });

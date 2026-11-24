@@ -162,7 +162,13 @@ O modelo não fala com o banco: ele pede uma consulta (tabela, colunas,
 filtros) e o servidor executa **com o login de quem perguntou**, sempre na
 empresa aberta. Ele enxerga ativos, categorias, planos, manutenções, anexos
 (só o nome), pneus e movimentações, e **não grava nada**. A conversa fica só
-na aba do navegador.
+na aba do navegador (sair para outra tela e voltar não a perde; fechar a aba,
+sim), separada por empresa.
+
+O modelo padrão é o `openai/gpt-oss-120b`. O console oferece uma lista de
+modelos que aceitam ferramentas (e os que a chave enxerga, depois do teste).
+Se o Groq desligar o modelo salvo (como fez com o `llama-3.3-70b-versatile`
+em 16/08/2026), o assistente passa sozinho para o padrão e o console avisa.
 
 ### Relatórios e WhatsApp
 
@@ -246,7 +252,8 @@ quanto é arquivo e quanto é banco, e quantos estão com WhatsApp.
 
 Na aba **Integrações** ficam as chaves de serviços externos, guardadas no
 banco (`sistema_credenciais`) e nunca devolvidas à tela (só o final aparece):
-o **Groq** do assistente de IA (chave, modelo e botão **Testar conexão**) e o
+o **Groq** do assistente de IA (chave, lista de modelos e **Testar conexão**,
+que também roda sozinho depois de salvar) e o
 backup.
 
 Na aba **Integrações** ficam as credenciais dos serviços de fora. O cartão

@@ -142,6 +142,12 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   leitura) e `lib/assistente.ts` executa com `createClient()` + `org_id` da
   empresa aberta. Tabela nova que o cliente deveria poder perguntar ⇒ entre
   em `TABELAS` (sem colunas sensíveis: caminho de arquivo, ids de usuário).
+  Modelos em `lib/modelos-groq.ts` (padrão `openai/gpt-oss-120b`, lista do
+  console, `DESLIGADOS`): modelo que o Groq desligar entra em `DESLIGADOS`
+  (vira o padrão sozinho); erro "modelo não existe" na hora também cai no
+  padrão. O teste do console lista os modelos da chave e faz uma chamada com
+  as ferramentas. Tela: rolagem da página com o campo `sticky` acima da barra
+  inferior do celular; conversa em `sessionStorage` por empresa.
 - Arquivos: o navegador sobe direto para `/api/arquivos` com token de envio
   (`criarUploadAssinado`); o caminho começa sempre por `{org_id}/`. Ao apagar
   linhas com anexos/fotos, chame `removerArquivos()` depois.

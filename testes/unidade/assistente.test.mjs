@@ -74,3 +74,30 @@ test("agregar soma e agrupa, do maior para o menor", () => {
   ]);
   assert.deepEqual(agregarLinhas([{}, {}], null, null), [{ grupo: "total", quantidade: 2 }]);
 });
+
+import {
+  GROQ_MODELO_PADRAO,
+  MODELOS_GROQ,
+  modeloDesligado,
+  modeloEfetivo,
+  modelosDeConversa,
+} from "../../lib/modelos-groq.ts";
+
+test("modelo desligado pelo Groq (ou vazio) vira o padrão; os outros ficam", () => {
+  assert.equal(modeloEfetivo("llama-3.3-70b-versatile"), GROQ_MODELO_PADRAO);
+  assert.equal(modeloEfetivo("  "), GROQ_MODELO_PADRAO);
+  assert.equal(modeloEfetivo(null), GROQ_MODELO_PADRAO);
+  assert.equal(modeloEfetivo("openai/gpt-oss-20b"), "openai/gpt-oss-20b");
+  assert.ok(modeloDesligado("llama-3.3-70b-versatile"));
+  assert.ok(!modeloDesligado(GROQ_MODELO_PADRAO));
+  // Nenhuma sugestão do console pode estar na lista de desligados.
+  for (const m of MODELOS_GROQ) assert.ok(!modeloDesligado(m.id), m.id);
+  assert.equal(MODELOS_GROQ[0].id, GROQ_MODELO_PADRAO);
+});
+
+test("lista do console tira modelos que não conversam (áudio, guarda)", () => {
+  assert.deepEqual(
+    modelosDeConversa(["whisper-large-v3", "openai/gpt-oss-120b", "canopylabs/orpheus-v1-english", "openai/gpt-oss-safeguard-20b", "openai/gpt-oss-20b"]),
+    ["openai/gpt-oss-120b", "openai/gpt-oss-20b"],
+  );
+});

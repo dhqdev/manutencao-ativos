@@ -74,8 +74,8 @@ export const carregarUso = cache(async (orgIds: string[]): Promise<Dados<Record<
 export const carregarGroq = cache(async (): Promise<Dados<SituacaoGroq>> => {
   await exigirSuperadminTela();
   try {
-    const { chave, modelo } = await resumoGroq();
-    return { dados: { ...chave, modelo }, erro: null };
+    const { chave, modelo, modeloSalvo } = await resumoGroq();
+    return { dados: { ...chave, modelo, modeloSalvo }, erro: null };
   } catch (e) {
     return { dados: null, erro: e instanceof Error ? e.message : String(e) };
   }

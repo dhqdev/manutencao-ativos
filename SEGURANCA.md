@@ -447,4 +447,6 @@ controla o servidor. Por isso:
   modelo consultou. Dados da empresa saem do servidor para a API do Groq;
   sem chave cadastrada, nada sai.
 - Freio de 15 perguntas por minuto por pessoa (protege a cota do Groq) e
-  resultado de cada consulta cortado em ~12 mil caracteres.
+  resultado de cada consulta cortado em ~9 mil caracteres.
+- A conversa guardada no navegador (`sessionStorage`) é separada por empresa
+  e some ao fechar a aba; o servidor revalida o histórico a cada pergunta.

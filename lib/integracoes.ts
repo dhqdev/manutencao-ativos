@@ -1,5 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/db/admin";
+import { modeloEfetivo } from "@/lib/modelos-groq";
 
 /**
  * Credenciais de serviços externos (db/sql/70-integracoes.sql), cadastradas
@@ -9,8 +10,6 @@ import { createAdminClient } from "@/lib/db/admin";
 
 export const GROQ_CHAVE = "groq_api_key";
 export const GROQ_MODELO = "groq_modelo";
-/** Modelo com chamada de ferramentas estável no Groq. Dá para trocar no console. */
-export const GROQ_MODELO_PADRAO = "llama-3.3-70b-versatile";
 
 export async function obterCredenciais(chaves: string[]): Promise<Record<string, string>> {
   const { data, error } = await createAdminClient()
@@ -24,13 +23,13 @@ export async function obterCredenciais(chaves: string[]): Promise<Record<string,
 export async function configuracaoGroq(): Promise<{ chave: string; modelo: string } | null> {
   const c = await obterCredenciais([GROQ_CHAVE, GROQ_MODELO]);
   if (!c[GROQ_CHAVE]) return null;
-  return { chave: c[GROQ_CHAVE], modelo: c[GROQ_MODELO] || GROQ_MODELO_PADRAO };
+  return { chave: c[GROQ_CHAVE], modelo: modeloEfetivo(c[GROQ_MODELO]) };
 }
 
 /** O que a tela do console pode ver de uma chave: se existe e o finalzinho. */
 export type ResumoChave = { configurada: boolean; final: string | null; atualizadoEm: string | null };
 
-export async function resumoGroq(): Promise<{ chave: ResumoChave; modelo: string }> {
+export async function resumoGroq(): Promise<{ chave: ResumoChave; modelo: string; modeloSalvo: string | null }> {
   const { data, error } = await createAdminClient()
     .from("sistema_credenciais")
     .select("chave, valor, atualizado_em")
@@ -38,13 +37,14 @@ export async function resumoGroq(): Promise<{ chave: ResumoChave; modelo: string
   if (error) throw new Error(error.message);
   const linhas = (data ?? []) as { chave: string; valor: string; atualizado_em: string }[];
   const chave = linhas.find((l) => l.chave === GROQ_CHAVE);
-  const modelo = linhas.find((l) => l.chave === GROQ_MODELO)?.valor || GROQ_MODELO_PADRAO;
+  const modeloSalvo = linhas.find((l) => l.chave === GROQ_MODELO)?.valor || null;
   return {
     chave: {
       configurada: Boolean(chave),
       final: chave ? chave.valor.slice(-4) : null,
       atualizadoEm: chave?.atualizado_em ?? null,
     },
-    modelo,
+    modelo: modeloEfetivo(modeloSalvo),
+    modeloSalvo,
   };
 }

@@ -2,13 +2,16 @@
 
 import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { CircleCheck, KeyRound, LoaderCircle, Sparkles } from "lucide-react";
+import { CircleCheck, KeyRound, LoaderCircle, Sparkles, TriangleAlert } from "lucide-react";
 import { BotaoExcluir } from "@/components/confirmar";
 import { Erro, useAcao } from "@/components/admin/comum";
 import { Badge, Botao, Campo, Secao } from "@/components/ui";
 import { chamarAcao } from "@/lib/acao-cliente";
 import { adminRemoverGroq, adminSalvarGroq, adminTestarGroq } from "@/lib/actions/integracoes";
 import { dataHoraBR } from "@/lib/format";
+import { GROQ_MODELO_PADRAO, MODELOS_GROQ, modeloDesligado } from "@/lib/modelos-groq";
+
+const OUTRO = "__outro__";
 
 /**
  * Aba "Integrações" do console: um cartão por serviço externo (Groq, Backblaze...).
@@ -22,7 +25,9 @@ export type SituacaoGroq = {
   configurada: boolean;
   final: string | null;
   atualizadoEm: string | null;
+  /** O que o assistente usa de fato (o salvo, ou o padrão se ele foi desligado). */
   modelo: string;
+  modeloSalvo: string | null;
 };
 
 export function CartaoGroq({ situacao }: { situacao: SituacaoGroq }) {
@@ -31,17 +36,29 @@ export function CartaoGroq({ situacao }: { situacao: SituacaoGroq }) {
   const [teste, setTeste] = useState<{ ok: boolean; texto: string } | null>(null);
   const [testando, setTestando] = useState(false);
   const [chave, setChave] = useState("");
+  // Modelos que a chave enxerga (vêm do teste); antes disso, só os sugeridos.
+  const [daConta, setDaConta] = useState<string[]>([]);
+  const conhecidos = MODELOS_GROQ.map((m) => m.id);
+  const [escolha, setEscolha] = useState(conhecidos.includes(situacao.modelo) ? situacao.modelo : OUTRO);
+  const [outro, setOutro] = useState(conhecidos.includes(situacao.modelo) ? "" : situacao.modelo);
+  const extras = daConta.filter((m) => !conhecidos.includes(m));
 
   function salvar(fd: FormData) {
     setTeste(null);
-    rodar(() => chamarAcao(() => adminSalvarGroq(fd)), () => setChave(""));
+    // Depois de salvar, testa sozinho: erro de chave ou de modelo aparece já.
+    rodar(() => chamarAcao(() => adminSalvarGroq(fd)), () => {
+      setChave("");
+      void testar();
+    });
   }
 
   async function testar() {
     setTestando(true);
     setTeste(null);
     const r = await chamarAcao(() => adminTestarGroq());
-    setTeste(r.ok ? { ok: true, texto: "Chave e modelo funcionando." } : { ok: false, texto: r.erro });
+    if ("modelos" in r && r.modelos.length) setDaConta(r.modelos);
+    if (r.ok && "modelo" in r) setTeste({ ok: true, texto: `Chave e modelo funcionando (${r.modelo}).` });
+    else setTeste({ ok: false, texto: r.erro ?? "Falha no teste." });
     setTestando(false);
   }
 
@@ -90,9 +107,51 @@ export function CartaoGroq({ situacao }: { situacao: SituacaoGroq }) {
           />
         </Campo>
 
-        <Campo label="Modelo" hint="Precisa aceitar chamada de ferramentas (tool use).">
-          <input name="modelo" defaultValue={situacao.modelo} className="campo font-mono" spellCheck={false} />
+        {modeloDesligado(situacao.modeloSalvo) && (
+          <p className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+            <span>
+              O modelo salvo (<code className="font-mono">{situacao.modeloSalvo}</code>) foi desligado pelo Groq. O
+              assistente já está usando <code className="font-mono">{GROQ_MODELO_PADRAO}</code>; salve para gravar a troca.
+            </span>
+          </p>
+        )}
+
+        <Campo label="Modelo" hint="Todos da lista aceitam chamada de ferramentas (tool use), que o assistente usa.">
+          <select
+            className="campo"
+            value={escolha}
+            onChange={(e) => setEscolha(e.target.value)}
+            name={escolha === OUTRO ? undefined : "modelo"}
+          >
+            {MODELOS_GROQ.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.rotulo} · {m.detalhe}
+              </option>
+            ))}
+            {extras.length > 0 && (
+              <optgroup label="Outros modelos da sua chave">
+                {extras.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            <option value={OUTRO}>Outro (digitar o nome)…</option>
+          </select>
         </Campo>
+        {escolha === OUTRO && (
+          <input
+            name="modelo"
+            value={outro}
+            onChange={(e) => setOutro(e.target.value)}
+            placeholder={GROQ_MODELO_PADRAO}
+            aria-label="Nome do modelo"
+            className="campo font-mono"
+            spellCheck={false}
+          />
+        )}
 
         {erro && <Erro>{erro}</Erro>}
         {teste && (teste.ok ? (

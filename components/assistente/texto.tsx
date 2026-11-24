@@ -1,4 +1,5 @@
 import { Fragment, type ReactNode } from "react";
+import { cn } from "@/components/ui";
 
 /**
  * Mostra a resposta do assistente com o pouco de Markdown que os modelos usam
@@ -20,6 +21,8 @@ function emLinha(texto: string): ReactNode[] {
     return <Fragment key={i}>{parte}</Fragment>;
   });
 }
+
+const NUMERICO = /^(R\$\s?)?-?[\d.,]+\s?(%|km|h|mm|psi)?$/;
 
 const celulas = (linha: string) =>
   linha
@@ -63,7 +66,11 @@ export function TextoAssistente({ texto }: { texto: string }) {
               {corpo.map((l, k) => (
                 <tr key={k} className="border-b border-slate-100 last:border-0">
                   {l.map((c, j) => (
-                    <td key={j} className="px-2 py-1.5 align-top text-slate-700">
+                    <td
+                      key={j}
+                      // Valores e números não quebram no meio ("R$" numa linha, o valor na outra).
+                      className={cn("px-2 py-1.5 align-top text-slate-700", NUMERICO.test(c) && "whitespace-nowrap tabular-nums")}
+                    >
                       {emLinha(c)}
                     </td>
                   ))}

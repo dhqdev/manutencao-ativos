@@ -5,7 +5,8 @@ import { testarChaveGroq } from "@/lib/assistente";
 import { obterSessao } from "@/lib/auth/sessao";
 import { createAdminClient } from "@/lib/db/admin";
 import { mensagemErro, texto, type Resultado } from "@/lib/form";
-import { configuracaoGroq, GROQ_CHAVE, GROQ_MODELO, GROQ_MODELO_PADRAO } from "@/lib/integracoes";
+import { configuracaoGroq, GROQ_CHAVE, GROQ_MODELO } from "@/lib/integracoes";
+import { GROQ_MODELO_PADRAO } from "@/lib/modelos-groq";
 
 /**
  * Credenciais da aba "Integrações" do console do superadmin. Cada ação confere
@@ -57,15 +58,21 @@ export async function adminRemoverGroq(): Promise<Resultado> {
   }
 }
 
-/** Confere a chave salva direto no Groq. */
-export async function adminTestarGroq(): Promise<Resultado> {
+export type ResultadoTesteGroq = { ok: boolean; erro: string | null; modelo: string; modelos: string[] };
+
+/**
+ * Confere a chave salva direto no Groq (lista de modelos + uma pergunta com
+ * ferramentas). Devolve os modelos de conversa da chave para o console
+ * oferecer na lista. A tela chama sozinha depois de salvar.
+ */
+export async function adminTestarGroq(): Promise<ResultadoTesteGroq> {
   try {
     await exigirSuperadmin();
     const config = await configuracaoGroq();
-    if (!config) return { ok: false, erro: "Nenhuma chave salva ainda." };
-    const erro = await testarChaveGroq(config.chave, config.modelo);
-    return erro ? { ok: false, erro } : { ok: true };
+    if (!config) return { ok: false, erro: "Nenhuma chave salva ainda.", modelo: GROQ_MODELO_PADRAO, modelos: [] };
+    const { erro, modelos } = await testarChaveGroq(config.chave, config.modelo);
+    return { ok: !erro, erro, modelo: config.modelo, modelos };
   } catch (e) {
-    return { ok: false, erro: mensagemErro(e) };
+    return { ok: false, erro: mensagemErro(e), modelo: GROQ_MODELO_PADRAO, modelos: [] };
   }
 }
