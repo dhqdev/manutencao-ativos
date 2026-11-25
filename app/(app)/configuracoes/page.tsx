@@ -11,10 +11,11 @@ import { AlternarEnfeites } from "@/components/festas/alternar";
 import { diaCurto } from "@/components/festas/temas";
 import { Cabecalho, Campo, Secao } from "@/components/ui";
 import { alterarSenha, salvarEmpresa, salvarPerfil, trocarEmpresa } from "@/lib/actions/configuracoes";
-import { dataBR } from "@/lib/format";
+import { dataBR, hoje } from "@/lib/format";
 import { podeGerenciar } from "@/lib/permissoes";
 import { enfeitesLigados, festaDoDia, proximasFestas } from "@/lib/festas";
 import { getContexto } from "@/lib/session";
+import { situacaoDoResumo, type EnvioDoDia } from "@/lib/whatsapp-agenda";
 import { createClient } from "@/lib/db/server";
 
 export const metadata = { title: "Configurações · Gestão de Manutenção" };
@@ -29,6 +30,7 @@ export default async function ConfiguracoesPage() {
     { count: totalAtivos },
     { count: totalManutencoes },
     { data: conexaoWhatsapp },
+    { data: envioHoje },
   ] = await Promise.all([
     db.from("org_membros").select("user_id", { count: "exact", head: true }).eq("org_id", orgId),
     db.from("categorias").select("id, nome, cor").eq("org_id", orgId).order("ordem").order("nome"),
@@ -39,6 +41,8 @@ export default async function ConfiguracoesPage() {
       .select("*")
       .eq("org_id", orgId)
       .maybeSingle(),
+    // "*": banco sem as colunas novas (tentativas, ultima_falha) ainda responde.
+    db.from("whatsapp_envios").select("*").eq("org_id", orgId).eq("data_referencia", hoje()).maybeSingle(),
   ]);
 
   const gestor = podeGerenciar(papel);
@@ -214,7 +218,19 @@ export default async function ConfiguracoesPage() {
       {/* WhatsApp */}
       <div className="mt-4">
         {gestor ? (
-          <PainelWhatsapp conexao={(conexaoWhatsapp as ConexaoAtual) ?? null} />
+          <PainelWhatsapp
+            conexao={(conexaoWhatsapp as ConexaoAtual) ?? null}
+            // Calculado aqui no servidor: no navegador a hora mudaria entre a
+            // renderização e a hidratação (erro #418 perto da hora cheia).
+            agenda={
+              conexaoWhatsapp?.notificar
+                ? situacaoDoResumo({
+                    horario: conexaoWhatsapp.horario_envio,
+                    envioHoje: envioHoje as EnvioDoDia | null,
+                  })
+                : null
+            }
+          />
         ) : (
           <Secao titulo="Notificações por WhatsApp">
             <p className="px-4 py-5 text-sm text-slate-600 sm:px-5">

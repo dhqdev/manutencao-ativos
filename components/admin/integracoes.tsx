@@ -6,7 +6,7 @@ import { CircleCheck, KeyRound, LoaderCircle, Sparkles, TriangleAlert } from "lu
 import { BotaoExcluir } from "@/components/confirmar";
 import { Erro, useAcao } from "@/components/admin/comum";
 import { Badge, Botao, Campo, Secao } from "@/components/ui";
-import { chamarAcao } from "@/lib/acao-cliente";
+import { chamarAcao, enviarSemLimpar } from "@/lib/acao-cliente";
 import { adminRemoverGroq, adminSalvarGroq, adminTestarGroq } from "@/lib/actions/integracoes";
 import { dataHoraBR } from "@/lib/format";
 import { GROQ_MODELO_PADRAO, MODELOS_GROQ, modeloDesligado } from "@/lib/modelos-groq";
@@ -73,7 +73,7 @@ export function CartaoGroq({ situacao }: { situacao: SituacaoGroq }) {
         )
       }
     >
-      <form action={salvar} className="space-y-4 px-4 py-4 sm:px-5">
+      <form onSubmit={enviarSemLimpar(salvar)} className="space-y-4 px-4 py-4 sm:px-5">
         <p className="text-sm text-slate-600">
           Liga o <strong>Assistente</strong> para todos os clientes. Ele responde perguntas consultando só os dados
           da empresa de quem pergunta, e não altera nada. Crie a chave em{" "}

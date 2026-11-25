@@ -10,6 +10,7 @@ import { criarUploadAssinado } from "@/lib/actions/upload";
 import { enviarArquivo } from "@/lib/arquivos-envio";
 import { TIPOS_MANUTENCAO, hoje } from "@/lib/format";
 import type { Manutencao, PlanoManutencao, TipoManutencao } from "@/lib/types";
+import { enviarSemLimpar } from "@/lib/acao-cliente";
 
 type AtivoOpcao = { id: string; nome: string; identificacao: string | null };
 
@@ -170,7 +171,7 @@ export function DialogoManutencao({
         descricao="Registre o serviço executado, custos e anexos."
         largura="max-w-3xl"
       >
-        <form action={enviar}>
+        <form onSubmit={enviarSemLimpar(enviar)}>
           <div className="space-y-4 px-5 py-5">
             {erro && (
               <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

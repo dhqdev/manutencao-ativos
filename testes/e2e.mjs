@@ -316,6 +316,10 @@ await passo("trocar a senha pede a atual; /nova-senha sem o link do e-mail não 
   await form.locator('input[name="confirmacao"]').fill("Outra-Senha-2026");
   await form.getByRole("button", { name: "Alterar senha" }).click();
   await page.getByText("A senha atual não confere.").waitFor();
+  // Com erro o formulário não se limpa sozinho (enviarSemLimpar): antes o
+  // React 19 apagava tudo o que tinha sido digitado.
+  const novaSenha = await form.locator('input[name="senha"]').inputValue();
+  verdade(novaSenha === "Outra-Senha-2026", `o formulário se limpou depois do erro (senha nova: "${novaSenha}")`);
 });
 
 await passo("outra empresa não enxerga os dados da primeira", async () => {

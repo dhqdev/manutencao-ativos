@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { hoje, mesBR, primeiroDiaDoMes, somarDias, somarMeses, ultimoDiaDoMes } from "../../lib/format.ts";
+import { dataBR, dataHoraBR, hoje, mesBR, primeiroDiaDoMes, somarDias, somarMeses, ultimoDiaDoMes } from "../../lib/format.ts";
 
 // 01/12/2026 às 01h UTC = 30/11/2026 às 22h em Brasília. O container roda em
 // UTC: sem o fuso fixo, o servidor já estaria em dezembro.
@@ -29,4 +29,20 @@ test("somarMeses não estoura o fim do mês", () => {
 test("somarDias atravessa mês e ano", () => {
   assert.equal(somarDias("2026-12-30", 3), "2027-01-02");
   assert.equal(somarDias("2026-03-01", -1), "2026-02-28");
+});
+
+test("dataBR: instante com hora mostra o dia de Brasília", () => {
+  // 26/11 01h30 UTC = 25/11 22h30 aqui. Cortar a string dava 26/11.
+  assert.equal(dataBR("2026-11-26T01:30:00+00:00"), "25/11/2026");
+  assert.equal(dataBR("2026-11-25T22:30:00-03:00"), "25/11/2026");
+  assert.equal(dataBR("2026-11-26T01:30:00.123Z"), "25/11/2026");
+});
+
+test("dataBR: data pura não muda de dia em fuso nenhum", () => {
+  assert.equal(dataBR("2026-11-25"), "25/11/2026");
+  assert.equal(dataBR(null), "—");
+});
+
+test("dataHoraBR mostra a hora de Brasília", () => {
+  assert.equal(dataHoraBR("2026-11-25T11:01:00Z"), "25/11/2026, 08:01");
 });

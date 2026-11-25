@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/db/admin";
 import { enviarTexto, estadoSessao } from "@/lib/whatsapp";
+import { NADA_PENDENTE, agoraEmBrasilia, horarioDoResumo } from "@/lib/whatsapp-agenda";
 import { destinatariosDe, montarResumo, type Pendencia } from "@/lib/whatsapp-mensagem";
 
 export const dynamic = "force-dynamic";
@@ -18,22 +19,6 @@ function comparacaoSegura(a: string, b: string) {
     return false;
   }
   return timingSafeEqual(ba, bb);
-}
-
-const HORARIO_PADRAO = 8;
-
-function agoraEmBrasilia() {
-  const partes = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Sao_Paulo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(new Date());
-
-  const v = (tipo: string) => partes.find((p) => p.type === tipo)?.value ?? "00";
-  return { hoje: `${v("year")}-${v("month")}-${v("day")}`, hora: Number(v("hour")) };
 }
 
 type Admin = ReturnType<typeof createAdminClient>;
@@ -65,24 +50,33 @@ async function reservar(db: Admin, orgId: string, hoje: string) {
   return !jaEnviado;
 }
 
-/** Registra o resultado do dia. Qualquer detalhe diferente de "enviando" libera a reserva. */
+/**
+ * Registra o resultado do dia. Qualquer detalhe diferente de "enviando" libera a reserva.
+ * Falha de verdade (não "nada pendente") fica também em `ultima_falha`, que o
+ * sucesso depois não apaga: a tela explica por que o resumo saiu mais tarde.
+ */
 async function registrar(
   db: Admin,
   orgId: string,
   hoje: string,
   r: { sucesso: boolean; quantidade?: number; detalhe: string | null },
 ) {
-  const { error } = await db.from("whatsapp_envios").upsert(
-    {
-      org_id: orgId,
-      data_referencia: hoje,
-      quantidade: r.quantidade ?? 0,
-      sucesso: r.sucesso,
-      detalhe: r.detalhe,
-      enviado_em: new Date().toISOString(),
-    },
-    { onConflict: "org_id,data_referencia" },
-  );
+  const linha = {
+    org_id: orgId,
+    data_referencia: hoje,
+    quantidade: r.quantidade ?? 0,
+    sucesso: r.sucesso,
+    detalhe: r.detalhe,
+    enviado_em: new Date().toISOString(),
+  };
+  const falha = !r.sucesso && r.detalhe && r.detalhe !== NADA_PENDENTE ? { ultima_falha: r.detalhe } : {};
+  let { error } = await db
+    .from("whatsapp_envios")
+    .upsert({ ...linha, ...falha }, { onConflict: "org_id,data_referencia" });
+  // Imagem nova antes do migrador: o banco ainda não tem a coluna. Grava sem ela.
+  if (error?.code === "PGRST204" && "ultima_falha" in falha) {
+    ({ error } = await db.from("whatsapp_envios").upsert(linha, { onConflict: "org_id,data_referencia" }));
+  }
   // Sem o registro, a reserva do dia pode ficar presa em "enviando": que
   // apareça no log do app em vez de sumir em silêncio.
   if (error) console.error(`[whatsapp] registrar envio ${orgId}:`, error.message);
@@ -131,9 +125,7 @@ export async function GET(request: NextRequest) {
 
   // Chegou a hora (ou já passou: se uma rodada falhar, a próxima cobre). Quem
   // já recebeu hoje é pulado na reserva.
-  const conexoes = (todas ?? []).filter(
-    (c) => Number(c.horario_envio ?? HORARIO_PADRAO) <= hora,
-  );
+  const conexoes = (todas ?? []).filter((c) => horarioDoResumo(c.horario_envio) <= hora);
 
   const resultado = {
     hora,
@@ -188,7 +180,7 @@ export async function GET(request: NextRequest) {
       // Nada pendente: não incomoda ninguém (e a próxima hora confere de novo).
       if (lista.length === 0) {
         resultado.puladas++;
-        await registrar(db, conexao.org_id, hoje, { sucesso: false, detalhe: "nada pendente" });
+        await registrar(db, conexao.org_id, hoje, { sucesso: false, detalhe: NADA_PENDENTE });
         return;
       }
 

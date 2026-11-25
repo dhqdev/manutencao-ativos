@@ -8,6 +8,7 @@ import { Botao, Campo, cn } from "@/components/ui";
 import { CORES_CATEGORIA, ICONES, OPCOES_ICONE } from "@/lib/icones";
 import { salvarCategoria } from "@/lib/actions/categorias";
 import type { Categoria } from "@/lib/types";
+import { enviarSemLimpar } from "@/lib/acao-cliente";
 
 export function DialogoCategoria({ categoria }: { categoria?: Categoria }) {
   const router = useRouter();
@@ -64,7 +65,7 @@ export function DialogoCategoria({ categoria }: { categoria?: Categoria }) {
         descricao="As categorias funcionam como pastas para organizar seus ativos."
         largura="max-w-lg"
       >
-        <form action={enviar}>
+        <form onSubmit={enviarSemLimpar(enviar)}>
           <div className="space-y-4 px-5 py-5">
             {erro && (
               <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

@@ -4,7 +4,8 @@ import Link from "next/link";
 import { startTransition, useActionState } from "react";
 import { ArrowRight, LoaderCircle, Mail } from "lucide-react";
 import { entrar, type EstadoForm } from "@/app/auth/actions";
-import { CampoIcone, CampoSenha, enviarSemLimpar } from "@/components/auth/campos";
+import { CampoIcone, CampoSenha } from "@/components/auth/campos";
+import { enviarSemLimpar } from "@/lib/acao-cliente";
 import { Alerta } from "@/components/auth/alerta";
 import { Botao } from "@/components/ui";
 

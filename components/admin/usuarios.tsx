@@ -40,7 +40,7 @@ import {
   adminVincularEmpresa,
 } from "@/lib/actions/admin";
 import { chamarAcao } from "@/lib/acao-cliente";
-import { dataBR, dataHoraBR, iniciais } from "@/lib/format";
+import { dataBR, dataHoraBR, hoje, iniciais } from "@/lib/format";
 import type { PapelMembro } from "@/lib/types";
 import { Busca, Erro, FormModal, Indicador, TONS, normalizar, useAcao, type Credenciais } from "./comum";
 import {
@@ -785,7 +785,7 @@ function exportarCsv(usuarios: UsuarioAdmin[]) {
   const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
   const a = document.createElement("a");
   a.href = url;
-  a.download = `usuarios-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = `usuarios-${hoje()}.csv`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

@@ -7,6 +7,7 @@ import { Modal, RodapeModal } from "@/components/modal";
 import { Botao, cn } from "@/components/ui";
 import type { CredenciaisAdmin } from "@/lib/actions/admin";
 import type { Resultado } from "@/lib/form";
+import { enviarSemLimpar } from "@/lib/acao-cliente";
 
 /** Peças comuns das telas do console do superadmin. */
 
@@ -211,7 +212,7 @@ export function FormModal({
       descricao={descricao}
       largura="max-w-lg"
     >
-      <form action={enviar}>
+      <form onSubmit={enviarSemLimpar(enviar)}>
         <div className="space-y-4 px-5 py-5">
           {erro && <Erro>{erro}</Erro>}
           {children}

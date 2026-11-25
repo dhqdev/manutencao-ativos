@@ -201,8 +201,11 @@ desatualizados, que seria pior do que não mostrar nada.
 
 O gestor conecta o WhatsApp da empresa lendo um QR code (ou digitando um
 código, sem câmera) dentro do sistema, cadastra quem recebe, e todo dia no
-horário escolhido sai o resumo das manutenções atrasadas e a vencer — com
-"digitando..." antes, como uma pessoa.
+horário escolhido (horário de Brasília) sai o resumo das manutenções
+atrasadas e a vencer — com "digitando..." antes, como uma pessoa. Se nessa hora
+o WhatsApp estiver fora do ar (ou não houver nada pendente), o sistema tenta de
+novo de hora em hora; a tela mostra quando sai o próximo e, se o de hoje
+atrasou, o motivo.
 
 O WhatsApp roda num serviço próprio com [Baileys](https://github.com/WhiskeySockets/Baileys)
 (pasta `whatsapp/`), sempre conectado.

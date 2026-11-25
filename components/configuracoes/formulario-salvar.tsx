@@ -4,7 +4,7 @@ import { useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Check, LoaderCircle } from "lucide-react";
 import { Botao } from "@/components/ui";
-import { chamarAcao } from "@/lib/acao-cliente";
+import { chamarAcao, enviarSemLimpar } from "@/lib/acao-cliente";
 import type { Resultado } from "@/lib/form";
 
 /**
@@ -48,7 +48,7 @@ export function FormularioSalvar({
   }
 
   return (
-    <form action={enviar} data-limpar={limparAoSalvar ? "1" : undefined}>
+    <form onSubmit={enviarSemLimpar(enviar)} data-limpar={limparAoSalvar ? "1" : undefined}>
       <div className="space-y-4 px-4 py-5 sm:px-5">
         {erro && (
           <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

@@ -1,3 +1,4 @@
+import type { FormEvent } from "react";
 import { unstable_rethrow } from "next/navigation";
 import { versaoDesatualizada } from "@/components/erro-tela";
 
@@ -25,4 +26,27 @@ export async function chamarAcao<T>(acao: () => Promise<T>): Promise<T | { ok: f
     }
     return { ok: false, erro: "Não consegui falar com o servidor agora. Tente de novo em instantes." };
   }
+}
+
+/**
+ * Envio de formulário SEM a limpeza automática do React 19. Use
+ * `<form onSubmit={enviarSemLimpar(enviar)}>`, nunca `<form action={enviar}>`.
+ *
+ * Com uma função em `action`, o React limpa o formulário quando ela termina,
+ * mesmo quando a action devolveu erro: num diálogo, o que a pessoa digitou
+ * sumia; e o `<select>` volta ao valor de quando a página abriu (ele não
+ * acompanha o `defaultValue` novo). Era assim que o "Horário do envio" do
+ * WhatsApp voltava para o horário antigo logo depois de salvo, e o próximo
+ * "Salvar" gravava o valor velho por cima. Quem precisa limpar chama
+ * `form.reset()` (como `limparAoSalvar` de `FormularioSalvar`).
+ */
+export function enviarSemLimpar(
+  acao: (dados: FormData) => void,
+  iniciar: (f: () => void) => void = (f) => f(),
+) {
+  return (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const dados = new FormData(e.currentTarget);
+    iniciar(() => acao(dados));
+  };
 }

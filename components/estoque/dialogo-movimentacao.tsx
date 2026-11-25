@@ -8,6 +8,7 @@ import { Botao, Campo, cn } from "@/components/ui";
 import { movimentarPneu } from "@/lib/actions/pneus";
 import { TIPOS_MOV_PNEU, hoje } from "@/lib/format";
 import type { Pneu, StatusPneu, TipoMovPneu } from "@/lib/types";
+import { enviarSemLimpar } from "@/lib/acao-cliente";
 
 /** O que faz sentido para cada situação do pneu. O banco confere de novo. */
 const PERMITIDOS: Record<StatusPneu, TipoMovPneu[]> = {
@@ -89,7 +90,7 @@ export function DialogoMovimentacao({
         descricao={`${pneu.marca} · ${pneu.medida}`}
         largura="max-w-lg"
       >
-        <form action={enviar}>
+        <form onSubmit={enviarSemLimpar(enviar)}>
           <input type="hidden" name="pneu_id" value={pneu.id} />
           <input type="hidden" name="tipo" value={tipo} />
 

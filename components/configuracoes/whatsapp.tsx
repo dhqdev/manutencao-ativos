@@ -26,6 +26,8 @@ import {
 } from "@/lib/actions/whatsapp";
 import { MAX_DESTINATARIOS, formatarTelefone } from "@/lib/telefone";
 import { dataHoraBR } from "@/lib/format";
+import { horarioDoResumo } from "@/lib/whatsapp-agenda";
+import { enviarSemLimpar } from "@/lib/acao-cliente";
 
 export type ConexaoAtual = {
   status: "desconectado" | "conectando" | "conectado";
@@ -68,7 +70,10 @@ function Passos({ itens }: { itens: string[] }) {
   );
 }
 
-export function PainelWhatsapp({ conexao }: { conexao: ConexaoAtual }) {
+/** Situação do resumo de hoje e quando sai o próximo (`situacaoDoResumo`). */
+export type AgendaResumo = { hoje: string | null; proximo: string | null } | null;
+
+export function PainelWhatsapp({ conexao, agenda = null }: { conexao: ConexaoAtual; agenda?: AgendaResumo }) {
   const router = useRouter();
 
   const [estado, setEstado] = useState<StatusWhatsapp>({
@@ -384,7 +389,7 @@ export function PainelWhatsapp({ conexao }: { conexao: ConexaoAtual }) {
               </div>
             </div>
 
-            <form action={salvar} className="space-y-4">
+            <form onSubmit={enviarSemLimpar(salvar)} className="space-y-4">
               {/* Quem recebe */}
               <div className="rounded-lg border border-slate-200 px-3.5 py-3">
                 <p className="text-sm font-medium text-slate-800">Quem recebe o resumo</p>
@@ -469,7 +474,7 @@ export function PainelWhatsapp({ conexao }: { conexao: ConexaoAtual }) {
                 <Campo label="Horário do envio" hint="Horário de Brasília.">
                   <select
                     name="horario_envio"
-                    defaultValue={String(conexao?.horario_envio ?? 8)}
+                    defaultValue={String(horarioDoResumo(conexao?.horario_envio))}
                     className="campo"
                   >
                     {Array.from({ length: 24 }, (_, h) => (
@@ -495,11 +500,15 @@ export function PainelWhatsapp({ conexao }: { conexao: ConexaoAtual }) {
               </div>
 
               <div className="flex items-center justify-between gap-3 pt-1">
-                <p className="text-xs text-slate-500">
-                  {conexao?.ultimo_envio
-                    ? `Último envio: ${dataHoraBR(conexao.ultimo_envio)}`
-                    : "Nenhum resumo enviado ainda."}
-                </p>
+                <div className="space-y-0.5 text-xs text-slate-500">
+                  <p>
+                    {conexao?.ultimo_envio
+                      ? `Último envio: ${dataHoraBR(conexao.ultimo_envio)}`
+                      : "Nenhum resumo enviado ainda."}
+                    {agenda?.proximo && ` · ${agenda.proximo}`}
+                  </p>
+                  {agenda?.hoje && <p>{agenda.hoje}</p>}
+                </div>
                 <Botao type="submit" tamanho="sm" disabled={ocupado}>
                   {ocupado && <LoaderCircle className="h-4 w-4 animate-spin" />}
                   Salvar preferências

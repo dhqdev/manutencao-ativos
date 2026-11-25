@@ -52,6 +52,18 @@ grant anon, authenticated, service_role to authenticator;
 alter role authenticated set statement_timeout = '30s';
 alter role anon          set statement_timeout = '5s';
 
+-- Fuso de Brasília no banco inteiro. Daqui saem o current_date dos
+-- vencimentos, dos "dias de antecedência", da situação das periódicas e do
+-- resumo do WhatsApp, e a hora das colunas timestamptz que o PostgREST
+-- devolve. Antes o fuso vinha só do TZ do contêiner na hora do initdb: um
+-- banco criado ou restaurado sem ele ficava em UTC e, depois das 21h daqui,
+-- já estava "amanhã" (periódica virando atrasada 3 h antes da hora).
+-- Vale para as conexões novas; o PostgREST renova as dele sozinho.
+do $$
+begin
+  execute format('alter database %I set timezone to %L', current_database(), 'America/Sao_Paulo');
+end $$;
+
 -- ---------------------------------------------------------------------------
 -- 2. PERMISSÕES PADRÃO
 --    Toda tabela nova do schema public já nasce acessível a "authenticated"

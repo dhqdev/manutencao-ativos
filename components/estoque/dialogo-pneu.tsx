@@ -8,6 +8,7 @@ import { Botao, Campo } from "@/components/ui";
 import { salvarPneu } from "@/lib/actions/pneus";
 import { CONDICAO_PNEU, hoje } from "@/lib/format";
 import type { CondicaoPneu, Pneu } from "@/lib/types";
+import { enviarSemLimpar } from "@/lib/acao-cliente";
 
 const MEDIDAS = [
   "295/80 R22.5",
@@ -69,7 +70,7 @@ export function DialogoPneu({ pneu, rotulo = "Novo pneu" }: { pneu?: Pneu; rotul
         descricao="O número de fogo é a marcação gravada no pneu e identifica ele no estoque."
         largura="max-w-2xl"
       >
-        <form action={enviar}>
+        <form onSubmit={enviarSemLimpar(enviar)}>
           <div className="space-y-5 px-5 py-5">
             {erro && (
               <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{erro}</p>

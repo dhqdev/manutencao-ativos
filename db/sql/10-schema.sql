@@ -1659,6 +1659,12 @@ comment on column public.whatsapp_conexoes.destinatarios is
 --    Devolve true só para UMA rodada por empresa e dia. Uma reserva presa (a
 --    rodada caiu no meio) expira em 10 minutos; uma falha registrada libera a
 --    próxima tentativa; um envio com sucesso encerra o dia.
+--    `tentativas` conta as rodadas que reservaram no dia e `ultima_falha`
+--    guarda o último erro (o sucesso depois não apaga): com eles a tela de
+--    Configurações explica um resumo que saiu depois do horário escolhido.
+alter table public.whatsapp_envios add column if not exists tentativas int not null default 0;
+alter table public.whatsapp_envios add column if not exists ultima_falha text;
+
 create or replace function public.whatsapp_reservar_envio(p_org uuid, p_data date)
 returns boolean
 language plpgsql
@@ -1668,10 +1674,10 @@ as $$
 declare
   reservado boolean;
 begin
-  insert into public.whatsapp_envios as e (org_id, data_referencia, quantidade, sucesso, detalhe, enviado_em)
-  values (p_org, p_data, 0, false, 'enviando', now())
+  insert into public.whatsapp_envios as e (org_id, data_referencia, quantidade, sucesso, detalhe, enviado_em, tentativas)
+  values (p_org, p_data, 0, false, 'enviando', now(), 1)
   on conflict (org_id, data_referencia) do update
-     set detalhe = 'enviando', enviado_em = now()
+     set detalhe = 'enviando', enviado_em = now(), tentativas = e.tentativas + 1
    where e.sucesso = false
      and (e.detalhe is distinct from 'enviando' or e.enviado_em < now() - interval '10 minutes')
   returning true into reservado;

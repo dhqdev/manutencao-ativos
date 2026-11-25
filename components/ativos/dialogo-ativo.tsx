@@ -9,6 +9,7 @@ import { definirFotoAtivo, prepararFotoAtivo, salvarAtivo } from "@/lib/actions/
 import { enviarArquivo } from "@/lib/arquivos-envio";
 import { STATUS_ATIVO, hoje } from "@/lib/format";
 import type { Ativo, Categoria, StatusAtivo } from "@/lib/types";
+import { enviarSemLimpar } from "@/lib/acao-cliente";
 
 /** Acima disto o envio fica lento no celular e o bucket recusa a partir de 25 MB. */
 const TAMANHO_MAXIMO = 10 * 1024 * 1024;
@@ -140,7 +141,7 @@ export function DialogoAtivo({
         titulo={editando ? "Editar ativo" : "Cadastrar ativo"}
         descricao="Dados de identificação do equipamento."
       >
-        <form action={enviar}>
+        <form onSubmit={enviarSemLimpar(enviar)}>
           <div className="space-y-4 px-5 py-5">
             {erro && (
               <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

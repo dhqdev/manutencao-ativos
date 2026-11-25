@@ -3,7 +3,8 @@
 import { startTransition, useActionState, useState } from "react";
 import { LoaderCircle } from "lucide-react";
 import { definirNovaSenha, type EstadoForm } from "@/app/auth/actions";
-import { CampoSenha, ForcaSenha, enviarSemLimpar } from "@/components/auth/campos";
+import { CampoSenha, ForcaSenha } from "@/components/auth/campos";
+import { enviarSemLimpar } from "@/lib/acao-cliente";
 import { Alerta } from "@/components/auth/alerta";
 import { Botao } from "@/components/ui";
 

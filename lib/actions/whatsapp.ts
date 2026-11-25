@@ -13,6 +13,7 @@ import {
   verificarNumeros,
   type EstadoSessao,
 } from "@/lib/whatsapp";
+import { HORARIO_PADRAO } from "@/lib/whatsapp-agenda";
 import { destinatariosDe, montarResumo } from "@/lib/whatsapp-mensagem";
 import { SEM_PERMISSAO, podeGerenciar } from "@/lib/permissoes";
 import {
@@ -217,7 +218,8 @@ export async function salvarPreferenciasWhatsapp(fd: FormData): Promise<Resultad
         notificar: booleano(fd, "notificar"),
         incluir_atrasadas: booleano(fd, "incluir_atrasadas"),
         dias_antecedencia: Math.min(Math.max(inteiro(fd, "dias_antecedencia", 3) ?? 3, 0), 60),
-        horario_envio: Math.min(Math.max(inteiro(fd, "horario_envio", 8) ?? 8, 0), 23),
+        // Hora cheia de Brasília (a rotina compara com a hora daqui, não com UTC).
+        horario_envio: Math.min(Math.max(inteiro(fd, "horario_envio", HORARIO_PADRAO) ?? HORARIO_PADRAO, 0), 23),
         destinatarios,
       })
       .eq("org_id", orgId);

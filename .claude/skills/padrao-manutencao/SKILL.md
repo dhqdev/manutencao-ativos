@@ -353,7 +353,13 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
   `router.refresh()` no sucesso (veja `FormModal` em `components/admin/comum.tsx`).
   Envolva a chamada em `chamarAcao(() => acao(fd))` (`lib/acao-cliente.ts`):
   queda de rede ou aba com versão antiga vira mensagem no formulário em vez
-  de derrubar a tela.
+  de derrubar a tela. Envie com `<form onSubmit={enviarSemLimpar(enviar)}>`
+  (mesmo arquivo), **nunca** `<form action={fn}>`: o React 19 limpa o
+  formulário quando a função termina, até com erro (o que a pessoa digitou
+  sumia), e o `<select>` volta ao valor de quando a página abriu, porque não
+  acompanha o `defaultValue` novo (o horário do WhatsApp "desfazia" e o
+  próximo Salvar regravava o valor velho). Limpar de propósito é
+  `form.reset()` (`limparAoSalvar` do `FormularioSalvar`).
 - **Listas com cara de ERP**: no computador, tabela densa com a classe
   `tabela-erp` (globals.css: cabeçalho fixo, linhas compactas, rodapé com o
   total) dentro de um `div` com `max-h-[calc(100dvh-13rem)] overflow-auto`;
@@ -400,7 +406,21 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
 - Tela restrita: confira no servidor e chame `notFound()` (não só esconder o botão).
 - Datas com hora: use `dataHoraBR` (fuso fixo de Brasília). `toLocaleString`
   sem `timeZone` em componente cliente gera erro de hidratação (#418) quando o
-  fuso do navegador difere do servidor.
+  fuso do navegador difere do servidor. `dataBR` de um timestamptz
+  ("criado em") já mostra o dia de Brasília; não corte a string do banco.
+  Texto que depende da hora atual (ex.: "próximo resumo às...") é montado no
+  servidor e vai pronto por prop para o componente cliente.
+- Fuso do banco: `00-fundacao.sql` fixa `timezone = America/Sao_Paulo` no
+  banco (`alter database`), então `current_date` das views e funções
+  (vencimentos, antecedência, situação das periódicas, pendências do
+  WhatsApp) é o dia de Brasília, igual ao `hoje()` do app. Não mude.
+- Resumo do WhatsApp: `horario_envio` é a hora cheia de Brasília. A regra
+  (padrão 8h, rodada no minuto 1 de cada hora, nova tentativa de hora em
+  hora) mora em `lib/whatsapp-agenda.ts`, usada pela rotina
+  (`/api/notificacoes/disparar`) e pela tela, que mostra o próximo envio.
+  `whatsapp_envios.tentativas` (somada por `whatsapp_reservar_envio`) e
+  `ultima_falha` (o sucesso depois não apaga) explicam um resumo que saiu
+  depois do horário.
 - "Hoje" e meses: `hoje()`, `mesBR(n)`, `primeiroDiaDoMes(n)`,
   `ultimoDiaDoMes(n)`, `somarDias`, `somarMeses` (`lib/format.ts`). Nunca
   `new Date()` + `setMonth`/`toLocaleDateString("sv-SE")` sem fuso: o

@@ -1,6 +1,6 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import { STATUS_PNEU, SULCO_ALERTA_MM, TIPOS_MANUTENCAO, TIPOS_MOV_PNEU, dataBR, moeda, numero } from "@/lib/format";
+import { STATUS_PNEU, SULCO_ALERTA_MM, TIPOS_MANUTENCAO, TIPOS_MOV_PNEU, dataBR, dataHoraBR, moeda, numero } from "@/lib/format";
 import { calcularTotais, calcularTotaisPneus, temPneus, type DadosRelatorio } from "@/lib/relatorio-dados";
 
 // Carregado só sob demanda (import dinâmico em components/relatorios/gerador.tsx).
@@ -34,7 +34,8 @@ export function gerarPDF(dados: DadosRelatorio): jsPDF {
     13,
     { align: "right" },
   );
-  doc.text(`Emitido em ${new Date().toLocaleString("pt-BR")}`, largura - margem, 20, {
+  // Brasília, como o resto do sistema (o navegador pode estar em outro fuso).
+  doc.text(`Emitido em ${dataHoraBR(new Date().toISOString())}`, largura - margem, 20, {
     align: "right",
   });
 

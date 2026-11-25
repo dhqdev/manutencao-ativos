@@ -5,6 +5,7 @@ import { LoaderCircle, TriangleAlert } from "lucide-react";
 import { Modal, RodapeModal } from "@/components/modal";
 import { Botao, Campo } from "@/components/ui";
 import { excluirConta } from "@/lib/actions/conta";
+import { enviarSemLimpar } from "@/lib/acao-cliente";
 
 export function ZonaPerigo({
   email,
@@ -53,7 +54,7 @@ export function ZonaPerigo({
         titulo="Excluir conta permanentemente"
         largura="max-w-lg"
       >
-        <form action={enviar}>
+        <form onSubmit={enviarSemLimpar(enviar)}>
           <div className="space-y-4 px-5 py-5">
             {erro && (
               <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

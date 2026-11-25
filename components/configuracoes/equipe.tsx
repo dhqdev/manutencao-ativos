@@ -32,6 +32,7 @@ import {
 import { cancelarConvite } from "@/lib/actions/convites";
 import { dataBR, dataHoraBR, iniciais } from "@/lib/format";
 import type { PapelMembro } from "@/lib/types";
+import { enviarSemLimpar } from "@/lib/acao-cliente";
 
 export const PAPEIS: Record<
   PapelMembro,
@@ -699,7 +700,7 @@ function NovoUsuario({
       descricao="O login já nasce dentro desta empresa."
       largura="max-w-lg"
     >
-      <form action={enviar}>
+      <form onSubmit={enviarSemLimpar(enviar)}>
         <div className="space-y-4 px-5 py-5">
           {erro && (
             <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{erro}</p>
@@ -796,7 +797,7 @@ function EditarMembro({ membro: m, aoFechar }: { membro: Membro; aoFechar: () =>
 
   return (
     <Modal aberto aoFechar={aoFechar} titulo="Editar dados" descricao={m.email ?? undefined} largura="max-w-md">
-      <form action={enviar}>
+      <form onSubmit={enviarSemLimpar(enviar)}>
         <div className="space-y-4 px-5 py-5">
           {erro && (
             <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{erro}</p>

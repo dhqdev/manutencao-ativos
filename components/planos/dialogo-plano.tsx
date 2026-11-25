@@ -8,6 +8,7 @@ import { Botao, Campo } from "@/components/ui";
 import { salvarPlano } from "@/lib/actions/planos";
 import { UNIDADES, hoje } from "@/lib/format";
 import type { PlanoManutencao, UnidadePeriodicidade } from "@/lib/types";
+import { enviarSemLimpar } from "@/lib/acao-cliente";
 
 const SUGESTOES = [
   "Troca de óleo e filtros",
@@ -85,7 +86,7 @@ export function DialogoPlano({
         descricao="O sistema avisa quando o prazo estiver próximo ou vencido."
         largura="max-w-2xl"
       >
-        <form action={enviar}>
+        <form onSubmit={enviarSemLimpar(enviar)}>
           <div className="space-y-4 px-5 py-5">
             {erro && (
               <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

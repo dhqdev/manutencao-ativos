@@ -16,6 +16,9 @@ export const numero = (v: number | null | undefined, casas = 0) =>
     Number(v ?? 0),
   );
 
+/** Fuso fixo de todas as datas e horas do sistema (o container roda em UTC). */
+const FUSO = "America/Sao_Paulo";
+
 /** Converte "2026-08-07" em Date local (sem o deslocamento de fuso do ISO). */
 export function paraData(iso: string | null | undefined): Date | null {
   if (!iso) return null;
@@ -25,6 +28,13 @@ export function paraData(iso: string | null | undefined): Date | null {
 }
 
 export function dataBR(iso: string | null | undefined) {
+  // Instante com hora (timestamptz: "criado em", "último pagamento"): o dia é o
+  // de Brasília. Cortar os 10 primeiros caracteres pegava o dia do fuso em que
+  // o banco respondeu — em UTC, depois das 21h daqui já seria amanhã.
+  if (iso && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}.*(Z|[+-]\d{2}(:?\d{2})?)$/.test(iso)) {
+    const instante = new Date(iso);
+    if (!Number.isNaN(instante.getTime())) return instante.toLocaleDateString("pt-BR", { timeZone: FUSO });
+  }
   const d = paraData(iso);
   return d ? d.toLocaleDateString("pt-BR") : "—";
 }
@@ -39,11 +49,9 @@ export function dataHoraBR(iso: string | null | undefined) {
   return new Date(iso).toLocaleString("pt-BR", {
     dateStyle: "short",
     timeStyle: "short",
-    timeZone: "America/Sao_Paulo",
+    timeZone: FUSO,
   });
 }
-
-const FUSO = "America/Sao_Paulo";
 
 /** Só a hora (HH:MM) em Brasília. */
 export function horaBR(iso: string | null | undefined) {

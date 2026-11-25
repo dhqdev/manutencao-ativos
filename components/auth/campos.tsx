@@ -1,21 +1,8 @@
 "use client";
 
-import { useState, type ComponentProps, type FormEvent } from "react";
+import { useState, type ComponentProps } from "react";
 import { ArrowBigUp, Eye, EyeOff, Lock, type LucideIcon } from "lucide-react";
 import { cn } from "@/components/ui";
-
-/**
- * Envia o formulário pela action SEM limpar os campos. O React 19 reseta o
- * <form action> depois de cada envio — com erro de senha, a pessoa perdia o
- * e-mail digitado e tinha que preencher tudo de novo.
- */
-export function enviarSemLimpar(acao: (dados: FormData) => void, iniciar: (f: () => void) => void) {
-  return (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const dados = new FormData(e.currentTarget);
-    iniciar(() => acao(dados));
-  };
-}
 
 export function CampoIcone({
   Icone,
