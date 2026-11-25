@@ -163,7 +163,9 @@ services:
       - POSTGREST_URL=http://manutencao-rest:3000
       # Sem JWT_SECRET: o token do banco (papel whatsapp_servico) vem do app.
       - APP_URL=http://manutencao-app:3000
-      - WHATSAPP_SEMPRE_ONLINE=true
+      # true deixa o número online o tempo todo, e o celular dele para de tocar
+      # notificação das mensagens recebidas. Para só mandar avisos, deixe false.
+      - WHATSAPP_SEMPRE_ONLINE=false
       - WHATSAPP_DIGITANDO=true
       - WHATSAPP_REJEITAR_CHAMADAS=false
       - WHATSAPP_NOME_APARELHO=Gestão de Manutenção

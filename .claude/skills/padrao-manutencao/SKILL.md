@@ -291,6 +291,25 @@ export async function salvarAlgo(fd: FormData): Promise<Resultado> {
 - Serviço de WhatsApp fala com o banco como `whatsapp_servico` (token do app
   em `/api/whatsapp/token`). Tabela nova que ele precise: `grant` explícito a
   esse papel. Nunca dê a ele o `JWT_SECRET`. Lock versionado (`npm ci`).
+- Conexão do WhatsApp (pedido do dono em 25/11/2026: "não pode cair nem parar
+  de receber do nada"), em `whatsapp/src/sessoes.js`: sessão pareada **nunca
+  desiste** — só 401/403/`device_removed` (celular) ou o Desconectar desligam;
+  `connectionReplaced` (440) espera 2→30 min e retoma. O **vigia** (30 s)
+  religa socket morto sem aviso, "conectando" > 3 min e pareada sem reconexão.
+  Envio passa por `Sessao.enviar` (prazo menor que o timeout do app, uma
+  segunda tentativa só para erro de conexão, nunca prende a fila). Sessão
+  sendo religada responde "conectando", nunca "desconectado" (a rotina
+  marcaria a empresa como desconectada). Toda leitura/gravação de uma sessão
+  passa pela fila **por sessão** de `armazenamento.js` (`naFila`); objeto de
+  credenciais trocado chama `fechar()`, apagado chama `descartar()`.
+  `getMessage` responde do cache/banco (`msg-<id>` em `whatsapp_sessoes`, 7
+  dias) — sem ele o destinatário fica em "Aguardando mensagem". Não desligue a
+  sincronização inicial (`shouldSyncHistoryMessage`): dela vêm os pares LID e
+  os tokens de contato. `WHATSAPP_SEMPRE_ONLINE` é `false` por padrão (online
+  fixo cala as notificações do celular). Tempos ficam em `tempos` /
+  `temposBanco` (os testes encurtam); cenário novo de queda ganha passo em
+  `whatsapp/test/sessoes.test.mjs` (defeitos sob encomenda em
+  `__comportamento` do mock).
 - Segredo novo lido pelo app: passe por `exigir()` de `lib/auth/config.ts`
   (recusa vazio e `TROQUE-...`) e inclua na lista do `infra/deploy.sh`.
 - Cookies: use as constantes de `lib/auth/sessao-cookie.ts` (`__Host-` com

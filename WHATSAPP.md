@@ -28,7 +28,9 @@ QR de novo.
 
 ## O que o servidor faz
 
-- **Sempre online** — o número aparece online o tempo todo (pode desligar, veja abaixo).
+- **Não cala o celular** — o número só fica online durante o "digitando" de
+  cada envio e sai logo depois. Online o tempo todo (`WHATSAPP_SEMPRE_ONLINE`)
+  faz o celular parar de tocar notificação das mensagens recebidas.
 - **"Digitando..."** — antes de cada mensagem, quem recebe vê o número digitando
   por 1 a 4 segundos, proporcional ao tamanho do texto.
 - **QR code direto no app** — Configurações → WhatsApp. Ele se renova sozinho.
@@ -39,7 +41,19 @@ QR de novo.
   (tabela `whatsapp_sessoes`). O processo pode reiniciar à vontade: as sessões
   voltam sozinhas, sem ler o QR de novo.
 - **Reconexão automática** — queda de internet ou do WhatsApp: tenta de novo
-  com espera crescente (2 s, 4 s, 8 s… até 1 min).
+  com espera crescente (2 s, 4 s, 8 s… até 1 min), sem desistir nunca de um
+  número pareado. Só o celular removendo o aparelho (ou o Desconectar do
+  sistema) desliga de vez.
+- **Vigia** — a cada 30 s confere cada número: conexão que morreu sem aviso,
+  login que não termina ("conectando" por mais de 3 min) ou número pareado
+  sem reconexão marcada são religados sozinhos.
+- **Envio que não se perde** — se a conexão cair (ou travar) bem na hora de
+  enviar, o servidor reconecta e tenta mais uma vez, dentro do prazo do app.
+  Um envio que trava não prende a fila dos próximos.
+- **Reenvio pedido pelo destinatário** — quando o celular de quem recebe não
+  consegue abrir uma mensagem (trocou de aparelho, abriu o WhatsApp Web), ele
+  pede de novo. O servidor guarda as mensagens enviadas por 7 dias para
+  atender; sem isso a pessoa ficava em "Aguardando mensagem".
 - **Nono dígito** — muitos celulares antigos continuam registrados no WhatsApp
   sem o 9. Antes de enviar, o servidor pergunta ao WhatsApp pelas duas formas
   e usa a que existe.
@@ -99,7 +113,7 @@ celular não ficar com dois aparelhos conectados.
 
 | Variável | Padrão | O que faz |
 |---|---|---|
-| `WHATSAPP_SEMPRE_ONLINE` | `true` | Mantém o número online. **Efeito colateral do WhatsApp:** enquanto um aparelho conectado está online, o celular pode parar de tocar notificação das mensagens **recebidas**. Se o número conectado for o celular pessoal de alguém, considere `false`. |
+| `WHATSAPP_SEMPRE_ONLINE` | `false` | Mantém o número online o tempo todo. **Efeito colateral do WhatsApp:** enquanto um aparelho conectado está online, o celular para de tocar notificação das mensagens **recebidas** (parece que o número "parou de receber"). Para só mandar avisos, deixe `false`: o número fica online só durante cada envio. |
 | `WHATSAPP_DIGITANDO` | `true` | "Digitando..." antes de cada mensagem. |
 | `WHATSAPP_REJEITAR_CHAMADAS` | `false` | Recusa ligações recebidas no número conectado. |
 | `WHATSAPP_INTERVALO_ENVIO_MS` | `1500` | Pausa entre mensagens da mesma empresa. |
@@ -147,11 +161,11 @@ Quem chama é só o app — a chave nunca vai ao navegador (`lib/whatsapp.ts` é
 
 | Método e rota | Corpo | Resposta |
 |---|---|---|
-| `GET /saude` | — | `{ ok, sessoes, conectadas }` |
+| `GET /saude` | — | `{ ok, sessoes, conectadas, conectando }` |
 | `POST /sessoes/:id/conectar` | `{ telefone? }` | `{ status, qr, codigoPareamento, numero, nomePerfil }` |
 | `GET /sessoes/:id` | — | o mesmo formato acima |
 | `DELETE /sessoes/:id` | — | remove o aparelho do celular e apaga as credenciais |
-| `POST /sessoes/:id/mensagens` | `{ numero, texto, digitando? }` | `{ ok, id, jid }` · 409 desconectado · 422 número sem WhatsApp |
+| `POST /sessoes/:id/mensagens` | `{ numero, texto, digitando? }` | `{ ok, id, jid }` · 409 desconectado · 422 número sem WhatsApp · 503/504 conexão caiu e não voltou a tempo |
 | `POST /sessoes/:id/arquivos` | `{ numero, nome, tipo, base64, legenda? }` | `{ ok, id, jid }` · imagem (JPG/PNG/WEBP) com legenda ou PDF como documento, até 8 MB · 415 outro tipo |
 | `POST /sessoes/:id/numeros` | `{ numeros: [] }` | `{ numeros: [{ numero, existe, jid }] }` |
 
@@ -166,10 +180,24 @@ Quem chama é só o app — a chave nunca vai ao navegador (`lib/whatsapp.ts` é
 - **Um processo só.** Duas cópias do serviço com as mesmas credenciais
   derrubam uma à outra (o WhatsApp responde `connectionReplaced`). Por isso a
   stack usa `replicas: 1` e atualiza com `stop-first` (a cópia velha sai antes
-  de a nova entrar). Não aumente as réplicas.
+  de a nova entrar). Não aumente as réplicas. Se mesmo assim acontecer, a
+  cópia derrubada não desiste: espera 2 min (depois 4, 8… até 30) e retoma,
+  relendo as credenciais do banco. No log aparece "sessão aberta em outra
+  conexão".
+- **Gravação das chaves.** Chave de criptografia que não chega ao banco volta
+  velha no próximo reinício e quebra a conversa. Por isso as gravações
+  insistem (até ~20 s por tentativa, mais as do Baileys), as credenciais
+  tentam de novo sozinhas até gravar e o desligamento espera o que já estava
+  na fila. Token do banco recusado (JWT_SECRET trocado) é renovado na hora.
+- **Número pareado antes desta versão** (com a sincronização inicial
+  desligada) não tem os pares LID ↔ número que o WhatsApp manda no
+  pareamento. Ele funciona, mas se algum número continuar sem receber,
+  desconecte e leia o QR de novo uma vez.
 - **Deploy e reinício não desconectam.** No desligamento (SIGTERM) o servidor
-  fecha as conexões sem deslogar; ao subir, religa todas as sessões salvas,
-  uma a cada 1,5 s.
+  fecha as conexões sem deslogar e espera as gravações pendentes; ao subir,
+  religa todas as sessões salvas, uma a cada 1,5 s. Enquanto religa, a sessão
+  responde "conectando" (nunca "desconectado"), e a rotina tenta na hora
+  seguinte sem marcar a empresa como desconectada.
 - **Desconectar pelo sistema** remove o aparelho do celular e apaga as
   credenciais do banco.
 - **QR que ninguém lê** para de girar depois de uns 3 minutos; é só clicar em

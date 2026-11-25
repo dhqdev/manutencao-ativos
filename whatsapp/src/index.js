@@ -20,7 +20,7 @@ import {
  * API HTTP do WhatsApp. Só o app (Vercel) conversa com ela, sempre com
  * `Authorization: Bearer WHATSAPP_API_KEY`.
  *
- *   GET    /saude                        status do processo (sem chave, para health check)
+ *   GET    /saude                        { ok, sessoes, conectadas, conectando } (sem chave, para health check)
  *   POST   /sessoes/:id/conectar         { telefone? } → QR (ou código de pareamento)
  *   GET    /sessoes/:id                  estado da sessão
  *   DELETE /sessoes/:id                  desconecta e apaga as credenciais
@@ -187,13 +187,20 @@ function restaurarComInsistencia(tentativa = 1) {
 }
 
 let desligando = false;
-async function desligar(sinal) {
+/**
+ * Fecha as conexões sem deslogar (para voltarem sozinhas na próxima partida)
+ * e espera as gravações de chaves que já estavam na fila: chave perdida aqui
+ * quebraria a conversa depois do reinício. O Swarm espera 10 s antes do
+ * SIGKILL; saímos antes disso de qualquer jeito.
+ */
+async function desligar(sinal, codigo = 0) {
   if (desligando) return;
   desligando = true;
+  setTimeout(() => process.exit(codigo), 9000).unref();
   logger.info({ sinal }, "desligando: fechando conexões sem deslogar");
   servidor.close();
   await Promise.race([encerrarTodas(), new Promise((r) => setTimeout(r, 8000))]);
-  process.exit(0);
+  process.exit(codigo);
 }
 
 process.on("SIGTERM", () => void desligar("SIGTERM"));
@@ -204,5 +211,5 @@ process.on("SIGINT", () => void desligar("SIGINT"));
 process.on("unhandledRejection", (err) => logger.error({ err }, "promessa rejeitada sem tratamento"));
 process.on("uncaughtException", (err) => {
   logger.fatal({ err }, "exceção não tratada; reiniciando o processo");
-  process.exit(1);
+  void desligar("uncaughtException", 1);
 });

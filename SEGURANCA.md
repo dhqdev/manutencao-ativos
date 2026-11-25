@@ -412,7 +412,10 @@ com a `WHATSAPP_API_KEY`) um token de 5 minutos desse papel
 tokens de `service_role` — invadir o contêiner do Baileys dava o banco inteiro.
 As dependências dele vão travadas no `whatsapp/package-lock.json` (`npm ci`).
 Quem tiver essas linhas consegue mandar mensagem como a empresa — trate os
-backups com o mesmo cuidado.
+backups com o mesmo cuidado. A mesma tabela guarda, por 7 dias, o conteúdo das
+mensagens enviadas (linhas `msg-<id>`: o resumo e os comprovantes), para
+atender o pedido de reenvio do celular de quem recebeu; o serviço apaga as
+mais velhas sozinho, e tudo sai junto quando o número é desconectado.
 
 ## Atualizador (botão Atualizar do console)
 

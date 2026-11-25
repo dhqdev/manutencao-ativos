@@ -22,23 +22,33 @@ function tokenDoApp() {
 }
 const banco = new Map(); // "sessao|chave" -> valor
 const patches = [];
+let tokensEmitidos = 0;
+let recusarTokens = 0; // 401 para tokens válidos (simula JWT_SECRET trocado na stack)
+let falharCreds = 0;   // 503 nas gravações de "creds" (banco fora do ar)
 const listaIn = (s) => [...decodeURIComponent(s).slice(4, -1).matchAll(/"((?:[^"\\]|\\.)*)"/g)].map((m) => m[1].replace(/\\(.)/g, "$1"));
 const db = http.createServer(async (req, res) => {
   const u = new URL(req.url, "http://x");
   let corpo = ""; for await (const p of req) corpo += p;
   if (u.pathname === "/api/whatsapp/token") {
     if (req.method !== "POST" || req.headers.authorization !== `Bearer ${CHAVE}`) { res.writeHead(401); return res.end("{}"); }
+    tokensEmitidos++;
     res.writeHead(200); return res.end(JSON.stringify({ token: tokenDoApp(), validade: 300 }));
   }
   const auth = tokenDeServidorValido(req.headers.authorization);
-  if (!auth) { res.writeHead(401); return res.end("{}"); }
+  if (!auth || (recusarTokens > 0 && recusarTokens--)) { res.writeHead(401); return res.end("{}"); }
   const p = Object.fromEntries(u.searchParams);
   const filtroSessao = p.sessao?.startsWith("eq.") ? p.sessao.slice(3) : null;
   const filtroChave = p.chave?.startsWith("eq.") ? [p.chave.slice(3)] : p.chave?.startsWith("in.") ? listaIn(encodeURIComponent(p.chave)) : null;
-  const casa = (k) => { const [s, c] = k.split("|"); return (!filtroSessao || s === filtroSessao) && (!filtroChave || filtroChave.includes(c)); };
+  const filtroLike = p.chave?.startsWith("like.") ? new RegExp("^" + p.chave.slice(5).replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + "$") : null;
+  const casa = (k) => { const [s, c] = k.split("|"); return (!filtroSessao || s === filtroSessao) && (!filtroChave || filtroChave.includes(c)) && (!filtroLike || filtroLike.test(c)); };
   if (u.pathname === "/whatsapp_sessoes") {
     if (req.method === "GET") { const linhas = [...banco].filter(([k]) => casa(k)).map(([k, v]) => ({ sessao: k.split("|")[0], chave: k.split("|")[1], valor: v })); res.writeHead(200); return res.end(JSON.stringify(linhas)); }
-    if (req.method === "POST") { assert.equal(p.on_conflict, "sessao,chave"); for (const l of JSON.parse(corpo)) banco.set(`${l.sessao}|${l.chave}`, l.valor); res.writeHead(201); return res.end(); }
+    if (req.method === "POST") {
+      assert.equal(p.on_conflict, "sessao,chave");
+      const linhas = JSON.parse(corpo);
+      if (falharCreds > 0 && linhas.some((l) => l.chave === "creds")) { falharCreds--; res.writeHead(503); return res.end("{}"); }
+      for (const l of linhas) banco.set(`${l.sessao}|${l.chave}`, l.valor); res.writeHead(201); return res.end();
+    }
     if (req.method === "DELETE") { for (const k of [...banco.keys()]) if (casa(k)) banco.delete(k); res.writeHead(204); return res.end(); }
   }
   if (u.pathname === "/whatsapp_conexoes" && req.method === "PATCH") { patches.push({ instancia: p.instancia.replace(/^eq\./, ""), ...JSON.parse(corpo) }); res.writeHead(204); return res.end(); }
@@ -49,6 +59,11 @@ const URL_DB = `http://127.0.0.1:${db.address().port}`;
 
 const CHAVE = "chave-de-teste-com-mais-de-24-caracteres";
 Object.assign(process.env, { PORT: "39111", WHATSAPP_API_KEY: CHAVE, POSTGREST_URL: URL_DB, APP_URL: URL_DB, WHATSAPP_INTERVALO_ENVIO_MS: "10" });
+// Mesmos módulos que o servidor vai usar: encurta as esperas antes de ele subir.
+const { tempos } = await import("../src/sessoes.js");
+const { temposBanco, podarMensagens } = await import("../src/armazenamento.js");
+Object.assign(tempos, { reconexao: 200, reconexaoMax: 2000, vigia: 100, conectandoMax: 500, fechamentoSemAviso: 300, substituida: 300, substituidaMax: 1000, esperaReconexao: 5000 });
+Object.assign(temposBanco, { esperaBase: 10, esperaMax: 50, credsDeNovo: 100, credsDeNovoMax: 400 });
 await import("../src/index.js");
 await new Promise((r) => setTimeout(r, 200));
 
@@ -57,6 +72,16 @@ const api = async (metodo, caminho, corpo, chave = CHAVE) => {
   return { status: r.status, json: await r.json() };
 };
 const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
+/** Espera a condição ficar verdadeira (em vez de dormir um tempo fixo). */
+async function ate(condicao, ms, oQue) {
+  const limite = Date.now() + ms;
+  while (Date.now() < limite) {
+    if (await condicao()) return;
+    await esperar(25);
+  }
+  throw new Error(`esperei ${ms} ms e não aconteceu: ${oQue}`);
+}
+const estadoDe = async (id) => (await api("GET", `/sessoes/${id}`)).json;
 
 try {
 // 1. saúde e autenticação
@@ -92,8 +117,11 @@ assert.equal(r.json.status, "conectado"); assert.equal(r.json.numero, "551199999
 assert.equal(__sockets.length, 2);
 assert.ok(banco.get("manut_a|creds").includes("5511999998888"), "creds salvas no banco");
 assert.deepEqual(patches.at(-1), { instancia: "manut_a", status: "conectado", numero: "5511999998888", nome_perfil: "Oficina Teste" });
-assert.equal(__sockets[1].cfg.markOnlineOnConnect, true);
+assert.equal(__sockets[1].cfg.markOnlineOnConnect, false, "online o tempo todo cala as notificações do celular");
+assert.equal(typeof __sockets[1].cfg.getMessage, "function");
+assert.equal(typeof __sockets[1].cfg.msgRetryCounterCache?.get, "function");
 assert.equal(__sockets[1].cfg.syncFullHistory, false);
+assert.ok(!("shouldSyncHistoryMessage" in __sockets[1].cfg), "sincronização inicial fica no padrão do Baileys (pares LID e tokens)");
 assert.deepEqual(__sockets[1].cfg.browser, ["Gestão de Manutenção", "Chrome", "22.04.4"]);
 console.log("✓ leitura do QR, reconexão 515, credenciais e status no banco");
 
@@ -111,12 +139,13 @@ __registro.length = 0;
 r = await api("POST", "/sessoes/manut_a/mensagens", { numero: "5511987654321", texto: "Olá" });
 assert.equal(r.status, 200, JSON.stringify(r.json)); assert.equal(r.json.jid, "551187654321@s.whatsapp.net");
 const tipos = __registro.map((x) => x[0] + (x[1] && x[0] === "presence" ? ":" + x[1] : ""));
-assert.deepEqual(tipos, ["onWhatsApp", "subscribe", "presence:composing", "presence:paused", "send"]);
+assert.deepEqual(tipos, ["onWhatsApp", "presence:available", "subscribe", "presence:composing", "presence:paused", "send", "presence:unavailable"]);
 assert.deepEqual(__registro[0], ["onWhatsApp", "5511987654321", "551187654321"]);
 r = await api("POST", "/sessoes/manut_a/mensagens", { numero: "5531900000000", texto: "x" });
 assert.equal(r.status, 422);
 r = await api("POST", "/sessoes/manut_a/mensagens", { numero: "5521999990000", texto: "sem digitar", digitando: false });
 assert.equal(r.status, 200); assert.ok(!__registro.slice(-3).some((x) => x[1] === "composing"));
+const idSemDigitar = r.json.id;
 r = await api("POST", "/sessoes/manut_b/mensagens", { numero: "5521999990000", texto: "x" });
 assert.equal(r.status, 409);
 r = await api("POST", "/sessoes/manut_a/numeros", { numeros: ["5511987654321", "5531900000000"] });
@@ -135,11 +164,95 @@ r = await api("POST", "/sessoes/manut_b/arquivos", { numero: "5521999990000", no
 assert.equal(r.status, 409);
 console.log("✓ envio de arquivo (imagem, PDF, tipo recusado, sessão desconectada)");
 
+// 7c. mensagem enviada fica guardada: o celular de quem recebeu pode pedir de novo
+const sockA = __sockets.at(-1);
+assert.deepEqual(await sockA.cfg.getMessage({ remoteJid: "5521999990000@s.whatsapp.net", id: idSemDigitar }), { conversation: "sem digitar" });
+await ate(() => banco.has(`manut_a|msg-${idSemDigitar}`), 1000, "mensagem guardada no banco");
+const guardar = (id, conteudo, em = Date.now()) => banco.set(`manut_a|msg-${id}`, JSON.stringify({ em, dados: Buffer.from(JSON.stringify(conteudo)).toString("base64") }));
+guardar("DO-BANCO", { conversation: "só no banco" }); // ex.: enviada antes de um reinício
+assert.deepEqual(await sockA.cfg.getMessage({ id: "DO-BANCO" }), { conversation: "só no banco" });
+assert.equal(await sockA.cfg.getMessage({ id: "NAO-EXISTE" }), undefined);
+guardar("ANTIGA", { conversation: "velha" }, Date.now() - 8 * 24 * 60 * 60_000);
+assert.equal(await podarMensagens("manut_a", 7), 1);
+assert.ok(!banco.has("manut_a|msg-ANTIGA") && banco.has("manut_a|msg-DO-BANCO"));
+console.log("✓ mensagens enviadas guardadas para reenvio (memória, banco, limpeza das antigas)");
+
 // 8. queda de rede → reconecta sozinho
 __sockets.at(-1).fechar(408);
-await esperar(3600);
-assert.equal((await api("GET", "/sessoes/manut_a")).json.status, "conectado");
+await ate(async () => (await estadoDe("manut_a")).status === "conectado" && __sockets.at(-1) !== sockA, 3000, "reconectar depois da queda");
 console.log("✓ reconexão automática após queda");
+
+// 8b. envio que pega a conexão caindo: reconecta e entrega
+let n = __sockets.length;
+__registro.length = 0;
+__comportamento.falharEnvios = 1;
+r = await api("POST", "/sessoes/manut_a/mensagens", { numero: "5521999990000", texto: "depois da queda", digitando: false });
+assert.equal(r.status, 200, JSON.stringify(r.json));
+assert.equal(__sockets.length, n + 1, "reconectou para a segunda tentativa");
+assert.deepEqual(__registro.filter((x) => x[0] === "falhou" || x[0] === "send").map((x) => x[0]), ["falhou", "send"]);
+console.log("✓ envio que pega a conexão caindo reconecta e entrega");
+
+// 8c. envio que trava (o Baileys nunca responde): não prende a fila
+const tentativaOriginal = tempos.tentativaTexto;
+tempos.tentativaTexto = 600;
+n = __sockets.length;
+__comportamento.travarEnvios = 1;
+r = await api("POST", "/sessoes/manut_a/mensagens", { numero: "5521999990000", texto: "depois do travamento", digitando: false });
+tempos.tentativaTexto = tentativaOriginal;
+assert.equal(r.status, 200, JSON.stringify(r.json));
+assert.equal(__sockets.length, n + 1);
+assert.equal(__registro.at(-1)[2], "depois do travamento");
+console.log("✓ envio travado desiste, reconecta e entrega");
+
+// 8d. websocket morto sem aviso: o vigia percebe e religa
+n = __sockets.length;
+__sockets.at(-1).morrerCalado();
+await ate(async () => __sockets.length === n + 1 && (await estadoDe("manut_a")).status === "conectado", 3000, "religar depois do websocket morto");
+console.log("✓ vigia religa conexão morta sem aviso");
+
+// 8e. socket que nem avisa o fechamento pedido: segue sem ele
+n = __sockets.length;
+__comportamento.endMudo = 1;
+__sockets.at(-1).morrerCalado();
+await ate(async () => __sockets.length === n + 1 && (await estadoDe("manut_a")).status === "conectado", 3000, "seguir sem o aviso de fechamento");
+assert.ok(__registro.some((x) => x[0] === "endMudo"));
+console.log("✓ fechamento sem aviso não deixa a sessão parada");
+
+// 8f. login que nunca termina ("conectando" eterno): recomeça
+n = __sockets.length;
+__comportamento.travarAbertura = 1;
+__sockets.at(-1).fechar(428);
+await ate(async () => __sockets.length === n + 2 && (await estadoDe("manut_a")).status === "conectado", 4000, "recomeçar o login travado");
+console.log("✓ conexão presa em conectando recomeça sozinha");
+
+// 8g. outra conexão com as mesmas credenciais (440): espera e retoma, sem desconectar a empresa
+n = __sockets.length;
+const patchesAntes = patches.length;
+__sockets.at(-1).fechar(440);
+await esperar(80);
+assert.equal((await estadoDe("manut_a")).status, "conectando", "não pode desistir de vez");
+assert.equal((await api("POST", "/sessoes/manut_a/mensagens", { numero: "5521999990000", texto: "x", digitando: false })).status, 409);
+await ate(async () => __sockets.length === n + 1 && (await estadoDe("manut_a")).status === "conectado", 3000, "retomar depois do connectionReplaced");
+assert.ok(!patches.slice(patchesAntes).some((x) => x.status === "desconectado"), "não marca a empresa como desconectada");
+assert.ok(banco.has("manut_a|creds"));
+console.log("✓ connectionReplaced espera e retoma a sessão");
+
+// 8h. banco recusa o token guardado (JWT_SECRET trocado): pede outro e grava
+const emitidos = tokensEmitidos;
+recusarTokens = 1;
+await __sockets.at(-1).authState.keys.set({ session: { "token-novo": Buffer.from([7]) } });
+assert.ok(banco.has("manut_a|session-token-novo"));
+assert.equal(tokensEmitidos, emitidos + 1, "pediu token novo ao app");
+console.log("✓ token recusado é renovado sem perder a gravação");
+
+// 8i. credenciais que não gravam (banco fora do ar) tentam de novo sozinhas
+const sockC = __sockets.at(-1);
+falharCreds = 10;
+sockC.authState.creds.me = { ...sockC.authState.creds.me, name: "Nome Novo" };
+sockC.ev.emit("creds.update", { me: sockC.authState.creds.me });
+await ate(() => banco.get("manut_a|creds")?.includes("Nome Novo"), 5000, "gravar as credenciais quando o banco voltar");
+assert.equal(falharCreds, 0);
+console.log("✓ credenciais gravam quando o banco volta");
 
 // 9. reinício do processo → sessão volta do banco
 const filho = spawn(
@@ -170,7 +283,7 @@ __sockets.at(-1).fechar(408);
 await esperar(100);
 r = await api("GET", "/sessoes/manut_c");
 assert.equal(r.json.status, "desconectado"); assert.equal(r.json.expirado, true);
-const antes = __sockets.length; await esperar(2500); assert.equal(__sockets.length, antes, "não pode ficar gerando QR para sempre");
+const antes = __sockets.length; await esperar(1000); assert.equal(__sockets.length, antes, "não pode ficar gerando QR para sempre");
 console.log("✓ QR expirado para de girar");
 
 // 11b. código pedido + queda de rede antes de digitar → recomeça limpo (QR e código novos)
@@ -179,7 +292,8 @@ r = await api("POST", "/sessoes/manut_e/conectar", { telefone: "5511912345678" }
 assert.equal(r.json.codigoPareamento, "ABCD-1234");
 const qtd = __sockets.length;
 __sockets.at(-1).fechar(428);
-await esperar(3600);
+await ate(() => __sockets.length === qtd + 1, 3000, "reconectar o pareamento interrompido");
+await esperar(300);
 assert.equal(__sockets.length, qtd + 1, "deve reconectar uma vez");
 assert.notEqual(__sockets.at(-1).authState.creds, __sockets.at(-2).authState.creds, "não pode reaproveitar as credenciais parciais do código");
 r = await api("GET", "/sessoes/manut_e");
@@ -199,6 +313,22 @@ r = await api("DELETE", "/sessoes/manut_d");
 assert.equal(r.status, 200); assert.ok(__registro.some((x) => x[0] === "logout")); assert.ok(![...banco.keys()].some((k) => k.startsWith("manut_d|")));
 assert.equal((await api("GET", "/sessoes/manut_d")).json.status, "desconectado");
 console.log("✓ desconectar pelo app");
+
+// 13. aparelho removido que chega como "conflict" (440 device_removed): limpa como logout
+await api("POST", "/sessoes/manut_f/conectar", {});
+await __sockets.at(-1).simularLeitura();
+await ate(async () => (await estadoDe("manut_f")).status === "conectado", 2000, "conectar manut_f");
+__sockets.at(-1).fechar(440, { tag: "conflict", attrs: { type: "device_removed" } });
+await ate(async () => (await estadoDe("manut_f")).status === "desconectado", 2000, "desconectar manut_f");
+await ate(() => ![...banco.keys()].some((k) => k.startsWith("manut_f|")), 2000, "apagar as credenciais de manut_f");
+console.log("✓ aparelho removido (device_removed) limpa as credenciais");
+
+// 14. sessão pareada fora da memória: já responde "conectando" (a rotina não pode ler "desconectado")
+banco.set("manut_g|creds", JSON.stringify({ me: { id: "5511888887777:2@s.whatsapp.net", name: "G" }, account: { details: { type: "Buffer", data: "AQ==" } } }));
+assert.equal((await estadoDe("manut_g")).status, "conectando");
+await ate(async () => (await estadoDe("manut_g")).status === "conectado", 2000, "restaurar manut_g");
+await api("DELETE", "/sessoes/manut_g");
+console.log("✓ sessão salva sobe como conectando, nunca desconectado");
 
 console.log("\nTODOS OS TESTES PASSARAM");
 process.exit(0);

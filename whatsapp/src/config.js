@@ -55,11 +55,13 @@ export const config = {
   nomeAparelho: texto("WHATSAPP_NOME_APARELHO", "Gestão de Manutenção"),
 
   /**
-   * Mantém o número "online" o tempo todo. Efeito colateral conhecido do
-   * WhatsApp: enquanto um aparelho conectado está online, o celular pode
-   * deixar de tocar notificação de mensagens recebidas.
+   * Mantém o número "online" o tempo todo. Desligado por padrão: enquanto um
+   * aparelho conectado está online, o WhatsApp entende que a pessoa está no
+   * computador e o celular para de tocar notificação das mensagens recebidas
+   * (parece que o número "parou de receber"). Para só enviar avisos, não
+   * precisa: o servidor fica online só durante o "digitando" de cada envio.
    */
-  sempreOnline: booleano("WHATSAPP_SEMPRE_ONLINE", true),
+  sempreOnline: booleano("WHATSAPP_SEMPRE_ONLINE", false),
 
   /** Mostra "digitando..." para quem recebe, antes de cada mensagem. */
   digitando: booleano("WHATSAPP_DIGITANDO", true),
